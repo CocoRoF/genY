@@ -73,7 +73,7 @@ export default function CreateSessionModal({ onClose }: Props) {
 
   return (
     <div className={modal.overlay} onClick={onClose}>
-      <div className={cn(modal.box, '!max-w-[480px]')} onClick={e => e.stopPropagation()}>
+        <div className={cn(modal.box, 'max-w-[480px]')} onClick={e => e.stopPropagation()}>
         <div className={modal.header}>
           <h3 className={modal.title}>Create New Session</h3>
           <button className={btn.close} onClick={onClose}>×</button>

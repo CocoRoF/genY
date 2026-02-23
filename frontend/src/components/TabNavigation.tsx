@@ -18,7 +18,7 @@ const SESSION_TABS = [
 ];
 
 const TAB_BASE =
-  'relative py-1.5 px-3.5 text-[0.8125rem] font-medium bg-transparent border-none rounded-[6px] cursor-pointer transition-all duration-150 whitespace-nowrap font-[inherit]';
+  'relative py-1.5 px-3.5 text-[0.8125rem] font-medium bg-transparent border-none rounded-[6px] cursor-pointer transition-all duration-150 whitespace-nowrap';
 
 function TabButton({ id, label, active, onClick }: { id: string; label: string; active: boolean; onClick: () => void }) {
   return (

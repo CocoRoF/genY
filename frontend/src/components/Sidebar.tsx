@@ -82,7 +82,7 @@ export default function Sidebar() {
     <>
       <aside className="w-[280px] bg-[var(--bg-secondary)] border-r border-[var(--border-color)] flex flex-col overflow-hidden">
         {/* Sidebar Header */}
-        <div className="flex justify-between items-center h-12 px-5 border-b border-[var(--border-color)]">
+        <div className="flex justify-between items-center h-11 px-5 border-b border-[var(--border-color)]">
           <h2 className="text-[0.8125rem] font-medium text-[var(--text-secondary)] uppercase tracking-[0.05em]">
             Sessions
           </h2>
