@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
+import { cn, btn, empty } from '@/lib/tw';
 import type { GraphStructure, GraphNode, GraphEdge } from '@/types';
 
 // ========== Layout Constants ==========
@@ -182,10 +183,10 @@ export default function GraphTab() {
 
   if (!selectedSessionId) {
     return (
-      <div className="no-session-selected">
-        <div className="empty-state">
-          <h3>Select a Session</h3>
-          <p>Choose a session to view its graph</p>
+      <div className={empty.noSession}>
+        <div className={empty.state}>
+          <h3 className={empty.title}>Select a Session</h3>
+          <p className={empty.desc}>Choose a session to view its graph</p>
         </div>
       </div>
     );
@@ -220,7 +221,7 @@ export default function GraphTab() {
                   onClick={() => setScale(s => Math.min(2.5, s + 0.15))}>+</button>
           <button className="flex items-center justify-center w-8 h-8 border border-[var(--border-color)] rounded-[6px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-pointer transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                   onClick={() => setScale(s => Math.max(0.15, s - 0.15))}>−</button>
-          <button className="btn btn-sm" onClick={fetchGraph}>⟳ Reset</button>
+          <button className={cn(btn.ghost, btn.sm)} onClick={fetchGraph}>⟳ Reset</button>
         </div>
       </div>
 
@@ -354,7 +355,7 @@ export default function GraphTab() {
               <span className="text-[16px]">{NODE_ICONS[selectedNode.id] || '●'}</span>
               <h3 className="text-[0.875rem] font-semibold text-[var(--text-primary)]">{selectedNode.label}</h3>
             </div>
-            <button className="btn-close" style={{ width: '28px', height: '28px' }} onClick={() => setSelectedNode(null)}>×</button>
+            <button className={btn.close} style={{ width: '28px', height: '28px' }} onClick={() => setSelectedNode(null)}>×</button>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 text-[0.75rem]">
             {/* Badges */}

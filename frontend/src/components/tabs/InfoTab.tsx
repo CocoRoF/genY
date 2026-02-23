@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
+import { cn, btn, empty } from '@/lib/tw';
 import type { SessionInfo } from '@/types';
 
 function formatTimestamp(ts: string) {
@@ -41,10 +42,10 @@ export default function InfoTab() {
 
   if (!selectedSessionId) {
     return (
-      <div className="no-session-selected">
-        <div className="empty-state">
-          <h3>Select a Session</h3>
-          <p>Choose a session to view its details</p>
+      <div className={empty.noSession}>
+        <div className={empty.state}>
+          <h3 className={empty.title}>Select a Session</h3>
+          <p className={empty.desc}>Choose a session to view its details</p>
         </div>
       </div>
     );
@@ -106,8 +107,8 @@ export default function InfoTab() {
       {/* Actions for deleted */}
       {isDeleted && (
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border-color)]">
-          <button className="btn btn-primary btn-sm" onClick={() => restoreSession(data.session_id)}>↻ Restore Session</button>
-          <button className="btn btn-danger btn-sm" onClick={() => permanentDeleteSession(data.session_id)}>🗑️ Permanently Delete</button>
+          <button className={cn(btn.primary, btn.sm)} onClick={() => restoreSession(data.session_id)}>↻ Restore Session</button>
+          <button className={cn(btn.danger, btn.sm)} onClick={() => permanentDeleteSession(data.session_id)}>🗑️ Permanently Delete</button>
         </div>
       )}
     </div>

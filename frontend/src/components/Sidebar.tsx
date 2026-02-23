@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { cn, btn, empty } from '@/lib/tw';
 import type { SessionInfo } from '@/types';
 import CreateSessionModal from '@/components/modals/CreateSessionModal';
 import DeleteSessionModal from '@/components/modals/DeleteSessionModal';
@@ -86,7 +87,7 @@ export default function Sidebar() {
             Sessions
           </h2>
           <div className="flex items-center gap-2">
-            <button className="btn btn-sm btn-primary" onClick={() => setShowCreateModal(true)}>
+            <button className={cn(btn.primary, btn.sm)} onClick={() => setShowCreateModal(true)}>
               New Session
             </button>
           </div>
@@ -123,8 +124,8 @@ export default function Sidebar() {
         {/* Session List */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
           {sessions.length === 0 ? (
-            <div className="empty-state">
-              <p>No sessions yet</p>
+            <div className={empty.state}>
+              <p className={empty.desc}>No sessions yet</p>
             </div>
           ) : (
             sessions.map(session => (
@@ -170,19 +171,16 @@ export default function Sidebar() {
                       {session.session_name || session.session_id.substring(0, 12)}
                     </span>
                     <button
-                      className="btn-icon"
+                      className={btn.icon}
                       onClick={() => restoreSession(session.session_id)}
                       title="Restore"
                     >
                       ↩
                     </button>
                     <button
-                      className="btn-icon"
-                      style={{ color: 'var(--text-muted)' }}
+                      className={cn(btn.icon, 'text-[var(--text-muted)] hover:!text-[var(--danger-color)]')}
                       onClick={() => permanentDeleteSession(session.session_id)}
                       title="Permanently delete"
-                      onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger-color)')}
-                      onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
                     >
                       ✕
                     </button>

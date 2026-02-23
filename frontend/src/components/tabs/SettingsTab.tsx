@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { configApi } from '@/lib/api';
+import { cn, btn, modal, empty } from '@/lib/tw';
 import type { ConfigItem, ConfigCategory, ConfigField, ConfigSchema } from '@/types';
 
 const CATEGORY_ICONS: Record<string, string> = { general: '🔧', channels: '💬', security: '🔒', advanced: '⚡' };
@@ -111,9 +112,9 @@ export default function SettingsTab() {
       <div className="flex justify-between items-center py-4 px-5 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
         <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">Settings</h3>
         <div className="flex gap-2">
-          <button className="btn btn-secondary btn-sm" onClick={exportConfigs}>Export</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => setImportOpen(true)}>Import</button>
-          <button className="btn btn-secondary btn-sm" onClick={loadConfigs}>Refresh</button>
+          <button className={cn(btn.secondary, btn.sm)} onClick={exportConfigs}>Export</button>
+          <button className={cn(btn.secondary, btn.sm)} onClick={() => setImportOpen(true)}>Import</button>
+          <button className={cn(btn.secondary, btn.sm)} onClick={loadConfigs}>Refresh</button>
         </div>
       </div>
 
@@ -149,7 +150,7 @@ export default function SettingsTab() {
         {/* Config List */}
         <div className="flex-1 overflow-y-auto p-5">
           {filtered.length === 0 ? (
-            <div className="empty-state"><p>No configurations found</p></div>
+            <div className={empty.state}><p className={empty.desc}>No configurations found</p></div>
           ) : (
             <div className="flex flex-col gap-3">
               {filtered.map(config => {
@@ -194,11 +195,11 @@ export default function SettingsTab() {
 
       {/* Edit Modal */}
       {editing && (
-        <div className="modal-overlay" onClick={() => setEditing(null)}>
+        <div className={modal.overlay} onClick={() => setEditing(null)}>
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-[600px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Edit: {editing.schema.display_name || editing.schema.name}</h3>
-              <button className="btn-close" onClick={() => setEditing(null)}>×</button>
+            <div className={modal.header}>
+              <h3 className={modal.title}>Edit: {editing.schema.display_name || editing.schema.name}</h3>
+              <button className={btn.close} onClick={() => setEditing(null)}>×</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <form id="config-form" className="flex flex-col gap-6">
@@ -230,11 +231,11 @@ export default function SettingsTab() {
                 })()}
               </form>
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-sm text-[var(--danger-color)]" onClick={resetConfig}>Reset to Defaults</button>
+            <div className={modal.footer}>
+              <button className={cn(btn.ghost, btn.sm, '!text-[var(--danger-color)]')} onClick={resetConfig}>Reset to Defaults</button>
               <div className="flex gap-2">
-                <button className="btn btn-sm" onClick={() => setEditing(null)}>Cancel</button>
-                <button className="btn btn-primary btn-sm" onClick={saveConfig}>Save</button>
+                <button className={cn(btn.ghost, btn.sm)} onClick={() => setEditing(null)}>Cancel</button>
+                <button className={cn(btn.primary, btn.sm)} onClick={saveConfig}>Save</button>
               </div>
             </div>
           </div>
@@ -243,22 +244,22 @@ export default function SettingsTab() {
 
       {/* Import Modal */}
       {importOpen && (
-        <div className="modal-overlay" onClick={() => setImportOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Import Configuration</h3>
-              <button className="btn-close" onClick={() => setImportOpen(false)}>×</button>
+        <div className={modal.overlay} onClick={() => setImportOpen(false)}>
+          <div className={modal.box} onClick={e => e.stopPropagation()}>
+            <div className={modal.header}>
+              <h3 className={modal.title}>Import Configuration</h3>
+              <button className={btn.close} onClick={() => setImportOpen(false)}>×</button>
             </div>
-            <div className="modal-body">
+            <div className={modal.body}>
               <textarea
                 className="w-full p-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] font-mono text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--primary-color)]"
                 rows={10} placeholder="Paste configuration JSON here..."
                 value={importData} onChange={e => setImportData(e.target.value)}
               />
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-sm" onClick={() => setImportOpen(false)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={importConfigs}>Import</button>
+            <div className={modal.footer}>
+              <button className={cn(btn.ghost, btn.sm)} onClick={() => setImportOpen(false)}>Cancel</button>
+              <button className={cn(btn.primary, btn.sm)} onClick={importConfigs}>Import</button>
             </div>
           </div>
         </div>

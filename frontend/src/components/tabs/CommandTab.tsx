@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
+import { cn, btn, empty } from '@/lib/tw';
 
 export default function CommandTab() {
   const { selectedSessionId, sessions, isExecuting, setIsExecuting, getSessionData, updateSessionData } = useAppStore();
@@ -64,10 +65,10 @@ export default function CommandTab() {
 
   if (!selectedSessionId || !session) {
     return (
-      <div className="no-session-selected">
-        <div className="empty-state">
-          <h3>Select a Session</h3>
-          <p>Choose a session from the list to execute commands</p>
+      <div className={empty.noSession}>
+        <div className={empty.state}>
+          <h3 className={empty.title}>Select a Session</h3>
+          <p className={empty.desc}>Choose a session from the list to execute commands</p>
         </div>
       </div>
     );
@@ -128,16 +129,16 @@ export default function CommandTab() {
           </label>
         </div>
         <div className="flex gap-2.5">
-          <button className="btn btn-primary" disabled={isExecuting || !sessionData?.input?.trim()} onClick={() => handleExecute(false)}>
+          <button className={btn.primary} disabled={isExecuting || !sessionData?.input?.trim()} onClick={() => handleExecute(false)}>
             {isExecuting ? '⏳ Executing...' : '▶ Execute'}
           </button>
           {session.autonomous && (
-            <button className="btn btn-autonomous" disabled={isExecuting || !sessionData?.input?.trim()} onClick={() => handleExecute(true)}>
+            <button className={btn.autonomous} disabled={isExecuting || !sessionData?.input?.trim()} onClick={() => handleExecute(true)}>
               🔄 Autonomous
             </button>
           )}
           {isExecuting && (
-            <button className="btn btn-danger" onClick={handleStop}>⏹ Stop</button>
+            <button className={btn.danger} onClick={handleStop}>⏹ Stop</button>
           )}
         </div>
       </div>

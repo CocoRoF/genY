@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useEffect } from 'react';
+import { cn } from '@/lib/tw';
 
 interface Props {
   value: number;
@@ -9,6 +10,18 @@ interface Props {
   max?: number;
   step?: number;
 }
+
+/* ── Shared Tailwind strings ── */
+const WRAP =
+  'flex flex-row items-stretch h-[42px] border border-[var(--border-subtle)] rounded-[6px] overflow-hidden bg-[var(--bg-secondary)] transition-all duration-150 focus-within:border-[var(--primary-color)] focus-within:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]';
+
+const BTN =
+  'flex items-center justify-center w-[38px] min-w-[38px] h-full border-none bg-transparent text-[var(--text-muted)] cursor-pointer transition-all duration-[120ms] p-0 m-0 shrink-0 leading-none hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)] active:bg-[var(--primary-color)] active:text-white';
+
+const BTN_DISABLED = 'opacity-25 !cursor-not-allowed';
+
+const VALUE =
+  'flex-1 min-w-0 w-auto border-none bg-transparent text-center text-[0.875rem] font-semibold tabular-nums text-[var(--text-primary)] p-0 px-1 m-0 rounded-none shadow-none outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
 export default function NumberStepper({ value, onChange, min = 1, max = 9999, step = 1 }: Props) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -39,10 +52,10 @@ export default function NumberStepper({ value, onChange, min = 1, max = 9999, st
   const atMax = value >= max;
 
   return (
-    <div className="ns-wrap">
+    <div className={WRAP}>
       <button
         type="button"
-        className={`ns-btn ns-btn-left${atMin ? ' ns-disabled' : ''}`}
+        className={cn(BTN, 'border-r border-r-[var(--border-subtle)] rounded-l-[6px]', atMin && BTN_DISABLED)}
         disabled={atMin}
         onMouseDown={() => startRepeat(-step)}
         onMouseUp={stopRepeat}
@@ -58,7 +71,7 @@ export default function NumberStepper({ value, onChange, min = 1, max = 9999, st
       <input
         type="text"
         inputMode="numeric"
-        className="ns-value"
+        className={VALUE}
         value={value}
         onChange={e => {
           const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -70,7 +83,7 @@ export default function NumberStepper({ value, onChange, min = 1, max = 9999, st
 
       <button
         type="button"
-        className={`ns-btn ns-btn-right${atMax ? ' ns-disabled' : ''}`}
+        className={cn(BTN, 'border-l border-l-[var(--border-subtle)] rounded-r-[6px]', atMax && BTN_DISABLED)}
         disabled={atMax}
         onMouseDown={() => startRepeat(step)}
         onMouseUp={stopRepeat}

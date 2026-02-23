@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
+import { empty } from '@/lib/tw';
 import type { ManagerDashboard, WorkerInfo, ManagerEvent } from '@/types';
 
 const EVENT_ICONS: Record<string, string> = {
@@ -52,10 +53,10 @@ export default function DashboardTab() {
 
   if (!selectedSessionId) {
     return (
-      <div className="no-session-selected">
-        <div className="empty-state">
-          <h3>Select a Session</h3>
-          <p>Choose a session to view its dashboard</p>
+      <div className={empty.noSession}>
+        <div className={empty.state}>
+          <h3 className={empty.title}>Select a Session</h3>
+          <p className={empty.desc}>Choose a session to view its dashboard</p>
         </div>
       </div>
     );
@@ -63,10 +64,10 @@ export default function DashboardTab() {
 
   if (!isManager) {
     return (
-      <div className="no-session-selected">
-        <div className="empty-state">
-          <h3>Manager Only</h3>
-          <p>Dashboard is only available for manager sessions</p>
+      <div className={empty.noSession}>
+        <div className={empty.state}>
+          <h3 className={empty.title}>Manager Only</h3>
+          <p className={empty.desc}>Dashboard is only available for manager sessions</p>
         </div>
       </div>
     );
@@ -108,7 +109,7 @@ export default function DashboardTab() {
           </div>
           <div className="flex-1 p-3 flex flex-col gap-2 overflow-y-auto">
             {!dashboard?.workers.length ? (
-              <div className="empty-state"><p>No workers assigned</p></div>
+              <div className={empty.state}><p className={empty.desc}>No workers assigned</p></div>
             ) : (
               dashboard.workers.map((w: WorkerInfo) => (
                 <div key={w.worker_id}
@@ -121,8 +122,8 @@ export default function DashboardTab() {
                     <div className="text-[11px] text-[var(--text-muted)] capitalize">{w.status}</div>
                   </div>
                   {w.is_busy ? (
-                    <span className="text-[10px] font-semibold text-[var(--warning-color)] py-[2px] px-2 rounded-[10px]"
-                          style={{ background: 'rgba(245, 158, 11, 0.15)', animation: 'pulse 1.5s infinite' }}>
+                    <span className="text-[10px] font-semibold text-[var(--warning-color)] py-[2px] px-2 rounded-[10px] animate-pulse"
+                          style={{ background: 'rgba(245, 158, 11, 0.15)' }}>
                       Working
                     </span>
                   ) : (
@@ -144,7 +145,7 @@ export default function DashboardTab() {
           </div>
           <div className="flex-1 py-3 px-4 overflow-y-auto flex flex-col gap-3">
             {!dashboard?.recent_events.length ? (
-              <div className="empty-state"><p>No activity yet</p></div>
+              <div className={empty.state}><p className={empty.desc}>No activity yet</p></div>
             ) : (
               dashboard.recent_events.map((ev: ManagerEvent, idx: number) => (
                 <div key={idx}
