@@ -40,5 +40,26 @@
     "is_deleted": false,
     "deleted_at": null,
     "registered_at": "2026-02-23T12:48:06.220611+00:00"
+  },
+  "c28267f5-303f-421e-8263-db8878a2aec4": {
+    "session_id": "c28267f5-303f-421e-8263-db8878a2aec4",
+    "session_name": "worker",
+    "status": "running",
+    "created_at": "2026-02-23T22:16:39.332995",
+    "pid": null,
+    "error_message": null,
+    "model": "",
+    "max_turns": 25,
+    "timeout": 300.0,
+    "autonomous": true,
+    "autonomous_max_iterations": 10,
+    "storage_path": "C:\\Users\\gkfua\\AppData\\Local\\claude_sessions\\c28267f5-303f-421e-8263-db8878a2aec4",
+    "pod_name": "Jang_LAB",
+    "pod_ip": "192.168.0.87",
+    "role": "worker",
+    "manager_id": "",
+    "is_deleted": false,
+    "deleted_at": null,
+    "registered_at": "2026-02-23T13:16:39.392577+00:00"
   }
 }

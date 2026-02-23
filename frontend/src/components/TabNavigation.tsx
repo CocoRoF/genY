@@ -8,7 +8,6 @@ const TABS = [
   { id: 'dashboard', label: 'Dashboard', managerOnly: true },
   { id: 'logs', label: 'Logs' },
   { id: 'storage', label: 'Storage' },
-  { id: 'batch', label: 'Batch' },
   { id: 'graph', label: 'Graph' },
   { id: 'info', label: 'Info' },
   { id: 'settings', label: 'Settings' },

@@ -107,32 +107,6 @@ export interface SessionLogsResponse {
   total_entries: number;
 }
 
-// ==================== Batch Types ====================
-
-export interface BatchCommandRequest {
-  session_ids: string[];
-  prompt: string;
-  timeout?: number;
-  skip_permissions?: boolean;
-  parallel?: boolean;
-}
-
-export interface BatchResult {
-  session_id: string;
-  success: boolean;
-  output?: string;
-  error?: string;
-  duration_ms?: number;
-}
-
-export interface BatchCommandResponse {
-  total_sessions: number;
-  successful: number;
-  failed: number;
-  results: BatchResult[];
-  total_duration_ms: number;
-}
-
 // ==================== Storage Types ====================
 
 export interface StorageFile {
