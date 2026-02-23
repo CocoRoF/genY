@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import type { SessionInfo, PromptInfo } from '@/types';
 import { agentApi, commandApi, healthApi } from '@/lib/api';
 
+// Session-scoped tab IDs (must match TabNavigation)
+const SESSION_TAB_IDS = new Set(['command', 'dashboard', 'logs', 'storage', 'graph', 'info']);
+
 // ==================== Session Data Cache ====================
 export interface SessionData {
   input: string;
@@ -90,7 +93,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  selectSession: (id) => set({ selectedSessionId: id }),
+  selectSession: (id) => {
+    const { activeTab } = get();
+    const updates: Partial<AppState> = { selectedSessionId: id };
+    if (id && !SESSION_TAB_IDS.has(activeTab)) {
+      // Selecting a session while on a global tab → jump to Command
+      updates.activeTab = 'command';
+    } else if (!id && SESSION_TAB_IDS.has(activeTab)) {
+      // Deselecting session while on a session tab → fall back to Playground
+      updates.activeTab = 'playground';
+    }
+    set(updates);
+  },
 
   createSession: async (data) => {
     await agentApi.create(data);
