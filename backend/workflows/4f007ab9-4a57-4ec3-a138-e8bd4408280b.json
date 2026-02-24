@@ -1,6 +1,6 @@
 {
-  "id": "16d0f489-ce28-4b41-93af-57c7bdeb13fb",
-  "name": "Autonomous Difficulty-Based (Copy)",
+  "id": "4f007ab9-4a57-4ec3-a138-e8bd4408280b",
+  "name": "Autonomous Difficulty-Based (Copy) (Copy)",
   "description": "Full autonomous execution graph with difficulty classification, easy/medium/hard paths, review loops, TODO management, and resilience infrastructure.",
   "nodes": [
     {
@@ -587,8 +587,8 @@
       "label": ""
     }
   ],
-  "created_at": "2026-02-24T08:01:27.452632+00:00",
-  "updated_at": "2026-02-24T08:01:29.014129+00:00",
+  "created_at": "2026-02-24T12:25:24.408930+00:00",
+  "updated_at": "2026-02-24T12:25:24.408930+00:00",
   "is_template": false,
   "template_name": null
 }

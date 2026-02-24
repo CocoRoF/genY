@@ -1,14 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import dynamic from 'next/dynamic';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import type { GraphStructure, GraphNode, GraphEdge } from '@/types';
-
-// Lazy-load the Workflow Editor (heavy React Flow dependency)
-const WorkflowEditor = dynamic(() => import('@/components/tabs/WorkflowTab'), { ssr: false });
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return twMerge(classes.filter(Boolean).join(' '));
@@ -110,42 +106,10 @@ function getNodeStroke(node: GraphNode) {
   return getPathColor(node) + '60';
 }
 
-// ========== Mode Switcher ==========
-
-function ModeSwitcher({ mode, onSwitch }: { mode: 'view' | 'edit'; onSwitch: (m: 'view' | 'edit') => void }) {
-  return (
-    <div className="inline-flex items-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] overflow-hidden">
-      <button
-        className={cn(
-          'px-3 py-1 text-xs font-medium transition-colors',
-          mode === 'view'
-            ? 'bg-[var(--primary-color)] text-white'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]',
-        )}
-        onClick={() => onSwitch('view')}
-      >
-        Graph View
-      </button>
-      <button
-        className={cn(
-          'px-3 py-1 text-xs font-medium transition-colors',
-          mode === 'edit'
-            ? 'bg-[var(--primary-color)] text-white'
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]',
-        )}
-        onClick={() => onSwitch('edit')}
-      >
-        Workflow Editor
-      </button>
-    </div>
-  );
-}
-
 // ========== Main Component ==========
 
 export default function GraphTab() {
-  const { selectedSessionId, sessions } = useAppStore();
-  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const { selectedSessionId, sessions, setActiveTab } = useAppStore();
   const [graphData, setGraphData] = useState<GraphStructure | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -221,32 +185,14 @@ export default function GraphTab() {
     setScale(newScale);
   };
 
-  // ── Edit mode: render the full Workflow Editor ──
-  if (mode === 'edit') {
-    return (
-      <div className="flex flex-col h-full min-h-0 overflow-hidden">
-        {/* Mode toggle bar */}
-        <div className="flex items-center h-10 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
-          <ModeSwitcher mode={mode} onSwitch={setMode} />
-        </div>
-        <div className="flex-1 min-h-0">
-          <WorkflowEditor />
-        </div>
-      </div>
-    );
-  }
-
-  // ── View mode: session graph viewer ──
+  // ── No session selected ──
   if (!selectedSessionId) {
     return (
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
-        <div className="flex items-center h-10 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
-          <ModeSwitcher mode={mode} onSwitch={setMode} />
-        </div>
         <div className="flex items-center justify-center flex-1">
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Select a Session</h3>
-            <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session to view its graph, or switch to <button className="text-[var(--primary-color)] underline underline-offset-2 font-medium bg-transparent border-none cursor-pointer" onClick={() => setMode('edit')}>Workflow Editor</button></p>
+            <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session to view its graph, or go to <button className="text-[var(--primary-color)] underline underline-offset-2 font-medium bg-transparent border-none cursor-pointer" onClick={() => setActiveTab('workflows')}>Workflows</button> to manage graph workflows</p>
           </div>
         </div>
       </div>
@@ -268,8 +214,6 @@ export default function GraphTab() {
       {/* Toolbar */}
       <div className="flex items-center justify-between py-3 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
         <div className="flex items-center gap-3">
-          <ModeSwitcher mode={mode} onSwitch={setMode} />
-          <div className="w-px h-5 bg-[var(--border-color)]" />
           <span className="text-[15px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
             Graph
           </span>
