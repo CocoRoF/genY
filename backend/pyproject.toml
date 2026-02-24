@@ -1,7 +1,7 @@
 [project]
-name = "claude-control"
+name = "geny"
 version = "1.0.0"
-description = "Claude Control - Claude Code Multi-Session Management System"
+description = "Geny (Geny Execute, Not You) - Autonomous Multi-Agent System for Claude Code"
 readme = "README.md"
 requires-python = ">=3.11"
 

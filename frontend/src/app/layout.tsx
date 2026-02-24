@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Claude Control",
-  description: "Agent session management and 3D city playground",
+  title: "Geny — Geny Execute, Not You",
+  description: "Geny: Geny Execute, Not You — Agent session management and 3D city playground",
 };
 
 export default function RootLayout({

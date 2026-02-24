@@ -11,8 +11,11 @@ export default function Header() {
     <header className="flex justify-between items-center px-6 h-14 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
       <div className="flex items-center gap-3">
         <h1 className="text-[1.125rem] font-semibold text-[var(--text-primary)] tracking-tight">
-          Claude Control
+          Geny
         </h1>
+        <span className="text-[0.7rem] text-[var(--text-tertiary)] tracking-wide hidden sm:inline">
+          Geny Execute, Not You
+        </span>
       </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-tertiary)] rounded-full text-[0.8125rem]">
