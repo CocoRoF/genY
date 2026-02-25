@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { useWorkflowStore, type WorkflowNodeData } from '@/store/useWorkflowStore';
+import { useI18n } from '@/lib/i18n';
 import type { WfNodeParameter, WfNodeTypeDef } from '@/types/workflow';
 
 // ========== Field Renderers ==========
@@ -74,6 +75,7 @@ function BooleanField({ value, onChange }: {
 function SelectField({ param, value, onChange }: {
   param: WfNodeParameter; value: string; onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <select
       value={value || ''}
@@ -85,7 +87,7 @@ function SelectField({ param, value, onChange }: {
         focus:outline-none focus:border-[var(--primary-color)]
       "
     >
-      <option value="">Select…</option>
+      <option value="">{t('propertyPanel.select')}</option>
       {param.options?.map(opt => (
         <option key={opt.value} value={opt.value}>{opt.label}</option>
       ))}
@@ -117,12 +119,13 @@ function TextareaField({ param, value, onChange }: {
 function PromptTemplateField({ param, value, onChange }: {
   param: WfNodeParameter; value: string; onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="space-y-1">
       <textarea
         value={value || ''}
         onChange={e => onChange(e.target.value)}
-        placeholder={param.placeholder || 'Enter prompt template…'}
+        placeholder={param.placeholder || t('propertyPanel.promptPlaceholder')}
         rows={6}
         className="
           w-full px-2.5 py-2 text-[11px]
@@ -134,7 +137,7 @@ function PromptTemplateField({ param, value, onChange }: {
         "
       />
       <div className="text-[10px] text-[var(--text-muted)]">
-        Use {'{field}'} for state variable substitution. Available: input, answer, review_feedback, last_output
+        {t('propertyPanel.promptHelp')}
       </div>
     </div>
   );
@@ -143,6 +146,7 @@ function PromptTemplateField({ param, value, onChange }: {
 function JsonField({ param, value, onChange }: {
   param: WfNodeParameter; value: string; onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   const [error, setError] = useState('');
 
   const handleChange = useCallback((v: string) => {
@@ -151,7 +155,7 @@ function JsonField({ param, value, onChange }: {
       if (v.trim()) JSON.parse(v);
       setError('');
     } catch {
-      setError('Invalid JSON');
+      setError(t('propertyPanel.invalidJson'));
     }
   }, [onChange]);
 
@@ -207,6 +211,7 @@ function ParameterField({ param, value, onChange }: {
 
 export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { selectedNodeId, nodes, nodeCatalog, updateNodeConfig, updateNodeLabel, deleteSelectedNode } = useWorkflowStore();
+  const { t } = useI18n();
 
   const selectedNode = useMemo(
     () => nodes.find(n => n.id === selectedNodeId),
@@ -246,7 +251,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
         <div className="text-[24px] mb-2 opacity-40">🔧</div>
         <div className="text-[12px] text-[var(--text-muted)]">
-          Select a node to edit its properties
+          {t('propertyPanel.selectNode')}
         </div>
       </div>
     );
@@ -281,7 +286,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
           </span>
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-              Properties
+              {t('propertyPanel.title')}
             </div>
             <div className="text-[10px] text-[var(--text-muted)] truncate">
               {data.nodeType}
@@ -295,7 +300,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
         {/* Node Label */}
         <div>
           <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1.5">
-            Node Label
+            {t('propertyPanel.nodeLabel')}
           </label>
           <input
             type="text"
@@ -316,7 +321,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
         {/* Node ID (read-only) */}
         <div>
           <label className="block text-[11px] font-semibold text-[var(--text-secondary)] mb-1.5">
-            Node ID
+            {t('propertyPanel.nodeId')}
           </label>
           <div className="px-2.5 py-1.5 text-[11px] font-mono text-[var(--text-muted)] bg-[var(--bg-primary)] rounded-md border border-[var(--border-color)]">
             {selectedNode.id}
@@ -370,7 +375,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
         {data.isConditional && data.outputPorts && (
           <div>
             <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 pb-1 border-b border-[var(--border-color)]">
-              Output Ports
+              {t('propertyPanel.outputPorts')}
             </div>
             <div className="space-y-1">
               {data.outputPorts.map(port => (
@@ -407,7 +412,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Delete Node
+            {t('propertyPanel.deleteNode')}
           </button>
         </div>
       )}

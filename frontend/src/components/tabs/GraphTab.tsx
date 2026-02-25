@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 import type { GraphStructure, GraphNode, GraphEdge } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -110,6 +111,7 @@ function getNodeStroke(node: GraphNode) {
 
 export default function GraphTab() {
   const { selectedSessionId, sessions, setActiveTab } = useAppStore();
+  const { t } = useI18n();
   const [graphData, setGraphData] = useState<GraphStructure | null>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
@@ -191,15 +193,15 @@ export default function GraphTab() {
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="flex items-center justify-center flex-1">
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Select a Session</h3>
-            <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session to view its graph, or go to <button className="text-[var(--primary-color)] underline underline-offset-2 font-medium bg-transparent border-none cursor-pointer" onClick={() => setActiveTab('workflows')}>Workflows</button> to manage graph workflows</p>
+            <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">{t('graphTab.selectSession')}</h3>
+            <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('graphTab.selectSessionDesc')}<button className="text-[var(--primary-color)] underline underline-offset-2 font-medium bg-transparent border-none cursor-pointer" onClick={() => setActiveTab('workflows')}>{t('graphTab.workflowsLink')}</button>{t('graphTab.selectSessionSuffix')}</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (loading) return <div className="flex items-center justify-center h-full text-[var(--text-muted)]">Loading graph...</div>;
+  if (loading) return <div className="flex items-center justify-center h-full text-[var(--text-muted)]">{t('graphTab.loadingGraph')}</div>;
   if (error) return <div className="flex items-center justify-center h-full text-[var(--danger-color)] text-[0.875rem]">{error}</div>;
   if (!graphData) return null;
 
@@ -215,11 +217,11 @@ export default function GraphTab() {
       <div className="flex items-center justify-between py-3 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
         <div className="flex items-center gap-3">
           <span className="text-[15px] font-semibold text-[var(--text-primary)] flex items-center gap-2">
-            Graph
+            {t('graphTab.title')}
           </span>
           <span className={`text-[11px] font-semibold py-[2px] px-2 rounded-[10px] uppercase tracking-[0.5px] ${graphData.graph_type === 'autonomous' ? 'text-[#c084fc] border border-[rgba(168,85,247,0.3)]' : 'text-[#60a5fa] border border-[rgba(59,130,246,0.3)]'}`}
                 style={{ background: graphData.graph_type === 'autonomous' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)' }}>
-            {graphData.graph_type === 'autonomous' ? 'Autonomous' : 'Simple'}
+            {graphData.graph_type === 'autonomous' ? t('graphTab.autonomous') : t('graphTab.simple')}
           </span>
           <span className="text-[13px] text-[var(--text-secondary)] max-w-[200px] truncate">{graphData.session_name}</span>
         </div>
@@ -228,7 +230,7 @@ export default function GraphTab() {
                   onClick={() => setScale(s => Math.min(2.5, s + 0.15))}>+</button>
           <button className="flex items-center justify-center w-8 h-8 border border-[var(--border-color)] rounded-[6px] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-pointer transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
                   onClick={() => setScale(s => Math.max(0.15, s - 0.15))}>−</button>
-          <button className="py-1.5 px-3 text-[0.75rem] bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]" onClick={fetchGraph}>⟳ Reset</button>
+          <button className="py-1.5 px-3 text-[0.75rem] bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]" onClick={fetchGraph}>⟳ {t('graphTab.resetBtn')}</button>
         </div>
       </div>
 
@@ -370,21 +372,21 @@ export default function GraphTab() {
               <span className="px-2 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)]">{selectedNode.type.toUpperCase()}</span>
               {selectedNode.metadata?.path && (
                 <span className="px-2 py-0.5 rounded" style={{ background: getPathColor(selectedNode) + '20', color: getPathColor(selectedNode) }}>
-                  {selectedNode.metadata.path.charAt(0).toUpperCase() + selectedNode.metadata.path.slice(1)} Path
+                  {t('graphTab.path', { name: selectedNode.metadata.path.charAt(0).toUpperCase() + selectedNode.metadata.path.slice(1) })}
                 </span>
               )}
-              {selectedNode.prompt_template && <span className="px-2 py-0.5 rounded bg-[var(--primary-color)]/20 text-[var(--primary-color)]">Has Prompt</span>}
+              {selectedNode.prompt_template && <span className="px-2 py-0.5 rounded bg-[var(--primary-color)]/20 text-[var(--primary-color)]">{t('graphTab.hasPrompt')}</span>}
             </div>
 
             {/* Description */}
             <div>
-              <h4 className="font-semibold text-[var(--text-muted)] mb-1">Description</h4>
+              <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.description')}</h4>
               <p className="text-[var(--text-secondary)]">{selectedNode.description}</p>
             </div>
 
             {/* Node ID */}
             <div>
-              <h4 className="font-semibold text-[var(--text-muted)] mb-1">Node ID</h4>
+              <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.nodeId')}</h4>
               <code className="text-[var(--text-secondary)] bg-[var(--bg-tertiary)] px-2 py-0.5 rounded">{selectedNode.id}</code>
             </div>
 
@@ -396,7 +398,7 @@ export default function GraphTab() {
                 <>
                   {inEdges.length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-[var(--text-muted)] mb-1">Incoming ({inEdges.length})</h4>
+                      <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.incoming', { count: inEdges.length })}</h4>
                       <div className="space-y-1">
                         {inEdges.map((e, i) => {
                           const srcN = graphData.nodes.find(n => n.id === e.source);
@@ -415,7 +417,7 @@ export default function GraphTab() {
                   )}
                   {outEdges.length > 0 && (
                     <div>
-                      <h4 className="font-semibold text-[var(--text-muted)] mb-1">Outgoing ({outEdges.length})</h4>
+                      <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.outgoing', { count: outEdges.length })}</h4>
                       <div className="space-y-1">
                         {outEdges.map((e, i) => {
                           const tgtN = graphData.nodes.find(n => n.id === e.target);
@@ -438,7 +440,7 @@ export default function GraphTab() {
                     if (!condEdge?.condition_map) return null;
                     return (
                       <div>
-                        <h4 className="font-semibold text-[var(--text-muted)] mb-1">Conditional Routing</h4>
+                        <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.conditionalRouting')}</h4>
                         <div className="space-y-1">
                           {Object.entries(condEdge.condition_map).map(([cond, target]) => {
                             const tn = graphData.nodes.find(n => n.id === target);
@@ -464,7 +466,7 @@ export default function GraphTab() {
             {/* Prompt template */}
             {selectedNode.prompt_template && (
               <div>
-                <h4 className="font-semibold text-[var(--text-muted)] mb-1">Prompt Template</h4>
+                <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.promptTemplate')}</h4>
                 <pre className="p-2 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] whitespace-pre-wrap font-mono text-[10px] max-h-[200px] overflow-y-auto">
                   {selectedNode.prompt_template}
                 </pre>
@@ -479,7 +481,7 @@ export default function GraphTab() {
               if (Object.keys(displayMeta).length === 0) return null;
               return (
                 <div>
-                  <h4 className="font-semibold text-[var(--text-muted)] mb-1">Metadata</h4>
+                  <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.metadata')}</h4>
                   <pre className="p-2 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] whitespace-pre-wrap font-mono text-[10px]">
                     {JSON.stringify(displayMeta, null, 2)}
                   </pre>
@@ -490,7 +492,7 @@ export default function GraphTab() {
             {/* Inner graph */}
             {selectedNode.metadata?.inner_graph && (
               <div>
-                <h4 className="font-semibold text-[var(--text-muted)] mb-1">Inner Graph</h4>
+                <h4 className="font-semibold text-[var(--text-muted)] mb-1">{t('graphTab.innerGraph')}</h4>
                 <p className="text-[var(--text-secondary)] mb-2">{selectedNode.metadata.inner_graph.description}</p>
                 <div className="flex flex-wrap gap-1">
                   {selectedNode.metadata.inner_graph.nodes.map((n: any, i: number) => (

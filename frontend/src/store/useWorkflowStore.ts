@@ -15,6 +15,7 @@ import {
   MarkerType,
 } from '@xyflow/react';
 import { workflowApi } from '@/lib/workflowApi';
+import { translate } from '@/lib/i18n';
 import type {
   WfNodeCatalog,
   WfNodeTypeDef,
@@ -278,7 +279,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ nodeCatalog: catalog });
     } catch (e) {
       console.error('Failed to load node catalog:', e);
-      set({ error: 'Failed to load node catalog' });
+      set({ error: translate('workflowStore.failedCatalog') });
     }
   },
 
@@ -289,7 +290,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ workflows, isLoading: false });
     } catch (e) {
       console.error('Failed to load workflows:', e);
-      set({ error: 'Failed to load workflows', isLoading: false });
+      set({ error: translate('workflowStore.failedLoad'), isLoading: false });
     }
   },
 
@@ -301,7 +302,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ isLoading: false });
     } catch (e) {
       console.error('Failed to load workflow:', e);
-      set({ error: 'Failed to load workflow', isLoading: false });
+      set({ error: translate('workflowStore.failedLoadSingle'), isLoading: false });
     }
   },
 
@@ -309,7 +310,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
     const { currentWorkflow, nodes, edges } = get();
     if (!currentWorkflow) return;
     if (currentWorkflow.is_template) {
-      set({ error: 'Cannot save a template. Clone it first.' });
+      set({ error: translate('workflowStore.cannotSaveTemplate') });
       return;
     }
 
@@ -326,7 +327,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ currentWorkflow: updated, isDirty: false, isLoading: false });
     } catch (e) {
       console.error('Failed to save workflow:', e);
-      set({ error: 'Failed to save workflow', isLoading: false });
+      set({ error: translate('workflowStore.failedSave'), isLoading: false });
     }
   },
 
@@ -344,7 +345,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       };
 
       const workflow = await workflowApi.create({
-        name: name || 'Untitled Workflow',
+        name: name || translate('workflowStore.untitled'),
         description: description || '',
         nodes: [startNode, endNode],
         edges: [],
@@ -355,7 +356,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ isLoading: false });
     } catch (e) {
       console.error('Failed to create workflow:', e);
-      set({ error: 'Failed to create workflow', isLoading: false });
+      set({ error: translate('workflowStore.failedCreate'), isLoading: false });
     }
   },
 
@@ -381,7 +382,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       set({ isLoading: false });
     } catch (e) {
       console.error('Failed to clone workflow:', e);
-      set({ error: 'Failed to clone workflow', isLoading: false });
+      set({ error: translate('workflowStore.failedClone'), isLoading: false });
     }
   },
 

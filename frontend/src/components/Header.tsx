@@ -2,9 +2,11 @@
 
 import Image from 'next/image';
 import { useAppStore } from '@/store/useAppStore';
+import { useI18n } from '@/lib/i18n';
 
 export default function Header() {
   const { healthStatus, sessions } = useAppStore();
+  const { t } = useI18n();
 
   const isHealthy = healthStatus === 'connected';
 
@@ -20,7 +22,7 @@ export default function Header() {
           priority
         /> */}
         <span className="text-[0.9rem] text-[var(--text-tertiary)] tracking-[0.08em] italic hidden sm:inline">
-          Geny Execute, Not You
+          {t('header.subtitle')}
         </span>
       </div>
       <div className="flex items-center gap-4">
@@ -34,7 +36,7 @@ export default function Header() {
             style={isHealthy ? { boxShadow: '0 0 8px var(--success-color)' } : undefined}
           />
           <span className="text-[var(--text-secondary)]">
-            {isHealthy ? `${sessions.length} sessions` : 'Disconnected'}
+            {isHealthy ? t('header.sessions', { count: sessions.length }) : t('header.disconnected')}
           </span>
         </div>
       </div>

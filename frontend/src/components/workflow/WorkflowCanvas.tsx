@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { useWorkflowStore, type WorkflowNodeData } from '@/store/useWorkflowStore';
+import { useI18n } from '@/lib/i18n';
 import { workflowNodeTypes } from './CustomNodes';
 
 export default function WorkflowCanvas({ readOnly = false }: { readOnly?: boolean }) {
@@ -33,6 +34,7 @@ export default function WorkflowCanvas({ readOnly = false }: { readOnly?: boolea
     nodeCatalog,
   } = useWorkflowStore();
 
+  const { t } = useI18n();
   // ── Fit view when workflow changes ──
   useEffect(() => {
     if (currentWorkflow && nodes.length > 0) {
@@ -182,11 +184,10 @@ export default function WorkflowCanvas({ readOnly = false }: { readOnly?: boolea
           <div className="text-center p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-lg">
             <div className="text-[28px] mb-2">🎨</div>
             <div className="text-[13px] font-semibold text-[var(--text-secondary)] mb-1">
-              Design Your Workflow
+              {t('workflowEditor.designTitle')}
             </div>
             <div className="text-[11px] text-[var(--text-muted)] leading-relaxed max-w-[260px]">
-              Drag nodes from the palette or load a template to get started.
-              Connect nodes by dragging from handles.
+              {t('workflowEditor.designSubtitle')}
             </div>
           </div>
         </div>

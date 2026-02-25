@@ -6,6 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { Eye, EyeOff } from 'lucide-react';
 import NumberStepper from '@/components/ui/NumberStepper';
 import InfoTooltip from '@/components/ui/InfoTooltip';
+import { useI18n, type Locale } from '@/lib/i18n';
 import type { ConfigItem, ConfigCategory, ConfigField, ConfigSchema } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -13,6 +14,7 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 }
 
 export default function SettingsTab() {
+  const { t, tRaw, setLocale } = useI18n();
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [categories, setCategories] = useState<ConfigCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -65,16 +67,23 @@ export default function SettingsTab() {
     });
     try {
       const res = await configApi.update(editing.name, values);
-      if (res.success) { setMsg({ type: 'success', text: 'Configuration saved' }); setEditing(null); loadConfigs(); }
-      else setMsg({ type: 'error', text: 'Save failed' });
+      if (res.success) {
+        // Sync frontend locale when language config changes
+        if (editing.name === 'language' && values.language) {
+          const lang = values.language;
+          if (lang === 'en' || lang === 'ko') setLocale(lang as Locale);
+        }
+        setMsg({ type: 'success', text: t('settings.configSaved') }); setEditing(null); loadConfigs();
+      }
+      else setMsg({ type: 'error', text: t('settings.saveFailed') });
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
   };
 
   const resetConfig = async () => {
-    if (!editing || !confirm(`Reset "${editing.schema.display_name}" to defaults?`)) return;
+    if (!editing || !confirm(t('settings.resetConfirm', { name: editing.schema.display_name }))) return;
     try {
       const res = await configApi.reset(editing.name);
-      if (res.success) { setMsg({ type: 'success', text: 'Reset to defaults' }); setEditing(null); loadConfigs(); }
+      if (res.success) { setMsg({ type: 'success', text: t('settings.resetSuccess') }); setEditing(null); loadConfigs(); }
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
   };
 
@@ -88,7 +97,7 @@ export default function SettingsTab() {
         a.download = `geny-config-${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
-        setMsg({ type: 'success', text: 'Exported' });
+        setMsg({ type: 'success', text: t('settings.exported') });
       }
     } catch (e: any) { setMsg({ type: 'error', text: e.message }); }
   };
@@ -98,9 +107,9 @@ export default function SettingsTab() {
     try {
       const parsed = JSON.parse(importData);
       const res = await configApi.importAll(parsed);
-      if (res.success) { setMsg({ type: 'success', text: res.message || 'Imported' }); setImportOpen(false); setImportData(''); loadConfigs(); }
-      else setMsg({ type: 'error', text: res.message || 'Import failed' });
-    } catch (e: any) { setMsg({ type: 'error', text: e.message || 'Invalid JSON' }); }
+      if (res.success) { setMsg({ type: 'success', text: res.message || t('settings.imported') }); setImportOpen(false); setImportData(''); loadConfigs(); }
+      else setMsg({ type: 'error', text: res.message || t('settings.importFailed') });
+    } catch (e: any) { setMsg({ type: 'error', text: e.message || t('settings.invalidJson') }); }
   };
 
   return (
@@ -114,11 +123,11 @@ export default function SettingsTab() {
 
       {/* Header */}
       <div className="flex justify-between items-center py-4 px-5 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
-        <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">Settings</h3>
+        <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.title')}</h3>
         <div className="flex gap-2">
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={exportConfigs}>Export</button>
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setImportOpen(true)}>Import</button>
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={loadConfigs}>Refresh</button>
+          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={exportConfigs}>{t('common.export')}</button>
+          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setImportOpen(true)}>{t('common.import')}</button>
+          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={loadConfigs}>{t('common.refresh')}</button>
         </div>
       </div>
 
@@ -131,7 +140,7 @@ export default function SettingsTab() {
               className={`w-full flex items-center gap-2.5 py-2.5 px-3 rounded-[var(--border-radius)] text-[0.875rem] font-medium text-left mb-1 transition-colors ${selectedCategory === 'all' ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
               onClick={() => setSelectedCategory('all')}
             >
-              <span className="flex-1">All</span>
+              <span className="flex-1">{t('settings.all')}</span>
               <span className="text-[0.75rem] text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">{configs.length}</span>
             </button>
             {categories.map(cat => {
@@ -152,7 +161,7 @@ export default function SettingsTab() {
         {/* Config List */}
         <div className="flex-1 overflow-y-auto p-5">
           {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">No configurations found</p></div>
+            <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">{t('settings.noConfigs')}</p></div>
           ) : (
             <div className="flex flex-col gap-3">
               {filtered.map(config => {
@@ -177,12 +186,12 @@ export default function SettingsTab() {
                       </div>
                       <span className={`shrink-0 inline-block py-1 px-2.5 rounded-[12px] text-[0.75rem] font-medium ${isEnabled ? 'text-[var(--success-color)]' : 'text-[var(--text-muted)] bg-[var(--bg-tertiary)]'}`}
                             style={isEnabled ? { background: 'rgba(16, 185, 129, 0.15)' } : {}}>
-                        {isEnabled ? 'Enabled' : 'Disabled'}
+                        {isEnabled ? t('common.enabled') : t('common.disabled')}
                       </span>
                     </div>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--border-color)]">
-                      <span className="text-[0.75rem] text-[var(--text-muted)]">{configured}/{total} fields configured</span>
-                      {!config.valid && <span className="text-[0.75rem] text-[var(--warning-color)]">⚠️ {config.errors?.length || 0} issues</span>}
+                      <span className="text-[0.75rem] text-[var(--text-muted)]">{t('settings.fieldsConfigured', { count: configured, total })}</span>
+                      {!config.valid && <span className="text-[0.75rem] text-[var(--warning-color)]">⚠️ {t('settings.issues', { count: config.errors?.length || 0 })}</span>}
                     </div>
                   </div>
                 );
@@ -197,7 +206,7 @@ export default function SettingsTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setEditing(null)}>
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-[600px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
-              <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">Edit: {editing.schema.display_name || editing.schema.name}</h3>
+              <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.editPrefix')}{editing.schema.display_name || editing.schema.name}</h3>
               <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setEditing(null)}>×</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -209,13 +218,7 @@ export default function SettingsTab() {
                     if (!groups[g]) groups[g] = [];
                     groups[g].push(f);
                   });
-                  const groupLabels: Record<string, string> = {
-                    connection: 'Connection', server: 'Server Settings', workspace: 'Workspace',
-                    teams: 'Teams', permissions: 'Permissions', behavior: 'Behavior',
-                    session: 'Session Settings', commands: 'Commands', graph: 'Microsoft Graph', general: 'General',
-                    language: 'Language', api: 'API Settings', redis: 'Redis',
-                    limits: 'Limits', telemetry: 'Telemetry', github: 'GitHub',
-                  };
+                  const groupLabels = tRaw<Record<string, string>>('settings.groupLabels');
                   return Object.entries(groups).map(([groupName, fields]) => (
                     <div key={groupName} className="border border-[var(--border-color)] rounded-[var(--border-radius)] overflow-hidden">
                       <h4 className="text-[0.8125rem] font-semibold text-[var(--text-secondary)] py-3 px-4 bg-[var(--bg-tertiary)] m-0 border-b border-[var(--border-color)]">
@@ -233,10 +236,10 @@ export default function SettingsTab() {
               </form>
             </div>
             <div className="flex justify-end items-center gap-3 py-4 px-6 border-t border-[var(--border-color)]">
-              <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]", '!text-[var(--danger-color)]')} onClick={resetConfig}>Reset to Defaults</button>
+              <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]", '!text-[var(--danger-color)]')} onClick={resetConfig}>{t('settings.resetToDefaults')}</button>
               <div className="flex gap-2">
-                <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setEditing(null)}>Cancel</button>
-                <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={saveConfig}>Save</button>
+                <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setEditing(null)}>{t('common.cancel')}</button>
+                <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={saveConfig}>{t('common.save')}</button>
               </div>
             </div>
           </div>
@@ -248,19 +251,19 @@ export default function SettingsTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setImportOpen(false)}>
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[520px] max-h-[85vh] flex flex-col shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
-              <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">Import Configuration</h3>
+              <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.importTitle')}</h3>
               <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setImportOpen(false)}>×</button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
               <textarea
                 className="w-full p-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] font-mono text-[var(--text-primary)] resize-none focus:outline-none focus:border-[var(--primary-color)]"
-                rows={10} placeholder="Paste configuration JSON here..."
+                rows={10} placeholder={t('settings.importPlaceholder')}
                 value={importData} onChange={e => setImportData(e.target.value)}
               />
             </div>
             <div className="flex justify-end items-center gap-3 py-4 px-6 border-t border-[var(--border-color)]">
-              <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setImportOpen(false)}>Cancel</button>
-              <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={importConfigs}>Import</button>
+              <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setImportOpen(false)}>{t('common.cancel')}</button>
+              <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={importConfigs}>{t('common.import')}</button>
             </div>
           </div>
         </div>
@@ -270,6 +273,7 @@ export default function SettingsTab() {
 }
 
 function ConfigFieldInput({ field, value, onChange }: { field: ConfigField; value: any; onChange: (v: any) => void }) {
+  const { t } = useI18n();
   const [showPass, setShowPass] = useState(false);
   const id = `cf-${field.name}`;
   const effectiveType = field.type === 'password' ? 'string' : field.type;
@@ -310,7 +314,7 @@ function ConfigFieldInput({ field, value, onChange }: { field: ConfigField; valu
       <div>
         {labelEl}
         <select id={id} name={field.name} value={value ?? ''} onChange={e => onChange(e.target.value)} className={inputClasses}>
-          <option value="">-- Select --</option>
+          <option value="">{t('common.selectOption')}</option>
           {(field.options || []).map((opt: any) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
@@ -362,7 +366,7 @@ function ConfigFieldInput({ field, value, onChange }: { field: ConfigField; valu
           <button type="button"
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-7 h-7 rounded-[var(--border-radius)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all duration-150 border-none bg-transparent cursor-pointer"
                   onClick={() => setShowPass(!showPass)}
-                  aria-label={showPass ? 'Hide' : 'Show'}>
+                  aria-label={showPass ? t('settings.hide') : t('settings.show')}>
             {showPass ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
           </button>
         )}

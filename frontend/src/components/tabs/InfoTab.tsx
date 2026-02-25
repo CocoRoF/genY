@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 import type { SessionInfo } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -16,6 +17,7 @@ function formatTimestamp(ts: string) {
 
 export default function InfoTab() {
   const { selectedSessionId, sessions, restoreSession, permanentDeleteSession } = useAppStore();
+  const { t } = useI18n();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,14 +50,14 @@ export default function InfoTab() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center justify-center py-12 px-4">
-          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Select a Session</h3>
-          <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session to view its details</p>
+          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">{t('info.selectSession')}</h3>
+          <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('info.selectSessionDesc')}</p>
         </div>
       </div>
     );
   }
 
-  if (loading) return <div className="flex items-center justify-center h-full text-[var(--text-muted)]">Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center h-full text-[var(--text-muted)]">{t('common.loading')}</div>;
   if (error) return <div className="flex items-center justify-center h-full text-[var(--danger-color)] text-[0.875rem]">{error}</div>;
   if (!data) return null;
 
@@ -70,31 +72,31 @@ export default function InfoTab() {
   };
 
   const fields = [
-    { label: 'Session ID', value: data.session_id },
-    { label: 'Name', value: data.session_name || '(unnamed)' },
-    { label: 'Status', value: isDeleted ? '🗑️ Deleted' : (data.status || 'unknown') },
-    { label: 'Model', value: data.model || 'default' },
-    { label: 'Role', value: data.role || 'worker' },
-    { label: 'Autonomous', value: data.autonomous ? 'Yes' : 'No' },
-    { label: 'Max Turns', value: data.max_turns ?? '—' },
-    { label: 'Timeout', value: data.timeout ? `${data.timeout}s` : '—' },
-    { label: 'Max Iterations', value: data.autonomous_max_iterations ?? '—' },
-    { label: 'Storage Path', value: data.storage_path || '—' },
-    { label: 'Created', value: data.created_at ? formatTimestamp(data.created_at) : '—' },
-    { label: 'PID', value: data.pid || '—' },
-    { label: 'Pod', value: data.pod_name || '—' },
-    { label: 'Manager ID', value: data.manager_id ? data.manager_id.substring(0, 8) + '...' : '—' },
-    ...(isDeleted ? [{ label: 'Deleted At', value: data.deleted_at ? formatTimestamp(data.deleted_at) : '—' }] : []),
+    { label: t('info.fields.sessionId'), value: data.session_id },
+    { label: t('info.fields.name'), value: data.session_name || t('info.unnamed') },
+    { label: t('info.fields.status'), value: isDeleted ? `🗑️ ${t('info.deleted')}` : (data.status || t('info.unknown')) },
+    { label: t('info.fields.model'), value: data.model || t('info.default') },
+    { label: t('info.fields.role'), value: data.role || t('info.worker') },
+    { label: t('info.fields.autonomous'), value: data.autonomous ? t('common.yes') : t('common.no') },
+    { label: t('info.fields.maxTurns'), value: data.max_turns ?? '—' },
+    { label: t('info.fields.timeout'), value: data.timeout ? `${data.timeout}s` : '—' },
+    { label: t('info.fields.maxIterations'), value: data.autonomous_max_iterations ?? '—' },
+    { label: t('info.fields.storagePath'), value: data.storage_path || '—' },
+    { label: t('info.fields.created'), value: data.created_at ? formatTimestamp(data.created_at) : '—' },
+    { label: t('info.fields.pid'), value: data.pid || '—' },
+    { label: t('info.fields.pod'), value: data.pod_name || '—' },
+    { label: t('info.fields.managerId'), value: data.manager_id ? data.manager_id.substring(0, 8) + '...' : '—' },
+    ...(isDeleted ? [{ label: t('info.fields.deletedAt'), value: data.deleted_at ? formatTimestamp(data.deleted_at) : '—' }] : []),
   ];
 
   return (
     <div className="p-5 overflow-y-auto h-full bg-[var(--bg-primary)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-[16px] font-semibold text-[var(--text-primary)] m-0">{data.session_name || 'Session Details'}</h4>
+        <h4 className="text-[16px] font-semibold text-[var(--text-primary)] m-0">{data.session_name || t('info.sessionDetails')}</h4>
         <span className="text-[11px] font-semibold py-[3px] px-2.5 rounded-[12px] uppercase tracking-[0.5px]"
               style={getStatusBadgeStyle()}>
-          {isDeleted ? 'Deleted' : (data.status || 'unknown')}
+          {isDeleted ? t('info.deleted') : (data.status || t('info.unknown'))}
         </span>
       </div>
 
@@ -111,8 +113,8 @@ export default function InfoTab() {
       {/* Actions for deleted */}
       {isDeleted && (
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border-color)]">
-          <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => restoreSession(data.session_id)}>↻ Restore Session</button>
-          <button className={cn("py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => permanentDeleteSession(data.session_id)}>🗑️ Permanently Delete</button>
+          <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => restoreSession(data.session_id)}>↻ {t('info.restoreSession')}</button>
+          <button className={cn("py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => permanentDeleteSession(data.session_id)}>🗑️ {t('info.permanentDelete')}</button>
         </div>
       )}
     </div>

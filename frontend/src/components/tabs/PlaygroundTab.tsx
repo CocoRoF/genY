@@ -7,6 +7,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { getRoads, getGroundTiles, BUILDINGS, NATURE } from '@/lib/cityLayout';
 import { Asset3DLoader } from '@/lib/assetLoader';
 import { AvatarSystem } from '@/lib/avatarSystem';
+import { useI18n } from '@/lib/i18n';
 
 /* ────────────────────────────────────────────────────────────
    Camera controller (reproduces the orbit / pan / zoom from
@@ -263,6 +264,7 @@ function buildCity(loader: Asset3DLoader, scene: THREE.Scene): void {
 
 export default function PlaygroundTab() {
   const sessions = useAppStore((s) => s.sessions);
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [loadingPct, setLoadingPct] = useState<number | null>(0);
 
@@ -287,11 +289,11 @@ export default function PlaygroundTab() {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-[0.9rem] font-semibold text-[var(--text-primary)]">
             <span className="text-[1.1rem]">🏙️</span>
-            City Playground
+            {t('playground.title')}
           </div>
           <span className="text-[0.75rem] text-[var(--text-muted)] px-2 py-0.5 rounded-full"
                 style={{ background: 'rgba(255, 255, 255, 0.06)' }}>
-            {sessions.length} citizens
+            {t('playground.citizens', { count: sessions.length })}
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -302,7 +304,7 @@ export default function PlaygroundTab() {
               background: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
-            title="Zoom In"
+            title={t('playground.zoomIn')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -315,7 +317,7 @@ export default function PlaygroundTab() {
               background: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
-            title="Zoom Out"
+            title={t('playground.zoomOut')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
               <line x1="5" y1="12" x2="19" y2="12" />
@@ -328,7 +330,7 @@ export default function PlaygroundTab() {
               background: 'rgba(255, 255, 255, 0.06)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
             }}
-            title="Reset View"
+            title={t('playground.resetView')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -349,7 +351,7 @@ export default function PlaygroundTab() {
                    border: '3px solid rgba(255, 255, 255, 0.1)',
                    borderTopColor: 'var(--primary-color)',
                  }} />
-            <div className="text-[0.85rem] text-[var(--text-secondary)]">Building city...</div>
+            <div className="text-[0.85rem] text-[var(--text-secondary)]">{t('playground.building')}</div>
           </div>
         )}
 
@@ -417,7 +419,7 @@ export default function PlaygroundTab() {
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center z-10 pointer-events-none">
           <div className="text-[0.8rem] text-[var(--text-muted)] px-4 py-1.5 rounded-full"
                style={{ background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(8px)' }}>
-            Create sessions to see citizens in the city!
+            {t('playground.emptyCta')}
           </div>
         </div>
       )}

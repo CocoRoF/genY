@@ -2,34 +2,37 @@
 
 import { useState, useCallback } from 'react';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
+import { useI18n } from '@/lib/i18n';
 import { CATEGORY_INFO, type WfNodeTypeDef } from '@/types/workflow';
 
 // ========== Special pseudo-nodes (frontend-only) ==========
 
-const SPECIAL_NODES: WfNodeTypeDef[] = [
-  {
-    node_type: 'start',
-    label: 'Start',
-    description: 'Entry point of the workflow',
-    category: 'special',
-    icon: '▶',
-    color: '#10b981',
-    is_conditional: false,
-    parameters: [],
-    output_ports: [{ id: 'default', label: 'Output' }],
-  },
-  {
-    node_type: 'end',
-    label: 'End',
-    description: 'Exit point of the workflow',
-    category: 'special',
-    icon: '⏹',
-    color: '#6b7280',
-    is_conditional: false,
-    parameters: [],
-    output_ports: [],
-  },
-];
+function getSpecialNodes(t: (key: string) => string): WfNodeTypeDef[] {
+  return [
+    {
+      node_type: 'start',
+      label: t('nodePalette.startNode'),
+      description: t('nodePalette.startDesc'),
+      category: 'special',
+      icon: '▶',
+      color: '#10b981',
+      is_conditional: false,
+      parameters: [],
+      output_ports: [{ id: 'default', label: t('nodePalette.output') }],
+    },
+    {
+      node_type: 'end',
+      label: t('nodePalette.endNode'),
+      description: t('nodePalette.endDesc'),
+      category: 'special',
+      icon: '⏹',
+      color: '#6b7280',
+      is_conditional: false,
+      parameters: [],
+      output_ports: [],
+    },
+  ];
+}
 
 // ========== Draggable Palette Item ==========
 
@@ -103,7 +106,9 @@ function CategorySection({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   const info = CATEGORY_INFO[category] || { label: category, icon: '📦', color: '#64748b' };
+  const label = t(`nodePalette.categories.${category}`) || info.label;
 
   return (
     <div className="mb-1">
@@ -117,7 +122,7 @@ function CategorySection({
       >
         <span className="text-[13px]">{info.icon}</span>
         <span className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex-1">
-          {info.label}
+          {label}
         </span>
         <span className="text-[10px] text-[var(--text-muted)] mr-1">{nodes.length}</span>
         <svg
@@ -147,6 +152,7 @@ function CategorySection({
 
 export default function NodePalette() {
   const { nodeCatalog } = useWorkflowStore();
+  const { t } = useI18n();
   const [openCategories, setOpenCategories] = useState<Set<string>>(
     new Set(['special', 'model', 'task', 'logic', 'memory', 'resilience']),
   );
@@ -164,13 +170,13 @@ export default function NodePalette() {
   if (!nodeCatalog) {
     return (
       <div className="flex items-center justify-center h-32 text-[var(--text-muted)] text-[12px]">
-        Loading nodes…
+        {t('nodePalette.loading')}
       </div>
     );
   }
 
   // Merge catalog categories with special pseudo-nodes
-  const allCategories: Record<string, WfNodeTypeDef[]> = { special: SPECIAL_NODES };
+  const allCategories: Record<string, WfNodeTypeDef[]> = { special: getSpecialNodes(t) };
   for (const [cat, nodes] of Object.entries(nodeCatalog.categories)) {
     allCategories[cat] = nodes;
   }
@@ -196,7 +202,7 @@ export default function NodePalette() {
       {/* Header */}
       <div className="px-3 py-2.5 border-b border-[var(--border-color)]">
         <div className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-          Node Palette
+          {t('nodePalette.title')}
         </div>
         {/* Search */}
         <div className="relative">
@@ -210,7 +216,7 @@ export default function NodePalette() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search nodes…"
+            placeholder={t('nodePalette.search')}
             className="
               w-full pl-7 pr-2 py-1.5 text-[12px]
               bg-[var(--bg-tertiary)] border border-[var(--border-color)]
@@ -236,14 +242,14 @@ export default function NodePalette() {
 
         {sortedCategories.length === 0 && (
           <div className="text-center text-[var(--text-muted)] text-[12px] py-8">
-            No matching nodes found
+            {t('nodePalette.noMatch')}
           </div>
         )}
       </div>
 
       {/* Tip */}
       <div className="px-3 py-2 border-t border-[var(--border-color)] text-[10px] text-[var(--text-muted)]">
-        Drag nodes onto the canvas to add them to your workflow.
+        {t('nodePalette.dragTip')}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { workflowApi } from '@/lib/workflowApi';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 import type { WorkflowDefinition } from '@/types/workflow';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 
@@ -15,26 +16,28 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 
 // ==================== Built-in Graph Cards ====================
 
-const BUILT_IN_GRAPHS = [
-  {
-    id: '__builtin_simple',
-    name: 'Simple (Default)',
-    description: 'Basic agent loop: memory → guard → LLM call → post-processing → end. Used when autonomous mode is disabled.',
-    graph_type: 'simple' as const,
-    nodeCount: 5,
-    edgeCount: 4,
-    isBuiltIn: true,
-  },
-  {
-    id: '__builtin_autonomous',
-    name: 'Autonomous',
-    description: 'Full autonomous execution graph with difficulty classification, easy/medium/hard paths, review loops, TODO management, and resilience infrastructure.',
-    graph_type: 'autonomous' as const,
-    nodeCount: 24,
-    edgeCount: 30,
-    isBuiltIn: true,
-  },
-];
+function getBuiltInGraphs(t: (key: string) => string) {
+  return [
+    {
+      id: '__builtin_simple',
+      name: t('workflowsTab.simpleDefault'),
+      description: t('workflowsTab.simpleDesc'),
+      graph_type: 'simple' as const,
+      nodeCount: 5,
+      edgeCount: 4,
+      isBuiltIn: true,
+    },
+    {
+      id: '__builtin_autonomous',
+      name: t('workflowsTab.autonomousName'),
+      description: t('workflowsTab.autonomousDesc'),
+      graph_type: 'autonomous' as const,
+      nodeCount: 24,
+      edgeCount: 30,
+      isBuiltIn: true,
+    },
+  ];
+}
 
 // ==================== Workflow Card ====================
 
@@ -57,6 +60,7 @@ function WorkflowCard({
   onClone?: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useI18n();
   const isTemplate = isBuiltIn || workflow.is_template;
   return (
     <div
@@ -76,27 +80,27 @@ function WorkflowCard({
         <div className="flex items-center gap-1 shrink-0">
           {isTemplate && (
             <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(168,85,247,0.12)] text-[#c084fc] border border-[rgba(168,85,247,0.2)] uppercase tracking-wide">
-              {isBuiltIn ? 'Built-in' : 'Template'}
+              {isBuiltIn ? t('workflowsTab.builtIn') : t('workflowsTab.template')}
             </span>
           )}
         </div>
       </div>
 
       {/* Description */}
-      <p className="text-[0.75rem] text-[var(--text-muted)] line-clamp-2 leading-[1.5]">{workflow.description || 'No description'}</p>
+      <p className="text-[0.75rem] text-[var(--text-muted)] line-clamp-2 leading-[1.5]">{workflow.description || t('workflowsTab.noDescription')}</p>
 
       {/* Stats */}
       <div className="flex items-center gap-3 text-[0.6875rem] text-[var(--text-muted)]">
         {workflow.nodeCount !== undefined && (
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary-color)]" />
-            {workflow.nodeCount} nodes
+            {t('workflowsTab.nodes', { count: workflow.nodeCount })}
           </span>
         )}
         {workflow.edgeCount !== undefined && (
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]" />
-            {workflow.edgeCount} edges
+            {t('workflowsTab.edges', { count: workflow.edgeCount })}
           </span>
         )}
       </div>
@@ -106,34 +110,34 @@ function WorkflowCard({
         {onView && (
           <button
             className="h-7 px-2 flex items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="View"
+            title={t('common.view')}
             onClick={e => { e.stopPropagation(); onView(); }}
           >
-            View
+            {t('common.view')}
           </button>
         )}
         {onEdit && (
           <button
             className="h-7 px-2 flex items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Edit"
+            title={t('common.edit')}
             onClick={e => { e.stopPropagation(); onEdit(); }}
           >
-            Edit
+            {t('common.edit')}
           </button>
         )}
         {onClone && (
           <button
             className="h-7 px-2 flex items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Clone"
+            title={t('common.clone')}
             onClick={e => { e.stopPropagation(); onClone(); }}
           >
-            Clone
+            {t('common.clone')}
           </button>
         )}
         {onDelete && !workflow.is_template && (
           <button
             className="w-7 h-7 flex items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[rgba(239,68,68,0.2)] text-[var(--text-muted)] hover:text-[var(--danger-color)] hover:bg-[rgba(239,68,68,0.08)] text-sm font-medium transition-colors"
-            title="Delete"
+            title={t('common.delete')}
             onClick={e => { e.stopPropagation(); onDelete(); }}
           >
             ×
@@ -200,7 +204,7 @@ export default function GraphWorkflowsTab() {
   }, [fetchAll]);
 
   const handleDelete = useCallback(async (id: string, name: string) => {
-    if (!confirm(`Delete workflow "${name}"?`)) return;
+    if (!confirm(t('workflowStore.deleteConfirm', { name }))) return;
     try {
       await workflowApi.delete(id);
       if (selectedId === id) setSelectedId(null);
@@ -211,6 +215,8 @@ export default function GraphWorkflowsTab() {
   }, [fetchAll, selectedId]);
 
   const { loadWorkflow, loadFromDefinition, loadCatalog } = useWorkflowStore();
+  const { t } = useI18n();
+  const builtInGraphs = getBuiltInGraphs(t);
 
   // Ensure node catalog is loaded so loadFromDefinition can resolve styles
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
@@ -253,9 +259,9 @@ export default function GraphWorkflowsTab() {
             className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={() => { setMode('list'); fetchAll(); }}
           >
-            ← Back to Workflows
+            {t('workflowsTab.backToWorkflows')}
           </button>
-          <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">Workflow Editor</span>
+          <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.workflowEditor')}</span>
         </div>
         <div className="flex-1 min-h-0">
           <WorkflowEditor />
@@ -273,11 +279,11 @@ export default function GraphWorkflowsTab() {
             className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={() => { setMode('list'); }}
           >
-            ← Back to Workflows
+            {t('workflowsTab.backToWorkflows')}
           </button>
-          <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">View: {viewName}</span>
+          <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.viewPrefix')}{viewName}</span>
           <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(107,114,128,0.12)] text-[var(--text-muted)] border border-[rgba(107,114,128,0.2)] uppercase tracking-wide">
-            Read-only
+            {t('workflowsTab.readOnly')}
           </span>
         </div>
         <div className="flex-1 min-h-0">
@@ -293,9 +299,9 @@ export default function GraphWorkflowsTab() {
       {/* Header */}
       <div className="flex items-center justify-between py-4 px-6 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
         <div>
-          <h2 className="text-[1.125rem] font-semibold text-[var(--text-primary)]">Graph Workflows</h2>
+          <h2 className="text-[1.125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.title')}</h2>
           <p className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">
-            Manage graph workflows for agent sessions. Built-in graphs are always available; create custom workflows for specialized behavior.
+            {t('workflowsTab.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -303,13 +309,13 @@ export default function GraphWorkflowsTab() {
             className="h-8 px-3 text-[0.75rem] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={openEditor}
           >
-            Open Editor
+            {t('workflowsTab.openEditor')}
           </button>
           <button
             className="h-8 px-3 text-[0.75rem] font-medium rounded-md border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)] hover:bg-[rgba(59,130,246,0.18)] transition-colors"
             onClick={() => setShowCreateDialog(true)}
           >
-            + New Workflow
+            {t('workflowsTab.newWorkflow')}
           </button>
         </div>
       </div>
@@ -318,24 +324,24 @@ export default function GraphWorkflowsTab() {
       {error && (
         <div className="mx-6 mt-3 p-2.5 rounded-md bg-[rgba(239,68,68,0.1)] text-[0.8125rem] text-[var(--danger-color)]">
           {error}
-          <button className="ml-2 underline text-[0.75rem]" onClick={() => setError('')}>dismiss</button>
+          <button className="ml-2 underline text-[0.75rem]" onClick={() => setError('')}>{t('common.dismiss')}</button>
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-5">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-[var(--text-muted)] text-[0.875rem]">Loading workflows…</div>
+          <div className="flex items-center justify-center py-12 text-[var(--text-muted)] text-[0.875rem]">{t('workflowsTab.loadingWorkflows')}</div>
         ) : (
           <div className="space-y-6">
             {/* Built-in Graphs */}
             <section>
               <h3 className="text-[0.8125rem] font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--success-color)]" />
-                Built-in Graphs
+                {t('workflowsTab.builtInGraphs')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {BUILT_IN_GRAPHS.map(g => (
+                {builtInGraphs.map(g => (
                   <WorkflowCard
                     key={g.id}
                     workflow={g}
@@ -357,7 +363,7 @@ export default function GraphWorkflowsTab() {
               <section>
                 <h3 className="text-[0.8125rem] font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#c084fc]" />
-                  Templates
+                  {t('workflowsTab.templates')}
                   <span className="text-[0.6875rem] text-[var(--text-muted)] font-normal">({templates.length})</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -379,17 +385,17 @@ export default function GraphWorkflowsTab() {
             <section>
               <h3 className="text-[0.8125rem] font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary-color)]" />
-                Custom Workflows
+                {t('workflowsTab.customWorkflows')}
                 <span className="text-[0.6875rem] text-[var(--text-muted)] font-normal">({workflows.filter(w => !w.is_template).length})</span>
               </h3>
               {workflows.filter(w => !w.is_template).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 px-4 rounded-lg border border-dashed border-[var(--border-color)] bg-[var(--bg-primary)]">
-                  <p className="text-[0.8125rem] text-[var(--text-muted)] mb-3">No custom workflows yet</p>
+                  <p className="text-[0.8125rem] text-[var(--text-muted)] mb-3">{t('workflowsTab.noCustom')}</p>
                   <button
                     className="h-8 px-3 text-[0.75rem] font-medium rounded-md border border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)] hover:bg-[rgba(59,130,246,0.18)] transition-colors"
                     onClick={() => setShowCreateDialog(true)}
                   >
-                    + Create your first workflow
+                    {t('workflowsTab.createFirst')}
                   </button>
                 </div>
               ) : (
@@ -417,15 +423,15 @@ export default function GraphWorkflowsTab() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateDialog(false)}>
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[400px] shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-3 px-5 border-b border-[var(--border-color)]">
-              <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">New Workflow</h3>
+              <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.newWorkflowTitle')}</h3>
               <button className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setShowCreateDialog(false)}>×</button>
             </div>
             <div className="p-5 flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-[0.75rem] font-medium text-[var(--text-secondary)]">Name</label>
+                <label className="text-[0.75rem] font-medium text-[var(--text-secondary)]">{t('workflowsTab.nameLabel')}</label>
                 <input
                   className="w-full py-2 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.8125rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
-                  placeholder="My Workflow"
+                  placeholder={t('workflowsTab.namePlaceholder')}
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleCreate()}
@@ -433,19 +439,19 @@ export default function GraphWorkflowsTab() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[0.75rem] font-medium text-[var(--text-secondary)]">Description</label>
+                <label className="text-[0.75rem] font-medium text-[var(--text-secondary)]">{t('workflowsTab.descriptionLabel')}</label>
                 <textarea
                   className="w-full py-2 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.8125rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] resize-y"
                   rows={2}
-                  placeholder="Optional description…"
+                  placeholder={t('workflowsTab.descriptionPlaceholder')}
                   value={newDesc}
                   onChange={e => setNewDesc(e.target.value)}
                 />
               </div>
             </div>
             <div className="flex justify-end gap-2 py-3 px-5 border-t border-[var(--border-color)]">
-              <button className="py-1.5 px-3 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer border border-[var(--border-color)]" onClick={() => setShowCreateDialog(false)}>Cancel</button>
-              <button className="py-1.5 px-3 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer border-none disabled:opacity-50" onClick={handleCreate} disabled={!newName.trim()}>Create</button>
+              <button className="py-1.5 px-3 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer border border-[var(--border-color)]" onClick={() => setShowCreateDialog(false)}>{t('common.cancel')}</button>
+              <button className="py-1.5 px-3 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer border-none disabled:opacity-50" onClick={handleCreate} disabled={!newName.trim()}>{t('common.create')}</button>
             </div>
           </div>
         </div>

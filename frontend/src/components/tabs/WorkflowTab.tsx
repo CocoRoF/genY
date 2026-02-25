@@ -7,6 +7,7 @@ import NodePalette from '@/components/workflow/NodePalette';
 import PropertyPanel from '@/components/workflow/PropertyPanel';
 import WorkflowCanvas from '@/components/workflow/WorkflowCanvas';
 import { workflowApi } from '@/lib/workflowApi';
+import { useI18n } from '@/lib/i18n';
 import type { WorkflowDefinition } from '@/types/workflow';
 
 // ==================== Toolbar ====================
@@ -26,6 +27,7 @@ function WorkflowToolbar() {
     loadFromDefinition,
   } = useWorkflowStore();
 
+  const { t } = useI18n();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [templates, setTemplates] = useState<WorkflowDefinition[]>([]);
@@ -45,7 +47,7 @@ function WorkflowToolbar() {
 
   const handleDelete = useCallback(async () => {
     if (!currentWorkflow) return;
-    if (!confirm(`Delete workflow "${currentWorkflow.name}"?`)) return;
+    if (!confirm(t('workflowStore.deleteConfirm', { name: currentWorkflow.name }))) return;
     await deleteWorkflow(currentWorkflow.id);
   }, [currentWorkflow, deleteWorkflow]);
 
@@ -71,10 +73,10 @@ function WorkflowToolbar() {
           max-w-[180px]
         "
       >
-        <option value="">Select workflow…</option>
+        <option value="">{t('workflowEditor.selectWorkflow')}</option>
         {workflows.map(w => (
           <option key={w.id} value={w.id}>
-            {w.name} {w.is_template ? '(template)' : ''}
+            {w.name} {w.is_template ? t('workflowEditor.templateSuffix') : ''}
           </option>
         ))}
       </select>
@@ -87,27 +89,27 @@ function WorkflowToolbar() {
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="Workflow name"
+            placeholder={t('workflowEditor.workflowName')}
             autoFocus
             className="h-7 px-2 text-[11px] w-[130px] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary-color)]"
           />
-          <ToolbarBtn onClick={handleCreate} title="Confirm" disabled={!newName.trim()}>
+          <ToolbarBtn onClick={handleCreate} title={t('workflowEditor.confirm')} disabled={!newName.trim()}>
             ✓
           </ToolbarBtn>
-          <ToolbarBtn onClick={() => setShowCreate(false)} title="Cancel">
+          <ToolbarBtn onClick={() => setShowCreate(false)} title={t('common.cancel')}>
             ✕
           </ToolbarBtn>
         </div>
       ) : (
-        <ToolbarBtn onClick={() => setShowCreate(true)} title="New workflow">
-          ＋ New
+        <ToolbarBtn onClick={() => setShowCreate(true)} title={t('workflowEditor.newWorkflowTooltip')}>
+          {t('workflowEditor.new')}
         </ToolbarBtn>
       )}
 
       {/* Templates */}
       <div className="relative">
-        <ToolbarBtn onClick={() => setShowTemplates(!showTemplates)} title="Load template">
-          📋 Template
+        <ToolbarBtn onClick={() => setShowTemplates(!showTemplates)} title={t('workflowEditor.loadTemplateTooltip')}>
+          {t('workflowEditor.saveTemplate')}
         </ToolbarBtn>
         {showTemplates && templates.length > 0 && (
           <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden">
@@ -131,23 +133,23 @@ function WorkflowToolbar() {
       <ToolbarBtn
         onClick={() => saveWorkflow()}
         disabled={!currentWorkflow || !isDirty}
-        title="Save workflow"
+        title={t('workflowEditor.saveTooltip')}
         accent={isDirty}
       >
-        💾 Save{isDirty ? '*' : ''}
+        {isDirty ? t('workflowEditor.saveDirty') : t('workflowEditor.save')}
       </ToolbarBtn>
 
       {/* Clone */}
       {currentWorkflow && (
-        <ToolbarBtn onClick={() => cloneWorkflow(currentWorkflow.id)} title="Clone workflow">
-          📑 Clone
+        <ToolbarBtn onClick={() => cloneWorkflow(currentWorkflow.id)} title={t('workflowEditor.cloneTooltip')}>
+          {t('workflowEditor.clone')}
         </ToolbarBtn>
       )}
 
       {/* Delete */}
       {currentWorkflow && !currentWorkflow.is_template && (
-        <ToolbarBtn onClick={handleDelete} danger title="Delete workflow">
-          🗑 Delete
+        <ToolbarBtn onClick={handleDelete} danger title={t('workflowEditor.deleteTooltip')}>
+          {t('workflowEditor.deleteBtn')}
         </ToolbarBtn>
       )}
 
@@ -156,7 +158,7 @@ function WorkflowToolbar() {
 
       {/* Status */}
       {isLoading && (
-        <span className="text-[10px] text-[var(--text-muted)] animate-pulse">Loading…</span>
+        <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t('workflowEditor.loading')}</span>
       )}
       {error && (
         <span className="text-[10px] text-[var(--danger-color)] max-w-[200px] truncate" title={error}>
@@ -167,7 +169,7 @@ function WorkflowToolbar() {
       {/* Workflow info */}
       {currentWorkflow && (
         <span className="text-[10px] text-[var(--text-muted)]">
-          {currentWorkflow.nodes?.length || 0} nodes · {currentWorkflow.edges?.length || 0} edges
+          {t('workflowEditor.nodesEdges', { nodes: currentWorkflow.nodes?.length || 0, edges: currentWorkflow.edges?.length || 0 })}
         </span>
       )}
     </div>

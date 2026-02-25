@@ -1,0 +1,489 @@
+/**
+ * English translations — the default / source-of-truth locale.
+ *
+ * Key naming convention:
+ *   <component>.<section?>.<key>
+ *
+ * Interpolation: use {variable} — replaced at runtime by the `t()` helper.
+ */
+
+const en = {
+  // ─── Global / Layout ───
+  app: {
+    title: 'Geny — Geny Execute, Not You',
+    description: 'Geny: Geny Execute, Not You — Agent session management and 3D city playground',
+  },
+
+  // ─── Header ───
+  header: {
+    subtitle: 'Geny Execute, Not You',
+    sessions: '{count} sessions',
+    disconnected: 'Disconnected',
+  },
+
+  // ─── Tab Navigation ───
+  tabs: {
+    main: 'Main',
+    playground: 'Playground',
+    workflows: 'Workflows',
+    settings: 'Settings',
+    info: 'Info',
+    graph: 'Graph',
+    command: 'Command',
+    dashboard: 'Dashboard',
+    storage: 'Storage',
+    logs: 'Logs',
+  },
+
+  // ─── Sidebar ───
+  sidebar: {
+    sessions: 'Sessions',
+    newSession: 'New Session',
+    total: 'Total',
+    running: 'Running',
+    errors: 'Errors',
+    noSessions: 'No sessions yet',
+    deleteSession: 'Delete session',
+    deletedSessions: 'Deleted Sessions',
+    restore: 'Restore',
+    permanentDelete: 'Permanently delete',
+    sessionFallback: 'Session {id}',
+  },
+
+  // ─── Common ───
+  common: {
+    save: 'Save',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    create: 'Create',
+    edit: 'Edit',
+    close: 'Close',
+    loading: 'Loading...',
+    refresh: 'Refresh',
+    yes: 'Yes',
+    no: 'No',
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    export: 'Export',
+    import: 'Import',
+    view: 'View',
+    clone: 'Clone',
+    reset: 'Reset',
+    back: 'Back',
+    dismiss: 'dismiss',
+    unknownTab: 'Unknown tab',
+    selectOption: '-- Select --',
+    noOutput: 'No output yet',
+  },
+
+  // ─── Main Tab ───
+  main: {
+    langLabel: 'Language',
+    heroTitle: 'Welcome to Geny',
+    heroSubtitle: 'Geny Execute, Not You',
+    heroTagline: 'An autonomous multi-agent system that manages multiple AI sessions, orchestrates complex tasks, and visualizes everything in an interactive 3D city playground.',
+    sections: [
+      {
+        title: '🚀 Getting Started',
+        body: [
+          '1. Create a Session — Click the "+ New Session" button in the sidebar to create a new agent session. Choose a role (Developer, Researcher, Manager, or Worker) and give it a name.',
+          '2. Send a Command — Switch to the Command tab and type your instruction. The agent will autonomously handle the task.',
+          '3. Watch it Work — Open the Playground tab to see your agents come alive as characters wandering a 3D miniature city!',
+        ],
+      },
+      {
+        title: '📂 Understanding Sessions',
+        body: [
+          'Each session is an independent AI agent with its own memory and workspace. You can run multiple sessions at the same time — each one works on its own task without interfering with the others.',
+          'Sessions can be paused, resumed, or deleted at any time from the sidebar. Deleted sessions go to the trash and can be restored if needed.',
+        ],
+      },
+      {
+        title: '🧭 Navigating the Tabs',
+        body: [
+          '• Main — You are here! This is the home page with a guide on how to use Geny.',
+          '• Playground — A 3D city visualization where your active agents appear as animated characters. Pan, rotate, and zoom to explore.',
+          '• Settings — Configure runtime settings, channel integrations, and advanced options.',
+          '• Info — View detailed information about the selected session.',
+          '• Graph — Visualize the agent\'s LangGraph execution flow in real time.',
+          '• Command — The primary interface to send instructions to your agent and see results.',
+          '• Dashboard — (Manager role only) Monitor and coordinate subordinate agents.',
+          '• Storage — Browse files and artifacts produced by the session.',
+          '• Logs — View raw execution logs for debugging and monitoring.',
+        ],
+      },
+      {
+        title: '🎭 Roles',
+        body: [
+          '• Developer — Optimized for coding tasks: writing, reviewing, and refactoring code.',
+          '• Researcher — Focused on information gathering, analysis, and summarization.',
+          '• Manager — Coordinates other sessions, delegates tasks, and oversees progress.',
+          '• Worker — A general-purpose executor for miscellaneous tasks.',
+          '• Self-Manager — Autonomous agent that plans and manages its own workflow.',
+        ],
+      },
+      {
+        title: '🏙️ The 3D Playground',
+        body: [
+          'The Playground tab renders a miniature city built from voxel-style assets. Each active session shows up as an animated character that wanders around the city using A* pathfinding.',
+          'Controls: Left-click drag to pan, right-click drag to rotate, scroll to zoom in/out.',
+        ],
+      },
+      {
+        title: '🔌 MCP & Custom Tools',
+        body: [
+          'Geny supports MCP (Model Context Protocol) servers and custom tools. MCP server configurations placed in the backend are automatically loaded for all sessions.',
+          'Custom Python tools placed in the tools directory are auto-registered and available to every agent.',
+        ],
+      },
+    ],
+    tipTitle: '💡 Tips',
+    tips: [
+      'You can run multiple sessions in parallel — each agent works independently.',
+      'Use the Manager role to orchestrate and delegate tasks across other sessions.',
+      'The sidebar shows real-time session status with a green dot for running sessions.',
+      'Click on any session in the sidebar to instantly switch to it.',
+      'Deleted sessions can be restored from the trash section at the bottom of the sidebar.',
+    ],
+    footerNote: 'Geny is under active development. Features and UI may change. For questions or issues, please refer to the project repository.',
+  },
+
+  // ─── Command Tab ───
+  commandTab: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session from the list to execute commands',
+    sessionFallback: 'Session {id}',
+    autonomous: 'Autonomous',
+    single: 'Single',
+    model: 'Model',
+    maxTurns: 'Max turns',
+    placeholder: 'Enter command or prompt...',
+    skipPermissions: 'Skip permissions',
+    executingBtn: '⏳ Executing...',
+    executeBtn: '▶ Execute',
+    autonomousBtn: '🔄 Autonomous',
+    stopBtn: '⏹ Stop',
+    output: 'Output',
+    statusExecuting: 'Executing...',
+    statusComplete: 'Complete',
+    iterations: 'iterations',
+    statusFailed: 'Failed',
+    requestFailed: 'Request failed',
+    statusStopped: 'Stopped',
+    statusSuccess: 'Success',
+  },
+
+  // ─── Settings Tab ───
+  settings: {
+    title: 'Settings',
+    all: 'All',
+    noConfigs: 'No configurations found',
+    fieldsConfigured: '{count}/{total} fields configured',
+    issues: '{count} issues',
+    editPrefix: 'Edit: ',
+    resetToDefaults: 'Reset to Defaults',
+    resetConfirm: 'Reset "{name}" to defaults?',
+    configSaved: 'Configuration saved',
+    saveFailed: 'Save failed',
+    resetSuccess: 'Reset to defaults',
+    exported: 'Exported',
+    imported: 'Imported',
+    importFailed: 'Import failed',
+    invalidJson: 'Invalid JSON',
+    importTitle: 'Import Configuration',
+    importPlaceholder: 'Paste configuration JSON here...',
+    groupLabels: {
+      connection: 'Connection',
+      server: 'Server Settings',
+      workspace: 'Workspace',
+      teams: 'Teams',
+      permissions: 'Permissions',
+      behavior: 'Behavior',
+      session: 'Session Settings',
+      commands: 'Commands',
+      graph: 'Microsoft Graph',
+      general: 'General',
+      language: 'Language',
+      api: 'API Settings',
+      redis: 'Redis',
+      limits: 'Limits',
+      telemetry: 'Telemetry',
+      github: 'GitHub',
+    } as Record<string, string>,
+    hide: 'Hide',
+    show: 'Show',
+  },
+
+  // ─── Info Tab ───
+  info: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session to view its details',
+    loading: 'Loading...',
+    sessionDetails: 'Session Details',
+    unnamed: '(unnamed)',
+    deleted: 'Deleted',
+    unknown: 'unknown',
+    default: 'default',
+    worker: 'worker',
+    restoreSession: 'Restore Session',
+    permanentDelete: 'Permanently Delete',
+    fields: {
+      sessionId: 'Session ID',
+      name: 'Name',
+      status: 'Status',
+      model: 'Model',
+      role: 'Role',
+      autonomous: 'Autonomous',
+      maxTurns: 'Max Turns',
+      timeout: 'Timeout',
+      maxIterations: 'Max Iterations',
+      storagePath: 'Storage Path',
+      created: 'Created',
+      pid: 'PID',
+      pod: 'Pod',
+      managerId: 'Manager ID',
+      deletedAt: 'Deleted At',
+    },
+  },
+
+  // ─── Dashboard Tab ───
+  dashboardTab: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session to view its dashboard',
+    managerOnly: 'Manager Only',
+    managerOnlyDesc: 'Dashboard is only available for manager sessions',
+    title: 'Manager Dashboard',
+    workers: 'Workers',
+    workersCount: '{count} workers',
+    noWorkers: 'No workers assigned',
+    working: 'Working',
+    idle: 'Idle',
+    timeline: 'Activity Timeline',
+    noActivity: 'No activity yet',
+    workerPrefix: 'Worker: ',
+    events: {
+      task_delegated: 'Task Delegated',
+      worker_started: 'Worker Started',
+      worker_completed: 'Worker Completed',
+      worker_error: 'Worker Error',
+      worker_progress: 'Progress Update',
+      plan_created: 'Plan Created',
+      plan_updated: 'Plan Updated',
+      user_message: 'User Message',
+      manager_response: 'Manager Response',
+    } as Record<string, string>,
+  },
+
+  // ─── Logs Tab ───
+  logsTab: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session from the list to view logs',
+    title: 'Session Logs',
+    allLevels: 'All Levels',
+    autoRefresh: 'Auto-refresh',
+    refresh: 'Refresh',
+    noLogs: 'No log entries',
+  },
+
+  // ─── Storage Tab ───
+  storageTab: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session from the list to view its storage',
+    title: 'Session Storage',
+    refresh: 'Refresh',
+    empty: 'Storage is empty',
+    noFile: 'No file selected',
+    loading: 'Loading...',
+    selectFile: 'Select a file to preview',
+    emptyFile: '(empty file)',
+    loadError: 'Error loading file: {message}',
+  },
+
+  // ─── Playground Tab ───
+  playground: {
+    title: 'City Playground',
+    citizens: '{count} citizens',
+    zoomIn: 'Zoom In',
+    zoomOut: 'Zoom Out',
+    resetView: 'Reset View',
+    building: 'Building city...',
+    emptyCta: 'Create sessions to see citizens in the city!',
+  },
+
+  // ─── Graph Tab ───
+  graphTab: {
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session to view its graph, or go to ',
+    workflowsLink: 'Workflows',
+    selectSessionSuffix: ' to manage graph workflows',
+    loadingGraph: 'Loading graph...',
+    title: 'Graph',
+    autonomous: 'Autonomous',
+    simple: 'Simple',
+    resetBtn: 'Reset',
+    hasPrompt: 'Has Prompt',
+    description: 'Description',
+    nodeId: 'Node ID',
+    incoming: 'Incoming ({count})',
+    outgoing: 'Outgoing ({count})',
+    conditionalRouting: 'Conditional Routing',
+    promptTemplate: 'Prompt Template',
+    metadata: 'Metadata',
+    innerGraph: 'Inner Graph',
+    path: '{name} Path',
+  },
+
+  // ─── Graph Workflows Tab ───
+  workflowsTab: {
+    title: 'Graph Workflows',
+    subtitle: 'Manage graph workflows for agent sessions. Built-in graphs are always available; create custom workflows for specialized behavior.',
+    openEditor: 'Open Editor',
+    newWorkflow: '+ New Workflow',
+    loadingWorkflows: 'Loading workflows…',
+    builtInGraphs: 'Built-in Graphs',
+    templates: 'Templates',
+    customWorkflows: 'Custom Workflows',
+    noCustom: 'No custom workflows yet',
+    createFirst: '+ Create your first workflow',
+    noDescription: 'No description',
+    builtIn: 'Built-in',
+    template: 'Template',
+    nodes: '{count} nodes',
+    edges: '{count} edges',
+    backToWorkflows: '← Back to Workflows',
+    workflowEditor: 'Workflow Editor',
+    viewPrefix: 'View: ',
+    readOnly: 'Read-only',
+    simpleDefault: 'Simple (Default)',
+    simpleDesc: 'Basic agent loop: memory → guard → LLM call → post-processing → end. Used when autonomous mode is disabled.',
+    autonomousName: 'Autonomous',
+    autonomousDesc: 'Full autonomous execution graph with difficulty classification, easy/medium/hard paths, review loops, TODO management, and resilience infrastructure.',
+    newWorkflowTitle: 'New Workflow',
+    nameLabel: 'Name',
+    namePlaceholder: 'My Workflow',
+    descriptionLabel: 'Description',
+    descriptionPlaceholder: 'Optional description…',
+  },
+
+  // ─── Workflow Editor ───
+  workflowEditor: {
+    selectWorkflow: 'Select workflow…',
+    templateSuffix: '(template)',
+    workflowName: 'Workflow name',
+    new: '＋ New',
+    confirm: 'Confirm',
+    newWorkflowTooltip: 'New workflow',
+    loadTemplateTooltip: 'Load template',
+    saveTemplate: '📋 Template',
+    save: '💾 Save',
+    saveDirty: '💾 Save*',
+    saveTooltip: 'Save workflow',
+    clone: '📑 Clone',
+    cloneTooltip: 'Clone workflow',
+    deleteBtn: '🗑 Delete',
+    deleteTooltip: 'Delete workflow',
+    loading: 'Loading…',
+    nodesEdges: '{nodes} nodes · {edges} edges',
+    designTitle: 'Design Your Workflow',
+    designSubtitle: 'Drag nodes from the palette or load a template to get started. Connect nodes by dragging from handles.',
+  },
+
+  // ─── Node Palette ───
+  nodePalette: {
+    title: 'Node Palette',
+    search: 'Search nodes…',
+    noMatch: 'No matching nodes found',
+    dragTip: 'Drag nodes onto the canvas to add them to your workflow.',
+    loading: 'Loading nodes…',
+    startNode: 'Start',
+    startDesc: 'Entry point of the workflow',
+    endNode: 'End',
+    endDesc: 'Exit point of the workflow',
+    output: 'Output',
+    categories: {
+      special: 'Special',
+      model: 'Model',
+      task: 'Task',
+      logic: 'Logic',
+      memory: 'Memory',
+      resilience: 'Resilience',
+    } as Record<string, string>,
+  },
+
+  // ─── Property Panel ───
+  propertyPanel: {
+    title: 'Properties',
+    selectNode: 'Select a node to edit its properties',
+    nodeLabel: 'Node Label',
+    nodeId: 'Node ID',
+    outputPorts: 'Output Ports',
+    deleteNode: 'Delete Node',
+    promptPlaceholder: 'Enter prompt template…',
+    promptHelp: 'Use {field} for state variable substitution. Available: input, answer, review_feedback, last_output',
+    invalidJson: 'Invalid JSON',
+    select: 'Select…',
+  },
+
+  // ─── Create Session Modal ───
+  createSession: {
+    title: 'Create New Session',
+    sessionName: 'Session Name',
+    sessionNamePlaceholder: 'e.g. my-worker-1',
+    role: 'Role',
+    roleWorker: 'Worker',
+    roleManager: 'Manager',
+    model: 'Model',
+    modelDefault: 'Default',
+    managerSession: 'Manager Session',
+    noneStandalone: 'None (Standalone)',
+    managerHelp: 'Select a manager to control this worker',
+    promptTemplate: 'Prompt Template',
+    customNone: 'Custom / None',
+    maxTurns: 'Max Turns',
+    timeout: 'Timeout (s)',
+    graphWorkflow: 'Graph Workflow',
+    builtIn: 'Built-in',
+    simpleDefault: 'Simple (Default)',
+    autonomous: 'Autonomous',
+    customTemplates: 'Custom / Templates',
+    simpleHelp: 'Basic agent loop: guard → LLM → output',
+    autonomousHelp: 'Difficulty-based routing with review loops and TODO management',
+    customHelp: 'Custom workflow graph',
+    maxIterations: 'Max Iterations',
+    systemPrompt: 'System Prompt',
+    systemPromptPlaceholder: 'Optional system prompt...',
+    creating: 'Creating...',
+    createSession: 'Create Session',
+    failedToCreate: 'Failed to create session',
+  },
+
+  // ─── Delete Session Modal ───
+  deleteSessionModal: {
+    title: 'Delete Session',
+    confirm: 'Are you sure you want to delete ',
+    softDeleteNote: 'This will soft-delete the session. You can restore it from the deleted sessions section.',
+    deleting: 'Deleting...',
+  },
+
+  // ─── Workflow Store (error messages) ───
+  workflowStore: {
+    deleteConfirm: 'Delete workflow "{name}"?',
+    cannotSaveTemplate: 'Cannot save a template. Clone it first.',
+    failedSave: 'Failed to save workflow',
+    untitled: 'Untitled Workflow',
+    failedCreate: 'Failed to create workflow',
+    failedLoad: 'Failed to load workflows',
+    failedLoadSingle: 'Failed to load workflow',
+    failedClone: 'Failed to clone workflow',
+    failedCatalog: 'Failed to load node catalog',
+  },
+
+  // ─── Accessibility ───
+  a11y: {
+    decrease: 'Decrease',
+    increase: 'Increase',
+  },
+};
+
+export default en;
+export type Translations = typeof en;

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { commandApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 import type { LogEntry } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -12,6 +13,7 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 
 export default function LogsTab() {
   const { selectedSessionId } = useAppStore();
+  const { t } = useI18n();
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [level, setLevel] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -56,8 +58,8 @@ export default function LogsTab() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center justify-center py-12 px-4">
-          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Select a Session</h3>
-          <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session from the list to view logs</p>
+          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">{t('logsTab.selectSession')}</h3>
+          <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('logsTab.selectSessionDesc')}</p>
         </div>
       </div>
     );
@@ -67,7 +69,7 @@ export default function LogsTab() {
     <div className="flex flex-col flex-1 p-6 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center mb-5 flex-wrap gap-3 shrink-0">
-        <h3 className="text-[1rem] font-semibold">Session Logs</h3>
+        <h3 className="text-[1rem] font-semibold">{t('logsTab.title')}</h3>
         <div className="flex gap-3 items-center">
           <select
             className="py-1.5 pl-2.5 pr-7 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-[6px] text-[var(--text-primary)] text-[0.75rem] font-medium cursor-pointer appearance-none transition-all hover:border-[var(--text-muted)] hover:bg-[var(--bg-secondary)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.15)]"
@@ -78,16 +80,16 @@ export default function LogsTab() {
             }}
             value={level} onChange={e => setLevel(e.target.value)}
           >
-            <option value="">All Levels</option>
+            <option value="">{t('logsTab.allLevels')}</option>
             {['INFO', 'ERROR', 'WARNING', 'DEBUG', 'COMMAND', 'RESPONSE', 'ITER', 'TOOL', 'STREAM'].map(l => (
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
           <label className="flex items-center gap-2 text-[0.8125rem] text-[var(--text-secondary)] cursor-pointer">
             <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
-            Auto-refresh
+            {t('logsTab.autoRefresh')}
           </label>
-          <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={fetchLogs}>↻ Refresh</button>
+          <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={fetchLogs}>↻ {t('common.refresh')}</button>
         </div>
       </div>
 
@@ -95,7 +97,7 @@ export default function LogsTab() {
       <div className="flex-1 min-h-0 overflow-auto bg-[var(--bg-secondary)] rounded-[var(--border-radius)] p-1">
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <p className="text-[0.8125rem] text-[var(--text-muted)]">No log entries</p>
+            <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('logsTab.noLogs')}</p>
           </div>
         ) : (
           entries.map((entry, idx) => {

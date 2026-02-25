@@ -3,20 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import type { ManagerDashboard, WorkerInfo, ManagerEvent } from '@/types';
 
 const EVENT_ICONS: Record<string, string> = {
   task_delegated: '📤', worker_started: '▶️', worker_completed: '✅',
   worker_error: '❌', worker_progress: '🔄', plan_created: '📋',
   plan_updated: '📝', user_message: '💬', manager_response: '🤖',
-};
-
-const EVENT_LABELS: Record<string, string> = {
-  task_delegated: 'Task Delegated', worker_started: 'Worker Started',
-  worker_completed: 'Worker Completed', worker_error: 'Worker Error',
-  worker_progress: 'Progress Update', plan_created: 'Plan Created',
-  plan_updated: 'Plan Updated', user_message: 'User Message',
-  manager_response: 'Manager Response',
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -27,6 +20,7 @@ const EVENT_COLORS: Record<string, string> = {
 
 export default function DashboardTab() {
   const { selectedSessionId, sessions } = useAppStore();
+  const { t, tRaw } = useI18n();
   const [dashboard, setDashboard] = useState<ManagerDashboard | null>(null);
   const [error, setError] = useState('');
 
@@ -54,8 +48,8 @@ export default function DashboardTab() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center justify-center py-12 px-4">
-          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Select a Session</h3>
-          <p className="text-[0.8125rem] text-[var(--text-muted)]">Choose a session to view its dashboard</p>
+          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">{t('dashboardTab.selectSession')}</h3>
+          <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('dashboardTab.selectSessionDesc')}</p>
         </div>
       </div>
     );
@@ -65,8 +59,8 @@ export default function DashboardTab() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center justify-center py-12 px-4">
-          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">Manager Only</h3>
-          <p className="text-[0.8125rem] text-[var(--text-muted)]">Dashboard is only available for manager sessions</p>
+          <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">{t('dashboardTab.managerOnly')}</h3>
+          <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('dashboardTab.managerOnlyDesc')}</p>
         </div>
       </div>
     );
@@ -88,13 +82,13 @@ export default function DashboardTab() {
     <div className="h-full flex flex-col bg-[var(--bg-secondary)]">
       {/* Header */}
       <div className="flex justify-between items-center py-4 px-5 border-b border-[var(--border-color)] bg-[var(--bg-primary)] shrink-0">
-        <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">Manager Dashboard</h3>
+        <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{t('dashboardTab.title')}</h3>
         <div className="flex items-center gap-3">
           <span className="text-[13px] text-[var(--text-muted)] py-1 px-2.5 bg-[var(--bg-tertiary)] rounded-[var(--border-radius)]">
             {session?.session_name || selectedSessionId.substring(0, 8)}
           </span>
           <span className="text-[12px] font-semibold text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">
-            {dashboard?.workers.length || 0} workers
+            {t('dashboardTab.workersCount', { count: dashboard?.workers.length || 0 })}
           </span>
         </div>
       </div>
@@ -104,11 +98,11 @@ export default function DashboardTab() {
         {/* Workers Section */}
         <div className="bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
           <div className="flex justify-between items-center py-3 px-4 border-b border-[var(--border-color)]">
-            <h4 className="text-[13px] font-semibold text-[var(--text-primary)] uppercase tracking-[0.5px]">Workers</h4>
+            <h4 className="text-[13px] font-semibold text-[var(--text-primary)] uppercase tracking-[0.5px]">{t('dashboardTab.workers')}</h4>
           </div>
           <div className="flex-1 p-3 flex flex-col gap-2 overflow-y-auto">
             {!dashboard?.workers.length ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">No workers assigned</p></div>
+              <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">{t('dashboardTab.noWorkers')}</p></div>
             ) : (
               dashboard.workers.map((w: WorkerInfo) => (
                 <div key={w.worker_id}
@@ -123,12 +117,12 @@ export default function DashboardTab() {
                   {w.is_busy ? (
                     <span className="text-[10px] font-semibold text-[var(--warning-color)] py-[2px] px-2 rounded-[10px] animate-pulse"
                           style={{ background: 'rgba(245, 158, 11, 0.15)' }}>
-                      Working
+                      {t('dashboardTab.working')}
                     </span>
                   ) : (
                     <span className="text-[10px] font-semibold text-[var(--success-color)] py-[2px] px-2 rounded-[10px]"
                           style={{ background: 'rgba(16, 185, 129, 0.15)' }}>
-                      Idle
+                      {t('dashboardTab.idle')}
                     </span>
                   )}
                 </div>
@@ -140,11 +134,11 @@ export default function DashboardTab() {
         {/* Activity Timeline Section */}
         <div className="bg-[var(--bg-secondary)] flex flex-col overflow-hidden">
           <div className="flex justify-between items-center py-3 px-4 border-b border-[var(--border-color)]">
-            <h4 className="text-[13px] font-semibold text-[var(--text-primary)] uppercase tracking-[0.5px]">Activity Timeline</h4>
+            <h4 className="text-[13px] font-semibold text-[var(--text-primary)] uppercase tracking-[0.5px]">{t('dashboardTab.timeline')}</h4>
           </div>
           <div className="flex-1 py-3 px-4 overflow-y-auto flex flex-col gap-3">
             {!dashboard?.recent_events.length ? (
-              <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">No activity yet</p></div>
+              <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">{t('dashboardTab.noActivity')}</p></div>
             ) : (
               dashboard.recent_events.map((ev: ManagerEvent, idx: number) => (
                 <div key={idx}
@@ -154,14 +148,14 @@ export default function DashboardTab() {
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[12px] font-semibold text-[var(--text-primary)]">
-                        {EVENT_LABELS[ev.event_type] || ev.event_type}
+                        {t(`dashboardTab.events.${ev.event_type}`) || ev.event_type}
                       </span>
                       <span className="text-[11px] text-[var(--text-muted)]">
                         {new Date(ev.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
                     <p className="text-[13px] text-[var(--text-secondary)] leading-[1.4]">{ev.message}</p>
-                    {ev.worker_id && <p className="text-[11px] text-[var(--text-muted)] mt-1">Worker: {ev.worker_id.substring(0, 8)}</p>}
+                    {ev.worker_id && <p className="text-[11px] text-[var(--text-muted)] mt-1">{t('dashboardTab.workerPrefix')}{ev.worker_id.substring(0, 8)}</p>}
                   </div>
                 </div>
               ))

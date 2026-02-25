@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { workflowApi } from '@/lib/workflowApi';
 import NumberStepper from '@/components/ui/NumberStepper';
+import { useI18n } from '@/lib/i18n';
 import type { CreateAgentRequest, SessionInfo } from '@/types';
 import type { WorkflowDefinition } from '@/types/workflow';
 
@@ -16,8 +17,8 @@ const selectArrow: React.CSSProperties = {
 
 interface Props { onClose: () => void; }
 
-const MODEL_OPTIONS = [
-  { value: '', label: 'Default' },
+const MODEL_OPTIONS_BASE = [
+  { value: '', labelKey: 'createSession.modelDefault' },
   { value: 'claude-opus-4-20250514', label: 'Claude Opus 4' },
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
   { value: 'claude-opus-4-0603', label: 'Claude Opus 4.5' },
@@ -27,6 +28,7 @@ const MODEL_OPTIONS = [
 
 export default function CreateSessionModal({ onClose }: Props) {
   const { createSession, prompts, loadPrompts, loadPromptContent } = useAppStore();
+  const { t } = useI18n();
 
   const [formState, setFormState] = useState<CreateAgentRequest>({
     session_name: '',
@@ -99,7 +101,7 @@ export default function CreateSessionModal({ onClose }: Props) {
       await createSession(payload);
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to create session');
+      setError(e instanceof Error ? e.message : t('createSession.failedToCreate'));
     } finally {
       setSubmitting(false);
     }
@@ -110,7 +112,7 @@ export default function CreateSessionModal({ onClose }: Props) {
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[480px] max-h-[85vh] flex flex-col shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
-          <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">Create New Session</h3>
+          <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('createSession.title')}</h3>
           <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={onClose}>×</button>
         </div>
 
@@ -120,27 +122,27 @@ export default function CreateSessionModal({ onClose }: Props) {
 
           {/* Session Name */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Session Name</label>
+            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.sessionName')}</label>
             <input
               className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)]"
-              placeholder="e.g. my-worker-1"
+              placeholder={t('createSession.sessionNamePlaceholder')}
               value={formState.session_name || ''} onChange={e => setFormState(f => ({ ...f, session_name: e.target.value }))} />
           </div>
 
           {/* Role + Model */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Role</label>
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.role')}</label>
               <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={formState.role} onChange={e => handleRoleChange(e.target.value)}>
-                <option value="worker">Worker</option>
-                <option value="manager">Manager</option>
+                <option value="worker">{t('createSession.roleWorker')}</option>
+                <option value="manager">{t('createSession.roleManager')}</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Model</label>
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.model')}</label>
               <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={formState.model || ''} onChange={e => setFormState(f => ({ ...f, model: e.target.value }))}>
-                {MODEL_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                {MODEL_OPTIONS_BASE.map(opt => (
+                  <option key={opt.value} value={opt.value}>{'labelKey' in opt ? t(opt.labelKey as string) : opt.label}</option>
                 ))}
               </select>
             </div>
@@ -149,9 +151,9 @@ export default function CreateSessionModal({ onClose }: Props) {
           {/* Manager selection */}
           {formState.role === 'worker' && (
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Manager Session</label>
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.managerSession')}</label>
               <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={formState.manager_id || ''} onChange={e => setFormState(f => ({ ...f, manager_id: e.target.value }))}>
-                <option value="">None (Standalone)</option>
+                <option value="">{t('createSession.noneStandalone')}</option>
                 {availableManagers.map(m => {
                   const statusIcon = m.status === 'running' ? '🟢' : '⚪';
                   return (
@@ -161,15 +163,15 @@ export default function CreateSessionModal({ onClose }: Props) {
                   );
                 })}
               </select>
-              <small className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">Select a manager to control this worker</small>
+              <small className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">{t('createSession.managerHelp')}</small>
             </div>
           )}
 
           {/* Prompt Template */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Prompt Template</label>
+            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.promptTemplate')}</label>
             <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedPrompt} onChange={e => handlePromptChange(e.target.value)}>
-              <option value="">Custom / None</option>
+              <option value="">{t('createSession.customNone')}</option>
               {prompts.map(p => (
                 <option key={p.name} value={p.name}>{p.name}</option>
               ))}
@@ -179,25 +181,25 @@ export default function CreateSessionModal({ onClose }: Props) {
           {/* Max Turns + Timeout */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Max Turns</label>
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.maxTurns')}</label>
               <NumberStepper value={formState.max_turns ?? 25} onChange={v => setFormState(f => ({ ...f, max_turns: v }))} min={1} max={500} step={5} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Timeout (s)</label>
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.timeout')}</label>
               <NumberStepper value={formState.timeout ?? 300} onChange={v => setFormState(f => ({ ...f, timeout: v }))} min={10} max={7200} step={30} />
             </div>
           </div>
 
           {/* Graph Workflow */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Graph Workflow</label>
+            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.graphWorkflow')}</label>
             <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedWorkflow} onChange={e => setSelectedWorkflow(e.target.value)}>
-              <optgroup label="Built-in">
-                <option value="__default">Simple (Default)</option>
-                <option value="__autonomous">Autonomous</option>
+              <optgroup label={t('createSession.builtIn')}>
+                <option value="__default">{t('createSession.simpleDefault')}</option>
+                <option value="__autonomous">{t('createSession.autonomous')}</option>
               </optgroup>
               {availableWorkflows.length > 0 && (
-                <optgroup label="Custom / Templates">
+                <optgroup label={t('createSession.customTemplates')}>
                   {availableWorkflows.map(w => (
                     <option key={w.id} value={w.id}>
                       {w.name}
@@ -208,10 +210,10 @@ export default function CreateSessionModal({ onClose }: Props) {
             </select>
             <small className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">
               {selectedWorkflow === '__default'
-                ? 'Basic agent loop: guard → LLM → output'
+                ? t('createSession.simpleHelp')
                 : selectedWorkflow === '__autonomous'
-                  ? 'Difficulty-based routing with review loops and TODO management'
-                  : 'Custom workflow graph'}
+                  ? t('createSession.autonomousHelp')
+                  : t('createSession.customHelp')}
             </small>
           </div>
 
@@ -219,7 +221,7 @@ export default function CreateSessionModal({ onClose }: Props) {
           {selectedWorkflow !== '__default' && (
             <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">Max Iterations</label>
+                <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.maxIterations')}</label>
                 <NumberStepper value={formState.autonomous_max_iterations ?? 10} onChange={v => setFormState(f => ({ ...f, autonomous_max_iterations: v }))} min={1} max={500} step={5} />
               </div>
             </div>
@@ -227,17 +229,17 @@ export default function CreateSessionModal({ onClose }: Props) {
 
           {/* System Prompt */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">System Prompt</label>
-            <textarea className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] resize-y" rows={4} placeholder="Optional system prompt..."
+            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('createSession.systemPrompt')}</label>
+            <textarea className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] resize-y" rows={4} placeholder={t('createSession.systemPromptPlaceholder')}
               value={formState.system_prompt || ''} onChange={e => setFormState(f => ({ ...f, system_prompt: e.target.value }))} />
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex justify-end items-center gap-3 py-4 px-6 border-t border-[var(--border-color)]">
-          <button className="py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]" onClick={onClose}>Cancel</button>
+          <button className="py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]" onClick={onClose}>{t('common.cancel')}</button>
           <button className="py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? 'Creating...' : 'Create Session'}
+            {submitting ? t('createSession.creating') : t('createSession.createSession')}
           </button>
         </div>
       </div>

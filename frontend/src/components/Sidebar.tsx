@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 import type { SessionInfo } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -14,6 +15,7 @@ import DeleteSessionModal from '@/components/modals/DeleteSessionModal';
 function SessionItem({ session, isSelected, onSelect }: {
   session: SessionInfo; isSelected: boolean; onSelect: () => void;
 }) {
+  const { t } = useI18n();
   const dotClass = session.status === 'running' ? 'bg-[var(--success-color)]'
     : session.status === 'error' ? 'bg-[var(--danger-color)]'
     : session.status === 'starting' ? 'bg-[var(--warning-color)]'
@@ -52,7 +54,7 @@ function SessionItem({ session, isSelected, onSelect }: {
       {/* Session info */}
       <div className="flex-1 min-w-0">
         <div className="font-medium text-[0.875rem] whitespace-nowrap overflow-hidden text-ellipsis">
-          {session.session_name || `Session ${session.session_id.substring(0, 8)}`}
+          {session.session_name || t('sidebar.sessionFallback', { id: session.session_id.substring(0, 8) })}
         </div>
         <div className="text-[0.75rem] text-[var(--text-muted)] font-mono mt-0.5">
           {session.session_id.substring(0, 12)}...
@@ -68,6 +70,7 @@ export default function Sidebar() {
     sidebarCollapsed, deletedSectionOpen, toggleDeletedSection,
     permanentDeleteSession, restoreSession,
   } = useAppStore();
+  const { t } = useI18n();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SessionInfo | null>(null);
@@ -88,11 +91,11 @@ export default function Sidebar() {
         {/* Sidebar Header */}
         <div className="flex justify-between items-center h-11 px-5 border-b border-[var(--border-color)]">
           <h2 className="text-[0.8125rem] font-medium text-[var(--text-secondary)] uppercase tracking-[0.05em]">
-            Sessions
+            {t('sidebar.sessions')}
           </h2>
           <div className="flex items-center gap-2">
             <button className="py-1.5 px-3 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => setShowCreateModal(true)}>
-              New Session
+              {t('sidebar.newSession')}
             </button>
           </div>
         </div>
@@ -104,7 +107,7 @@ export default function Sidebar() {
               {sessions.length}
             </span>
             <span className="text-[0.6875rem] text-[var(--text-muted)] uppercase tracking-[0.05em] mt-0.5">
-              Total
+              {t('sidebar.total')}
             </span>
           </div>
           <div className="text-center">
@@ -112,7 +115,7 @@ export default function Sidebar() {
               {running}
             </span>
             <span className="text-[0.6875rem] text-[var(--text-muted)] uppercase tracking-[0.05em] mt-0.5">
-              Running
+              {t('sidebar.running')}
             </span>
           </div>
           <div className="text-center">
@@ -120,7 +123,7 @@ export default function Sidebar() {
               {errors}
             </span>
             <span className="text-[0.6875rem] text-[var(--text-muted)] uppercase tracking-[0.05em] mt-0.5">
-              Errors
+              {t('sidebar.errors')}
             </span>
           </div>
         </div>
@@ -129,7 +132,7 @@ export default function Sidebar() {
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
           {sessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
-              <p className="text-[0.8125rem] text-[var(--text-muted)]">No sessions yet</p>
+              <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('sidebar.noSessions')}</p>
             </div>
           ) : (
             sessions.map(session => (
@@ -143,7 +146,7 @@ export default function Sidebar() {
                   <button
                     className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:text-[var(--danger-color)] cursor-pointer transition-colors duration-150"
                     onClick={(e) => handleDeleteClick(e, session)}
-                    title="Delete session"
+                    title={t('sidebar.deleteSession')}
                   >
                     ✕
                   </button>
@@ -162,7 +165,7 @@ export default function Sidebar() {
               onClick={toggleDeletedSection}
             >
               <span style={{ fontSize: '9px', transition: 'transform 0.15s' }}>{deletedSectionOpen ? '▼' : '▶'}</span>
-              <span>Deleted Sessions</span>
+              <span>{t('sidebar.deletedSessions')}</span>
               <span className="ml-auto text-center" style={{ fontSize: '10px', fontWeight: 600, background: 'rgba(107, 114, 128, 0.2)', color: 'var(--text-muted)', padding: '1px 7px', borderRadius: '10px', minWidth: '18px' }}>
                 {deletedSessions.length}
               </span>
@@ -177,14 +180,14 @@ export default function Sidebar() {
                     <button
                       className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer transition-colors duration-150"
                       onClick={() => restoreSession(session.session_id)}
-                      title="Restore"
+                      title={t('sidebar.restore')}
                     >
                       ↩
                     </button>
                     <button
                       className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:!text-[var(--danger-color)] cursor-pointer transition-colors duration-150"
                       onClick={() => permanentDeleteSession(session.session_id)}
-                      title="Permanently delete"
+                      title={t('sidebar.permanentDelete')}
                     >
                       ✕
                     </button>

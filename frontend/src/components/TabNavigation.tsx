@@ -2,26 +2,21 @@
 
 import { useAppStore } from '@/store/useAppStore';
 import { twMerge } from 'tailwind-merge';
+import { useI18n } from '@/lib/i18n';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return twMerge(classes.filter(Boolean).join(' '));
 }
 
-const GLOBAL_TABS = [
-  { id: 'main', label: 'Main' },
-  { id: 'playground', label: 'Playground' },
-  { id: 'workflows', label: 'Workflows' },
-  { id: 'settings', label: 'Settings' },
-];
-
-const SESSION_TABS = [
-  { id: 'info', label: 'Info' },
-  { id: 'graph', label: 'Graph' },
-  { id: 'command', label: 'Command' },
-  { id: 'dashboard', label: 'Dashboard', managerOnly: true },
-  { id: 'storage', label: 'Storage' },
-  { id: 'logs', label: 'Logs' },
-];
+const GLOBAL_TAB_IDS = ['main', 'playground', 'workflows', 'settings'] as const;
+const SESSION_TAB_DEFS = [
+  { id: 'info' },
+  { id: 'graph' },
+  { id: 'command' },
+  { id: 'dashboard', managerOnly: true },
+  { id: 'storage' },
+  { id: 'logs' },
+] as const;
 
 const TAB_BASE =
   'relative py-1.5 px-3.5 text-[0.8125rem] font-medium bg-transparent border-none rounded-[6px] cursor-pointer transition-all duration-150 whitespace-nowrap';
@@ -48,6 +43,7 @@ function TabButton({ id, label, active, onClick }: { id: string; label: string; 
 
 export default function TabNavigation() {
   const { activeTab, setActiveTab, selectedSessionId, sessions } = useAppStore();
+  const { t } = useI18n();
 
   const selectedSession = sessions.find(s => s.session_id === selectedSessionId);
   const hasSession = !!selectedSessionId && !!selectedSession;
@@ -61,13 +57,13 @@ export default function TabNavigation() {
     <div className="flex items-center gap-0.5 h-11 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
       {/* ── Global Tabs ── */}
       <div className="flex items-center gap-0.5">
-        {GLOBAL_TABS.map(tab => (
+        {GLOBAL_TAB_IDS.map(id => (
           <TabButton
-            key={tab.id}
-            id={tab.id}
-            label={tab.label}
-            active={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            key={id}
+            id={id}
+            label={t(`tabs.${id}`)}
+            active={activeTab === id}
+            onClick={() => setActiveTab(id)}
           />
         ))}
       </div>
@@ -91,11 +87,11 @@ export default function TabNavigation() {
             {sessionName}
           </div>
           <div className="flex items-center gap-0.5">
-            {SESSION_TABS.filter(tab => !tab.managerOnly || showDashboard).map(tab => (
+            {SESSION_TAB_DEFS.filter(tab => !('managerOnly' in tab && tab.managerOnly) || showDashboard).map(tab => (
               <TabButton
                 key={tab.id}
                 id={tab.id}
-                label={tab.label}
+                label={t(`tabs.${tab.id}`)}
                 active={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
               />

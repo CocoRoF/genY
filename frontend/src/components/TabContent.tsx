@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useAppStore } from '@/store/useAppStore';
+import { useI18n } from '@/lib/i18n';
 
 // Lazy load tab components
 const MainTab = dynamic(() => import('@/components/tabs/MainTab'));
@@ -30,11 +31,12 @@ const TAB_MAP: Record<string, React.ComponentType> = {
 
 export default function TabContent() {
   const activeTab = useAppStore(s => s.activeTab);
+  const { t } = useI18n();
   const Component = TAB_MAP[activeTab];
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-      {Component ? <Component /> : <div className="p-8 text-[var(--text-muted)]">Unknown tab</div>}
+      {Component ? <Component /> : <div className="p-8 text-[var(--text-muted)]">{t('common.unknownTab')}</div>}
     </div>
   );
 }
