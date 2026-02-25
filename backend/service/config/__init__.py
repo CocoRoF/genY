@@ -22,6 +22,11 @@ from service.config.sub_config.channels.discord_config import DiscordConfig
 from service.config.sub_config.channels.kakao_config import KakaoConfig
 from service.config.sub_config.channels.slack_config import SlackConfig
 from service.config.sub_config.channels.teams_config import TeamsConfig
+from service.config.sub_config.general.language_config import LanguageConfig
+from service.config.sub_config.general.api_config import APIConfig
+from service.config.sub_config.general.limits_config import LimitsConfig
+from service.config.sub_config.general.telemetry_config import TelemetryConfig
+from service.config.sub_config.general.github_config import GitHubConfig
 
 __all__ = [
     'BaseConfig',
@@ -31,5 +36,10 @@ __all__ = [
     'DiscordConfig',
     'KakaoConfig',
     'SlackConfig',
-    'TeamsConfig'
+    'TeamsConfig',
+    'LanguageConfig',
+    'APIConfig',
+    'LimitsConfig',
+    'TelemetryConfig',
+    'GitHubConfig',
 ]

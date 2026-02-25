@@ -10,9 +10,12 @@ All configs should inherit from BaseConfig to enable:
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields, asdict
-from typing import Any, Dict, List, Optional, Type, TypeVar, get_type_hints
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, get_type_hints
 from enum import Enum
 import json
+from logging import getLogger
+
+_logger = getLogger(__name__)
 
 
 class FieldType(str, Enum):
@@ -44,6 +47,9 @@ class ConfigField:
     pattern: Optional[str] = None  # Regex pattern for validation
     group: str = "general"  # Group name for UI organization
     secure: bool = False  # If True, field is masked with show/hide toggle in UI
+    apply_change: Optional[Callable[[Any, Any], None]] = field(
+        default=None, repr=False
+    )  # Callback(old_value, new_value) invoked when this field changes
 
 
 # Registry for all config classes
@@ -254,6 +260,29 @@ class BaseConfig(ABC):
     def is_valid(self) -> bool:
         """Check if config is valid"""
         return len(self.validate()) == 0
+
+    def apply_field_changes(self, old_values: Dict[str, Any]) -> None:
+        """
+        Compare current values against *old_values* and invoke
+        ``apply_change`` callbacks for every field that actually changed.
+
+        Called automatically by ConfigManager.update_config().
+        """
+        meta_lookup = {f.name: f for f in self.get_fields_metadata()}
+        new_values = self.to_dict()
+
+        for name, new_val in new_values.items():
+            old_val = old_values.get(name)
+            if old_val == new_val:
+                continue
+            meta = meta_lookup.get(name)
+            if meta and meta.apply_change is not None:
+                try:
+                    meta.apply_change(old_val, new_val)
+                except Exception as exc:
+                    _logger.error(
+                        f"apply_change failed for {self.get_config_name()}.{name}: {exc}"
+                    )
 
     @classmethod
     def get_schema(cls) -> Dict[str, Any]:

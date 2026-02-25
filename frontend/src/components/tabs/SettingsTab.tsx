@@ -10,7 +10,11 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 }
 
 const CATEGORY_ICONS: Record<string, string> = { general: '🔧', channels: '💬', security: '🔒', advanced: '⚡' };
-const CONFIG_ICONS: Record<string, string> = { discord: '🎮', slack: '💼', teams: '👥', settings: '⚙️' };
+const CONFIG_ICONS: Record<string, string> = {
+  discord: '🎮', slack: '💼', teams: '👥', kakao: '💬',
+  language: '🌐', api: '🤖', limits: '📊', telemetry: '📡', github: '🐙',
+  settings: '⚙️',
+};
 
 export default function SettingsTab() {
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
@@ -218,6 +222,8 @@ export default function SettingsTab() {
                     connection: 'Connection', server: 'Server Settings', workspace: 'Workspace',
                     teams: 'Teams', permissions: 'Permissions', behavior: 'Behavior',
                     session: 'Session Settings', commands: 'Commands', graph: 'Microsoft Graph', general: 'General',
+                    language: 'Language', api: 'API Settings', redis: 'Redis',
+                    limits: 'Limits', telemetry: 'Telemetry', github: 'GitHub',
                   };
                   return Object.entries(groups).map(([groupName, fields]) => (
                     <div key={groupName} className="border border-[var(--border-color)] rounded-[var(--border-radius)] overflow-hidden">

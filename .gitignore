@@ -1,5 +1,5 @@
 # config
-/service/config/variables/*.json
+backend/service/config/variables/*.json
 /frontend-legacy
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -157,8 +157,11 @@ class ConfigManager:
         # Load existing config
         config = self.load_config(config_class)
 
+        # Snapshot old values for change detection
+        old_values = config.to_dict()
+
         # Apply updates
-        current_data = config.to_dict()
+        current_data = old_values.copy()
         current_data.update(updates)
 
         # Create new instance with updated data
@@ -172,6 +175,8 @@ class ConfigManager:
 
         # Save
         if self.save_config(updated_config):
+            # Invoke apply_change callbacks for changed fields
+            updated_config.apply_field_changes(old_values)
             return updated_config
         return None
 
