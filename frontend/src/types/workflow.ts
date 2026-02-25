@@ -12,12 +12,37 @@ export interface WfNodeParameter {
   min?: number;
   max?: number;
   group?: string;
+  /** When true, changes to this parameter dynamically recompute output ports. */
+  generates_ports?: boolean;
 }
 
 export interface WfOutputPort {
   id: string;
   label: string;
   description?: string;
+}
+
+/** Help section inside a node help guide. */
+export interface WfHelpSection {
+  title: string;
+  content: string;
+}
+
+/** Complete help content for a node, in one locale. */
+export interface WfNodeHelp {
+  title: string;
+  summary: string;
+  sections: WfHelpSection[];
+}
+
+/** Locale-specific translations for a node. */
+export interface WfNodeI18n {
+  label?: string;
+  description?: string;
+  parameters?: Record<string, { label?: string; description?: string }>;
+  output_ports?: Record<string, { label?: string; description?: string }>;
+  groups?: Record<string, string>;
+  help?: WfNodeHelp;
 }
 
 /** A registered node type definition (from the backend catalog). */
@@ -31,6 +56,8 @@ export interface WfNodeTypeDef {
   is_conditional: boolean;
   parameters: WfNodeParameter[];
   output_ports: WfOutputPort[];
+  /** i18n translations keyed by locale (e.g. 'ko', 'en') */
+  i18n?: Record<string, WfNodeI18n>;
 }
 
 export interface WfNodeCatalog {

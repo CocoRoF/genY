@@ -30,12 +30,13 @@ def create_autonomous_template() -> WorkflowDefinition:
     """Build the full autonomous graph as a WorkflowDefinition.
 
     Topology::
-        START → memory_inject → guard_classify → classify_difficulty → post_classify
-          ↓ [easy / medium / hard / end]
+        START → memory_inject → guard_classify → classify
+          ↓ [easy / medium / hard / end]  (classify routes directly)
 
         EASY:   guard_direct → direct_answer → post_direct → END
         MEDIUM: guard_answer → answer → post_answer → guard_review
-                → review → post_review → [approved→END | retry→iter_gate_medium]
+                → review → post_review → rev_router
+                → [approved→END | retry→iter_gate_medium]
                 iter_gate_medium → [continue→guard_answer | stop→END]
         HARD:   guard_create_todos → create_todos → post_create_todos
                 → guard_execute → execute_todo → post_execute → check_progress
@@ -81,17 +82,13 @@ def create_autonomous_template() -> WorkflowDefinition:
     _add("context_guard", "guard_cls", "Guard (Classify)",
          top_center_x, y, {"position_label": "classify"})
     y += step_h
-    _add("classify_difficulty", "classify", "Classify Difficulty", top_center_x, y)
-    y += step_h
-    _add("post_model", "post_cls", "Post Classify",
-         top_center_x, y, {"detect_completion": False})
+    _add("classify", "classify", "Classify", top_center_x, y)
     branch_base = y + branch_gap
 
     # Edges: common entry chain
     _edge("start", "mem_inject")
     _edge("mem_inject", "guard_cls")
     _edge("guard_cls", "classify")
-    _edge("classify", "post_cls")
 
     # ── EASY PATH ──
     y = branch_base
@@ -123,6 +120,13 @@ def create_autonomous_template() -> WorkflowDefinition:
     y += step_h
     _add("post_model", "post_rev", "Post Review", col_medium_x, y)
     y += step_h
+    _add("conditional_router", "rev_router", "Review Router",
+         col_medium_x, y, {
+             "routing_field": "review_result",
+             "route_map": {"approved": "approved", "rejected": "retry"},
+             "default_port": "end",
+         })
+    y += step_h
     _add("iteration_gate", "gate_med", "Iter Gate (Medium)", col_medium_x, y)
     y += step_h
 
@@ -131,6 +135,7 @@ def create_autonomous_template() -> WorkflowDefinition:
     _edge("post_ans", "guard_rev")
     _edge("guard_rev", "review")
     _edge("review", "post_rev")
+    _edge("post_rev", "rev_router")
 
     # ── HARD PATH ──
     y = branch_base
@@ -179,19 +184,19 @@ def create_autonomous_template() -> WorkflowDefinition:
     max_y = max(n.position["y"] for n in nodes) + branch_gap
     _add("end", "end", "End", top_center_x, max_y)
 
-    # ── Conditional routing: post_classify → branches ──
-    _edge("post_cls", "guard_dir", port="easy", lbl="Easy")
-    _edge("post_cls", "guard_ans", port="medium", lbl="Medium")
-    _edge("post_cls", "guard_todo", port="hard", lbl="Hard")
-    _edge("post_cls", "end", port="end", lbl="End")
+    # ── Conditional routing: classify → branches (direct routing) ──
+    _edge("classify", "guard_dir", port="easy", lbl="Easy")
+    _edge("classify", "guard_ans", port="medium", lbl="Medium")
+    _edge("classify", "guard_todo", port="hard", lbl="Hard")
+    _edge("classify", "end", port="end", lbl="End")
 
     # Easy → END
     _edge("post_dir", "end")
 
     # Medium review routing
-    _edge("post_rev", "end", port="approved", lbl="Approved")
-    _edge("post_rev", "gate_med", port="retry", lbl="Retry")
-    _edge("post_rev", "end", port="end", lbl="End")
+    _edge("rev_router", "end", port="approved", lbl="Approved")
+    _edge("rev_router", "gate_med", port="retry", lbl="Retry")
+    _edge("rev_router", "end", port="end", lbl="End")
 
     # Medium iteration gate
     _edge("gate_med", "guard_ans", port="continue", lbl="Continue")

@@ -57,6 +57,7 @@ class NodeParameter:
     min: Optional[float] = None
     max: Optional[float] = None
     group: str = "general"
+    generates_ports: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {
@@ -76,6 +77,72 @@ class NodeParameter:
             d["min"] = self.min
         if self.max is not None:
             d["max"] = self.max
+        if self.generates_ports:
+            d["generates_ports"] = True
+        return d
+
+
+# ============================================================================
+# Help Content — structured help for the frontend help modal
+# ============================================================================
+
+
+@dataclass
+class HelpSection:
+    """A single section inside a node help guide."""
+
+    title: str
+    content: str
+
+    def to_dict(self) -> Dict[str, str]:
+        return {"title": self.title, "content": self.content}
+
+
+@dataclass
+class NodeHelp:
+    """Complete help content for a node, in one locale."""
+
+    title: str
+    summary: str
+    sections: List[HelpSection] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "title": self.title,
+            "summary": self.summary,
+            "sections": [s.to_dict() for s in self.sections],
+        }
+
+
+@dataclass
+class NodeI18n:
+    """Locale-specific translations for a node.
+
+    Provides localised label, description, parameter labels/descriptions,
+    output port labels, group names, and optional detailed help content.
+    """
+
+    label: str = ""
+    description: str = ""
+    parameters: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    output_ports: Dict[str, Dict[str, str]] = field(default_factory=dict)
+    groups: Dict[str, str] = field(default_factory=dict)
+    help: Optional[NodeHelp] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {}
+        if self.label:
+            d["label"] = self.label
+        if self.description:
+            d["description"] = self.description
+        if self.parameters:
+            d["parameters"] = self.parameters
+        if self.output_ports:
+            d["output_ports"] = self.output_ports
+        if self.groups:
+            d["groups"] = self.groups
+        if self.help:
+            d["help"] = self.help.to_dict()
         return d
 
 
@@ -234,6 +301,9 @@ class BaseNode(ABC):
         OutputPort(id="default", label="Next"),
     ]
 
+    # ── i18n translations keyed by locale (override in subclasses) ──
+    i18n: Dict[str, NodeI18n] = {}
+
     # ── Properties ──
 
     @property
@@ -274,21 +344,59 @@ class BaseNode(ABC):
         """
         return None
 
+    def get_dynamic_output_ports(
+        self, config: Dict[str, Any],
+    ) -> Optional[List[OutputPort]]:
+        """Compute output ports from instance config at runtime.
+
+        Override this in nodes whose port set depends on user
+        configuration (e.g. configurable categories, route maps).
+
+        Returns ``None`` to use the class-level ``output_ports``.
+        """
+        return None
+
     # ── Serialization ──
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize the node *type* definition for the frontend."""
-        return {
+    def to_dict(self, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Serialize the node *type* definition for the frontend.
+
+        If *config* is provided, dynamic output ports are computed.
+        """
+        ports = self.output_ports
+        if config is not None:
+            dynamic = self.get_dynamic_output_ports(config)
+            if dynamic is not None:
+                ports = dynamic
+
+        d: Dict[str, Any] = {
             "node_type": self.node_type,
             "label": self.label,
             "description": self.description,
             "category": self.category,
             "icon": self.icon,
             "color": self.color,
-            "is_conditional": self.is_conditional,
+            "is_conditional": len(ports) > 1,
             "parameters": [p.to_dict() for p in self.parameters],
-            "output_ports": [p.to_dict() for p in self.output_ports],
+            "output_ports": [p.to_dict() for p in ports],
         }
+        # Include i18n translations for all locales
+        if self.i18n:
+            d["i18n"] = {
+                locale: i18n_data.to_dict()
+                for locale, i18n_data in self.i18n.items()
+            }
+        return d
+
+    def get_help(self, locale: str = "en") -> Optional[Dict[str, Any]]:
+        """Return help content for the given locale.
+
+        Falls back to English if the locale is not available.
+        """
+        i18n_data = self.i18n.get(locale) or self.i18n.get("en")
+        if i18n_data and i18n_data.help:
+            return i18n_data.help.to_dict()
+        return None
 
 
 # ============================================================================
@@ -301,10 +409,15 @@ class NodeRegistry:
 
     Node classes decorate themselves with ``@register_node`` or
     call ``registry.register(cls)`` to make themselves available.
+
+    Supports **aliases**: when a node type is renamed, the old
+    name can be registered as an alias so that existing templates
+    and saved workflows continue to resolve correctly.
     """
 
     def __init__(self) -> None:
         self._registry: Dict[str, BaseNode] = {}
+        self._aliases: Dict[str, str] = {}
 
     def register(self, node_class: Type[BaseNode]) -> Type[BaseNode]:
         """Register a node class (creates & stores a singleton instance)."""
@@ -323,9 +436,22 @@ class NodeRegistry:
         self._registry[node_type] = instance
         return node_class
 
+    def register_alias(self, alias: str, canonical: str) -> None:
+        """Register *alias* as an alternative name for *canonical*.
+
+        Lookup via ``get(alias)`` will transparently return the
+        node registered under *canonical*.
+        """
+        self._aliases[alias] = canonical
+
     def get(self, node_type: str) -> Optional[BaseNode]:
-        """Lookup a node by its type identifier."""
-        return self._registry.get(node_type)
+        """Lookup a node by its type identifier (or alias)."""
+        node = self._registry.get(node_type)
+        if node is None:
+            canonical = self._aliases.get(node_type)
+            if canonical:
+                node = self._registry.get(canonical)
+        return node
 
     def list_all(self) -> Dict[str, BaseNode]:
         """Return all registered nodes."""

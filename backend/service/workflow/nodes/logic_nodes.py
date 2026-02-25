@@ -3,10 +3,17 @@ Logic Nodes — routing, gating, and progress-checking nodes.
 
 These nodes perform pure state-based decisions without
 invoking the LLM model. They implement the graph's control flow.
+
+Generalisation design:
+    Every logic node exposes configurable field names and
+    thresholds so that the same control-flow pattern can be
+    re-used across different workflow topologies without
+    hard-coding to specific state field names like ``todos``.
 """
 
 from __future__ import annotations
 
+import json
 from logging import getLogger
 from typing import Any, Callable, Dict, List, Optional
 
@@ -20,6 +27,12 @@ from service.workflow.nodes.base import (
     NodeParameter,
     OutputPort,
     register_node,
+)
+from service.workflow.nodes.i18n import (
+    CONDITIONAL_ROUTER_I18N,
+    ITERATION_GATE_I18N,
+    CHECK_PROGRESS_I18N,
+    STATE_SETTER_I18N,
 )
 
 logger = getLogger(__name__)
@@ -36,14 +49,17 @@ class ConditionalRouterNode(BaseNode):
 
     Reads a configurable state field and maps its value to
     one of the output ports. Useful for building custom branching.
+
+    Already maximally generalised — no structural changes needed.
     """
 
     node_type = "conditional_router"
     label = "Conditional Router"
-    description = "Route based on a state field value"
+    description = "Pure state-based routing node. Reads a specified state field and maps its value to output ports via a configurable JSON route map. Handles enums, strings, and other types with automatic normalization. Essential for building branching workflows where routing decisions are separated from node execution."
     category = "logic"
     icon = "🔀"
     color = "#6366f1"
+    i18n = CONDITIONAL_ROUTER_I18N
 
     parameters = [
         NodeParameter(
@@ -66,6 +82,7 @@ class ConditionalRouterNode(BaseNode):
                 'Example: {"value1": "port_a", "value2": "port_b"}'
             ),
             group="routing",
+            generates_ports=True,
         ),
         NodeParameter(
             name="default_port",
@@ -78,7 +95,6 @@ class ConditionalRouterNode(BaseNode):
     ]
 
     # Output ports are dynamic — determined by route_map at build time.
-    # The executor will read the config to build the edge map.
     output_ports = [
         OutputPort(id="default", label="Default", description="Fallback route"),
     ]
@@ -100,7 +116,6 @@ class ConditionalRouterNode(BaseNode):
 
         route_map_raw = config.get("route_map", "{}")
         if isinstance(route_map_raw, str):
-            import json
             try:
                 route_map = json.loads(route_map_raw)
             except (json.JSONDecodeError, TypeError):
@@ -118,15 +133,14 @@ class ConditionalRouterNode(BaseNode):
 
         return _route
 
-    def get_dynamic_output_ports(self, config: Dict[str, Any]) -> List[OutputPort]:
+    def get_dynamic_output_ports(self, config: Dict[str, Any]) -> Optional[List[OutputPort]]:
         """Compute output ports from the route_map config."""
         route_map_raw = config.get("route_map", "{}")
         if isinstance(route_map_raw, str):
-            import json
             try:
                 route_map = json.loads(route_map_raw)
             except (json.JSONDecodeError, TypeError):
-                return [OutputPort(id="default", label="Default")]
+                return None
         else:
             route_map = route_map_raw
 
@@ -141,7 +155,7 @@ class ConditionalRouterNode(BaseNode):
         if default_port not in seen:
             ports.append(OutputPort(id=default_port, label="Default"))
 
-        return ports
+        return ports or None
 
 
 # ============================================================================
@@ -155,14 +169,18 @@ class IterationGateNode(BaseNode):
 
     Gates loop continuation: sets ``is_complete=True`` when any
     limit is exceeded. Conditional output: continue / stop.
+
+    Generalised: Each check can be individually toggled, and a
+    custom state field can serve as an additional stop condition.
     """
 
     node_type = "iteration_gate"
     label = "Iteration Gate"
-    description = "Prevent infinite loops by checking iteration limits and context budget"
+    description = "Loop prevention guard that checks multiple stop conditions: iteration count vs limit, context window budget status, completion signals, and an optional custom state field. When any limit is exceeded, sets is_complete=True and routes to the 'stop' port. Place before loop-back edges to prevent infinite execution."
     category = "logic"
     icon = "🚧"
     color = "#6366f1"
+    i18n = ITERATION_GATE_I18N
 
     parameters = [
         NodeParameter(
@@ -174,6 +192,41 @@ class IterationGateNode(BaseNode):
             max=500,
             description="Override the global max iterations. 0 = use default.",
             group="behavior",
+        ),
+        NodeParameter(
+            name="check_iteration",
+            label="Check Iteration Limit",
+            type="boolean",
+            default=True,
+            description="Enable checking against the iteration counter.",
+            group="checks",
+        ),
+        NodeParameter(
+            name="check_budget",
+            label="Check Context Budget",
+            type="boolean",
+            default=True,
+            description="Enable checking context window budget status.",
+            group="checks",
+        ),
+        NodeParameter(
+            name="check_completion",
+            label="Check Completion Signals",
+            type="boolean",
+            default=True,
+            description="Enable checking for structured completion signals.",
+            group="checks",
+        ),
+        NodeParameter(
+            name="custom_stop_field",
+            label="Custom Stop Field",
+            type="string",
+            default="",
+            description=(
+                "Additional state field to check. "
+                "If truthy, the gate will stop. Leave empty to disable."
+            ),
+            group="checks",
         ),
     ]
 
@@ -192,20 +245,26 @@ class IterationGateNode(BaseNode):
         max_iter_override = int(config.get("max_iterations_override", 0))
         max_iterations = max_iter_override if max_iter_override > 0 else state.get("max_iterations", 50)
 
+        check_iteration = config.get("check_iteration", True)
+        check_budget = config.get("check_budget", True)
+        check_completion = config.get("check_completion", True)
+        custom_stop_field = config.get("custom_stop_field", "")
+
         stop_reason = None
 
         # Check 1: iteration limit
-        if iteration >= max_iterations:
-            stop_reason = f"Iteration limit ({iteration}/{max_iterations})"
+        if check_iteration and not stop_reason:
+            if iteration >= max_iterations:
+                stop_reason = f"Iteration limit ({iteration}/{max_iterations})"
 
         # Check 2: context budget
-        if not stop_reason:
+        if check_budget and not stop_reason:
             budget = state.get("context_budget") or {}
             if budget.get("status") in ("block", "overflow"):
                 stop_reason = f"Context budget {budget['status']}"
 
         # Check 3: completion signal
-        if not stop_reason:
+        if check_completion and not stop_reason:
             signal = state.get("completion_signal")
             if signal in (
                 CompletionSignal.COMPLETE.value,
@@ -213,6 +272,11 @@ class IterationGateNode(BaseNode):
                 CompletionSignal.ERROR.value,
             ):
                 stop_reason = f"Completion signal: {signal}"
+
+        # Check 4: custom stop field
+        if custom_stop_field and not stop_reason:
+            if state.get(custom_stop_field):
+                stop_reason = f"Custom stop: {custom_stop_field}={state[custom_stop_field]}"
 
         updates: Dict[str, Any] = {}
         if stop_reason:
@@ -232,27 +296,64 @@ class IterationGateNode(BaseNode):
 
 
 # ============================================================================
-# Check Progress — TODO completion checker
+# Check Progress — list completion checker (generalised)
 # ============================================================================
 
 
 @register_node
 class CheckProgressNode(BaseNode):
-    """Check TODO list completion progress (hard path).
+    """Check list completion progress.
 
-    Pure state-checking node. Conditional output: continue / complete.
+    Originally TODO-specific, now generalised to work with any
+    state list field and index field. Conditional: continue / complete.
     """
 
     node_type = "check_progress"
     label = "Check Progress"
-    description = "Check TODO list completion progress"
+    description = "Checks completion progress of a configurable list field. Compares the current index against the list length and counts completed/failed items. Routes to 'continue' when items remain or 'complete' when all items are processed. Also respects completion signals and error flags."
     category = "logic"
     icon = "📊"
     color = "#6366f1"
+    i18n = CHECK_PROGRESS_I18N
+
+    parameters = [
+        NodeParameter(
+            name="list_field",
+            label="List State Field",
+            type="string",
+            default="todos",
+            description="State field containing the list to check progress on.",
+            group="state_fields",
+        ),
+        NodeParameter(
+            name="index_field",
+            label="Index State Field",
+            type="string",
+            default="current_todo_index",
+            description="State field tracking the current index in the list.",
+            group="state_fields",
+        ),
+        NodeParameter(
+            name="completed_status",
+            label="Completed Status Value",
+            type="string",
+            default="completed",
+            description="Status value that counts an item as completed.",
+            group="behavior",
+        ),
+        NodeParameter(
+            name="failed_status",
+            label="Failed Status Value",
+            type="string",
+            default="failed",
+            description="Status value that counts an item as failed.",
+            group="behavior",
+        ),
+    ]
 
     output_ports = [
-        OutputPort(id="continue", label="Continue", description="More TODOs remaining"),
-        OutputPort(id="complete", label="Complete", description="All TODOs done"),
+        OutputPort(id="continue", label="Continue", description="More items remaining"),
+        OutputPort(id="complete", label="Complete", description="All items done"),
     ]
 
     async def execute(
@@ -261,38 +362,46 @@ class CheckProgressNode(BaseNode):
         context: ExecutionContext,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        current_index = state.get("current_todo_index", 0)
-        todos = state.get("todos", [])
-        completed = sum(1 for t in todos if t.get("status") == TodoStatus.COMPLETED)
-        failed = sum(1 for t in todos if t.get("status") == TodoStatus.FAILED)
+        list_field = config.get("list_field", "todos")
+        index_field = config.get("index_field", "current_todo_index")
+        completed_status = config.get("completed_status", "completed")
+        failed_status = config.get("failed_status", "failed")
+
+        current_index = state.get(index_field, 0)
+        items = state.get(list_field, [])
+        completed = sum(1 for t in items if t.get("status") == completed_status)
+        failed = sum(1 for t in items if t.get("status") == failed_status)
 
         logger.info(
             f"[{context.session_id}] check_progress: "
-            f"{completed} done, {failed} failed, {current_index}/{len(todos)}"
+            f"{completed} done, {failed} failed, {current_index}/{len(items)}"
         )
 
         return {
             "current_step": "progress_checked",
             "metadata": {
                 **state.get("metadata", {}),
-                "completed_todos": completed,
-                "failed_todos": failed,
-                "total_todos": len(todos),
+                "completed_items": completed,
+                "failed_items": failed,
+                "total_items": len(items),
             },
         }
 
     def get_routing_function(
         self, config: Dict[str, Any],
     ) -> Optional[Callable[[Dict[str, Any]], str]]:
+        list_field = config.get("list_field", "todos")
+        index_field = config.get("index_field", "current_todo_index")
+
         def _route(state: Dict[str, Any]) -> str:
             if state.get("is_complete") or state.get("error"):
                 return "complete"
             signal = state.get("completion_signal")
             if signal in (CompletionSignal.COMPLETE.value, CompletionSignal.BLOCKED.value):
                 return "complete"
-            current_index = state.get("current_todo_index", 0)
-            todos = state.get("todos", [])
-            if current_index >= len(todos):
+            current_index = state.get(index_field, 0)
+            items = state.get(list_field, [])
+            if current_index >= len(items):
                 return "complete"
             return "continue"
         return _route
@@ -308,14 +417,17 @@ class StateSetterNode(BaseNode):
     """Set specific state fields to configured values.
 
     Useful for initialising state or resetting counters.
+
+    Already maximally generalised — no structural changes needed.
     """
 
     node_type = "state_setter"
     label = "State Setter"
-    description = "Set state fields to specific values"
+    description = "Directly manipulates state fields by setting them to configured JSON values. Useful for initializing state, resetting counters, setting flags, or injecting static configuration into the workflow at specific points."
     category = "logic"
     icon = "✏️"
     color = "#6366f1"
+    i18n = STATE_SETTER_I18N
 
     parameters = [
         NodeParameter(
@@ -335,8 +447,6 @@ class StateSetterNode(BaseNode):
         context: ExecutionContext,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        import json
-
         raw = config.get("state_updates", "{}")
         if isinstance(raw, str):
             try:

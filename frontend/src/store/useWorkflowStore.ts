@@ -19,6 +19,7 @@ import { translate } from '@/lib/i18n';
 import type {
   WfNodeCatalog,
   WfNodeTypeDef,
+  WfNodeParameter,
   WorkflowDefinition,
   WfNodeInstance,
   WfEdge,
@@ -90,21 +91,129 @@ interface WorkflowEditorState {
 
 // ==================== Helpers ====================
 
+/**
+ * Look up a node type definition from the catalog.
+ */
+function findTypeDef(
+  catalog: WfNodeCatalog,
+  nodeType: string,
+): WfNodeTypeDef | undefined {
+  for (const nodes of Object.values(catalog.categories)) {
+    const found = nodes.find(n => n.node_type === nodeType);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Parse a flexible category string into a list of lowercase category names.
+ *
+ * Accepts:  "easy, medium, hard"  |  '["easy","medium"]'  |  "['easy']"  |  "easy"
+ */
+function parseCategoryList(raw: unknown): string[] | null {
+  if (Array.isArray(raw)) {
+    const cats = raw.map(c => String(c).trim().toLowerCase()).filter(Boolean);
+    return cats.length > 0 ? cats : null;
+  }
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+
+  const text = raw.trim();
+
+  // Try JSON parse
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      const cats = parsed.map((c: unknown) => String(c).trim().toLowerCase()).filter(Boolean);
+      return cats.length > 0 ? cats : null;
+    }
+  } catch { /* not JSON */ }
+
+  // Try single-quoted JSON  e.g. ['easy', 'medium']
+  if (text.startsWith('[') && text.endsWith(']')) {
+    try {
+      const fixed = text.replace(/'/g, '"');
+      const parsed = JSON.parse(fixed);
+      if (Array.isArray(parsed)) {
+        const cats = parsed.map((c: unknown) => String(c).trim().toLowerCase()).filter(Boolean);
+        return cats.length > 0 ? cats : null;
+      }
+    } catch { /* not fixable */ }
+  }
+
+  // Comma-separated:  "easy, medium, hard"  or single value  "easy"
+  const parts = text.split(',').map(p => p.trim().toLowerCase()).filter(Boolean);
+  return parts.length > 0 ? parts : null;
+}
+
+/**
+ * Recompute output ports from config when a parameter has `generates_ports`.
+ *
+ * - Category list (array / comma-separated) → each element becomes a port + "end"
+ * - JSON object → each unique value becomes a port + default_port
+ *
+ * Returns null when dynamic computation doesn't apply or fails,
+ * in which case the caller should keep the static catalog ports.
+ */
+function computeDynamicPorts(
+  config: Record<string, unknown>,
+  parameters: WfNodeParameter[],
+): Array<{ id: string; label: string }> | null {
+  const portParam = parameters.find(p => p.generates_ports);
+  if (!portParam) return null;
+
+  const rawValue = config[portParam.name] ?? portParam.default;
+
+  // First try as category list (ClassifyNode — textarea / comma-separated)
+  const cats = parseCategoryList(rawValue);
+  if (cats) {
+    const ports = cats.map(c => ({
+      id: c,
+      label: c.charAt(0).toUpperCase() + c.slice(1),
+    }));
+    ports.push({ id: 'end', label: 'End' });
+    return ports;
+  }
+
+  // Try as JSON object mapping (ConditionalRouterNode — route_map)
+  let parsed: unknown = rawValue;
+  if (typeof rawValue === 'string') {
+    try { parsed = JSON.parse(rawValue); } catch { return null; }
+  }
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const seen = new Set<string>();
+    const ports: Array<{ id: string; label: string }> = [];
+    for (const portId of Object.values(parsed as Record<string, string>)) {
+      const pid = String(portId);
+      if (!seen.has(pid)) {
+        ports.push({ id: pid, label: pid.charAt(0).toUpperCase() + pid.slice(1) });
+        seen.add(pid);
+      }
+    }
+    const defaultPort = (config['default_port'] as string) || 'default';
+    if (!seen.has(defaultPort)) {
+      ports.push({ id: defaultPort, label: 'Default' });
+    }
+    return ports.length > 0 ? ports : null;
+  }
+
+  return null;
+}
+
 function wfNodeToReactFlow(
   inst: WfNodeInstance,
   catalog: WfNodeCatalog | null,
 ): Node<WorkflowNodeData> {
   // Find the type definition
-  let typeDef: WfNodeTypeDef | undefined;
-  if (catalog) {
-    for (const nodes of Object.values(catalog.categories)) {
-      typeDef = nodes.find(n => n.node_type === inst.node_type);
-      if (typeDef) break;
-    }
-  }
+  const typeDef = catalog ? findTypeDef(catalog, inst.node_type) : undefined;
 
   const isStart = inst.node_type === 'start';
   const isEnd = inst.node_type === 'end';
+
+  // Compute dynamic ports from saved config (e.g. categories, route_map)
+  const staticPorts = typeDef?.output_ports || [{ id: 'default', label: 'Next' }];
+  const dynamicPorts = typeDef
+    ? computeDynamicPorts(inst.config, typeDef.parameters)
+    : null;
 
   return {
     id: inst.id,
@@ -118,7 +227,7 @@ function wfNodeToReactFlow(
       category: typeDef?.category || 'general',
       isConditional: typeDef?.is_conditional || false,
       config: inst.config,
-      outputPorts: typeDef?.output_ports || [{ id: 'default', label: 'Next' }],
+      outputPorts: dynamicPorts || staticPorts,
     },
   };
 }
@@ -222,6 +331,9 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       }
     }
 
+    // Compute dynamic ports from defaults (e.g. classify categories)
+    const dynamicPorts = computeDynamicPorts(defaultConfig, nodeType.parameters);
+
     const newNode: Node<WorkflowNodeData> = {
       id,
       type: isStart ? 'startNode' : isEnd ? 'endNode' : nodeType.is_conditional ? 'conditionalNode' : 'workflowNode',
@@ -234,7 +346,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
         category: nodeType.category,
         isConditional: nodeType.is_conditional,
         config: defaultConfig,
-        outputPorts: nodeType.output_ports,
+        outputPorts: dynamicPorts || nodeType.output_ports,
       },
     };
 
@@ -243,9 +355,29 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
   },
 
   updateNodeConfig: (nodeId, config) => {
+    const { nodes, nodeCatalog } = get();
+    // Check if dynamic ports need recomputation
+    const node = nodes.find(n => n.id === nodeId);
+    let dynamicPorts: Array<{ id: string; label: string }> | null = null;
+    if (node && nodeCatalog) {
+      const typeDef = findTypeDef(nodeCatalog, (node.data as WorkflowNodeData).nodeType);
+      if (typeDef) {
+        dynamicPorts = computeDynamicPorts(config, typeDef.parameters);
+      }
+    }
+
     set({
-      nodes: get().nodes.map(n =>
-        n.id === nodeId ? { ...n, data: { ...n.data, config } } : n
+      nodes: nodes.map(n =>
+        n.id === nodeId
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                config,
+                ...(dynamicPorts ? { outputPorts: dynamicPorts } : {}),
+              },
+            }
+          : n
       ),
       isDirty: true,
     });

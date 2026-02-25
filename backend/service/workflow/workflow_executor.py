@@ -136,8 +136,15 @@ class WorkflowExecutor:
             if not base_node:
                 continue
 
-            # ── Conditional node ──
-            if base_node.is_conditional or self._has_multiple_targets(edges):
+            # ── Decide wiring strategy ──
+            # Use conditional routing only when edges actually go to
+            # multiple distinct targets.  A conditional node whose
+            # edges all converge on one target (pass-through pattern)
+            # is wired with a simple edge — the routing function
+            # would be pointless since all outcomes lead to the same
+            # node, and calling it could fail when the edge_map
+            # doesn't contain every possible return value.
+            if self._has_multiple_targets(edges):
                 config = source_inst.config
                 routing_fn = base_node.get_routing_function(config)
 
@@ -150,7 +157,7 @@ class WorkflowExecutor:
                     source_id, routing_fn, edge_map
                 )
             else:
-                # ── Simple direct edge ──
+                # ── Simple direct edge (single target) ──
                 target = self._resolve_target(edges[0].target, instance_map)
                 graph_builder.add_edge(source_id, target)
 

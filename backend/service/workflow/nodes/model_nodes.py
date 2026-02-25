@@ -5,13 +5,20 @@ These nodes call the Claude CLI model with configurable prompts
 and handle response parsing. They cover the full spectrum from
 generic LLM calls to specialised operations like difficulty
 classification or review.
+
+Generalisation design:
+    Every model node exposes powerful parameters so that users
+    can replicate most specialisations via configuration alone.
+    Nodes with irreplaceable core logic (structured parsing,
+    conditional routing) keep that logic internally while still
+    making surrounding behaviour configurable.
 """
 
 from __future__ import annotations
 
 import json
 from logging import getLogger
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from langchain_core.messages import HumanMessage
 
@@ -19,8 +26,6 @@ from service.langgraph.state import (
     CompletionSignal,
     Difficulty,
     ReviewResult,
-    TodoItem,
-    TodoStatus,
 )
 from service.prompt.sections import AutonomousPrompts
 from service.workflow.nodes.base import (
@@ -28,10 +33,88 @@ from service.workflow.nodes.base import (
     ExecutionContext,
     NodeParameter,
     OutputPort,
+    get_node_registry,
     register_node,
+)
+from service.workflow.nodes.i18n import (
+    LLM_CALL_I18N,
+    CLASSIFY_I18N,
+    DIRECT_ANSWER_I18N,
+    ANSWER_I18N,
+    REVIEW_I18N,
 )
 
 logger = getLogger(__name__)
+
+
+# ============================================================================
+# Helpers
+# ============================================================================
+
+
+def _safe_format(template: str, state: Dict[str, Any]) -> str:
+    """Substitute state fields into a prompt template, safely."""
+    try:
+        return template.format(**{
+            k: (v if isinstance(v, str) else str(v) if v is not None else "")
+            for k, v in state.items()
+        })
+    except (KeyError, IndexError):
+        return template
+
+
+def _parse_categories(
+    raw: Any,
+    fallback: Optional[List[str]] = None,
+) -> List[str]:
+    """Parse categories from flexible user input.
+
+    Accepts:
+      - JSON array:       '["easy", "medium", "hard"]'
+      - Single-quoted:    "['easy']"
+      - Comma-separated:  'easy, medium, hard'
+      - Single value:     'easy'
+      - Python list:      ['easy', 'medium', 'hard']  (already parsed)
+
+    Returns a list of lowercase stripped category strings,
+    falling back to *fallback* when parsing yields nothing.
+    """
+    _fallback = fallback or ["easy", "medium", "hard"]
+
+    if isinstance(raw, list):
+        cats = [str(c).strip().lower() for c in raw if str(c).strip()]
+        return cats if cats else _fallback
+
+    if not isinstance(raw, str) or not raw.strip():
+        return _fallback
+
+    text = raw.strip()
+
+    # Try JSON first
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, list):
+            cats = [str(c).strip().lower() for c in parsed if str(c).strip()]
+            return cats if cats else _fallback
+        if isinstance(parsed, dict):
+            return _fallback  # JSON object is not a valid category list
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # Try single-quoted JSON  e.g.  ['easy', 'medium']
+    if text.startswith("[") and text.endswith("]"):
+        try:
+            fixed = text.replace("'", '"')
+            parsed = json.loads(fixed)
+            if isinstance(parsed, list):
+                cats = [str(c).strip().lower() for c in parsed if str(c).strip()]
+                return cats if cats else _fallback
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Comma-separated:  "easy, medium, hard"  or  "easy"
+    parts = [p.strip().lower() for p in text.split(",") if p.strip()]
+    return parts if parts else _fallback
 
 
 # ============================================================================
@@ -43,18 +126,29 @@ logger = getLogger(__name__)
 class LLMCallNode(BaseNode):
     """Generic LLM invocation with a configurable prompt template.
 
-    The prompt template can reference state fields using ``{field}``
-    placeholders that are substituted at runtime (e.g. ``{input}``).
+    This is the most powerful general-purpose model node. Through its
+    parameters you can replicate the behaviour of most specialised model
+    nodes (DirectAnswer, Answer, FinalReview, FinalAnswer, etc.).
+
+    Key capabilities:
+        - **Prompt Template** with ``{field}`` state substitution.
+        - **Conditional Prompt** — switch to an alternative prompt when
+          a state field meets a condition (enables retry/feedback loops).
+        - **Multiple Output Mappings** — store the response in several
+          state fields at once.
+        - **Completion flag** — optionally mark the workflow as complete.
     """
 
     node_type = "llm_call"
     label = "LLM Call"
-    description = "Invoke the language model with a configurable prompt template"
+    description = "Universal LLM invocation node. Sends a configurable prompt template to the model with {field} state variable substitution. Supports conditional prompt switching, multiple output field mappings, and an optional completion flag. Can replicate most specialized model nodes through configuration alone."
     category = "model"
     icon = "🤖"
     color = "#8b5cf6"
+    i18n = LLM_CALL_I18N
 
     parameters = [
+        # ── Prompt ──
         NodeParameter(
             name="prompt_template",
             label="Prompt Template",
@@ -68,11 +162,56 @@ class LLMCallNode(BaseNode):
             group="prompt",
         ),
         NodeParameter(
+            name="conditional_field",
+            label="Conditional Prompt Field",
+            type="string",
+            default="",
+            description=(
+                "State field to check for prompt switching. "
+                "When set and the condition is met, the Alternative Prompt is used instead."
+            ),
+            group="prompt",
+        ),
+        NodeParameter(
+            name="conditional_check",
+            label="Conditional Check",
+            type="select",
+            default="truthy",
+            description="How to evaluate the conditional field.",
+            options=[
+                {"label": "Truthy (non-empty / non-zero)", "value": "truthy"},
+                {"label": "Falsy (empty / zero / None)", "value": "falsy"},
+                {"label": "Greater than zero", "value": "gt_zero"},
+            ],
+            group="prompt",
+        ),
+        NodeParameter(
+            name="alternative_prompt",
+            label="Alternative Prompt",
+            type="prompt_template",
+            default="",
+            description="Prompt used when the conditional field check passes.",
+            group="prompt",
+        ),
+        # ── Output ──
+        NodeParameter(
             name="output_field",
             label="Output State Field",
             type="string",
             default="last_output",
-            description="State field to store the model response in.",
+            description="Primary state field to store the model response in.",
+            group="output",
+        ),
+        NodeParameter(
+            name="output_mappings",
+            label="Additional Output Mappings (JSON)",
+            type="json",
+            default="{}",
+            description=(
+                "Additional state fields to set from the response. "
+                'Keys are field names, values are true to copy the response. '
+                'Example: {"answer": true, "final_answer": true}'
+            ),
             group="output",
         ),
         NodeParameter(
@@ -95,15 +234,26 @@ class LLMCallNode(BaseNode):
         output_field = config.get("output_field", "last_output")
         set_complete = config.get("set_complete", False)
 
-        # Substitute state fields into template
-        try:
-            prompt = template.format(**{
-                k: (v if isinstance(v, str) else str(v) if v is not None else "")
-                for k, v in state.items()
-            })
-        except KeyError:
-            prompt = template  # fallback: use raw template
+        # ── Conditional prompt switching ──
+        cond_field = config.get("conditional_field", "")
+        alt_prompt = config.get("alternative_prompt", "")
+        if cond_field and alt_prompt:
+            cond_check = config.get("conditional_check", "truthy")
+            field_val = state.get(cond_field)
+            use_alt = False
+            if cond_check == "truthy":
+                use_alt = bool(field_val)
+            elif cond_check == "falsy":
+                use_alt = not bool(field_val)
+            elif cond_check == "gt_zero":
+                try:
+                    use_alt = (int(field_val or 0) > 0)
+                except (TypeError, ValueError):
+                    use_alt = False
+            if use_alt:
+                template = alt_prompt
 
+        prompt = _safe_format(template, state)
         messages = [HumanMessage(content=prompt)]
         response, fallback = await context.resilient_invoke(messages, "llm_call")
 
@@ -113,6 +263,21 @@ class LLMCallNode(BaseNode):
             "last_output": response.content,
             "current_step": "llm_call_complete",
         }
+
+        # ── Additional output mappings ──
+        raw_mappings = config.get("output_mappings", "{}")
+        if isinstance(raw_mappings, str):
+            try:
+                mappings = json.loads(raw_mappings)
+            except (json.JSONDecodeError, TypeError):
+                mappings = {}
+        else:
+            mappings = raw_mappings
+        if isinstance(mappings, dict):
+            for field_name, flag in mappings.items():
+                if flag:
+                    result[field_name] = response.content
+
         if set_complete:
             result["is_complete"] = True
         result.update(fallback)
@@ -125,18 +290,29 @@ class LLMCallNode(BaseNode):
 
 
 @register_node
-class ClassifyDifficultyNode(BaseNode):
-    """Classify task difficulty as easy / medium / hard.
+class ClassifyNode(BaseNode):
+    """General-purpose LLM classification with port-based routing.
 
-    Conditional node — routes to one of four output ports.
+    Conditional node — classifies input into configurable categories
+    via LLM analysis, then routes execution directly through named
+    output ports.  Each configured category becomes a port.
+
+    Fully general: While the defaults use easy/medium/hard for
+    backward compatibility, users can define arbitrary categories
+    (e.g. low/medium/high/critical, positive/negative/neutral, etc.)
+    and choose any state field to store the classification result.
+
+    This node is self-routing — connect its output ports directly
+    to downstream nodes.  No separate ConditionalRouter is needed.
     """
 
-    node_type = "classify_difficulty"
-    label = "Classify Difficulty"
-    description = "Classify the input task difficulty (easy/medium/hard)"
+    node_type = "classify"
+    label = "Classify"
+    description = "General-purpose LLM classification node. Sends a configurable prompt to the model, parses the response into one of the configured categories, stores the result in a state field, and routes execution directly through the matching output port. Default categories are easy/medium/hard but fully customizable to any set of labels."
     category = "model"
     icon = "🔀"
     color = "#3b82f6"
+    i18n = CLASSIFY_I18N
 
     parameters = [
         NodeParameter(
@@ -144,8 +320,39 @@ class ClassifyDifficultyNode(BaseNode):
             label="Classification Prompt",
             type="prompt_template",
             default=AutonomousPrompts.classify_difficulty(),
-            description="Prompt template for difficulty classification.",
+            description=(
+                "Prompt sent to the model for classification. "
+                "Use {input} for the user request, {field_name} for other state fields. "
+                "The model's response is parsed for category keywords."
+            ),
             group="prompt",
+        ),
+        NodeParameter(
+            name="categories",
+            label="Categories (JSON)",
+            type="json",
+            default='["easy", "medium", "hard"]',
+            description=(
+                "List of category names the LLM should classify into. "
+                "Each category becomes an output port. "
+                'Example: ["low", "medium", "high", "critical"]'
+            ),
+            group="routing",            generates_ports=True,        ),
+        NodeParameter(
+            name="default_category",
+            label="Default Category",
+            type="string",
+            default="medium",
+            description="Category to use when the LLM response doesn't match any known category.",
+            group="routing",
+        ),
+        NodeParameter(
+            name="output_field",
+            label="Output State Field",
+            type="string",
+            default="difficulty",
+            description="State field to store the classification result in.",
+            group="output",
         ),
     ]
 
@@ -164,36 +371,51 @@ class ClassifyDifficultyNode(BaseNode):
     ) -> Dict[str, Any]:
         input_text = state.get("input", "")
         template = config.get("prompt_template", AutonomousPrompts.classify_difficulty())
+        output_field = config.get("output_field", "difficulty")
+
+        # Parse categories (flexible: comma-separated, JSON array, etc.)
+        categories = _parse_categories(
+            config.get("categories", "easy, medium, hard")
+        )
+
+        default_cat = config.get("default_category", "medium")
+        if default_cat not in categories:
+            default_cat = categories[1] if len(categories) > 1 else categories[0]
 
         try:
-            prompt = template.format(input=input_text)
-        except (KeyError, IndexError):
-            prompt = template
+            prompt = _safe_format(template, {**state, "input": input_text})
+            messages = [HumanMessage(content=prompt)]
 
-        messages = [HumanMessage(content=prompt)]
-
-        try:
             response, fallback = await context.resilient_invoke(
-                messages, "classify_difficulty"
+                messages, "classify"
             )
             response_text = response.content.strip().lower()
 
-            if "easy" in response_text:
-                difficulty = Difficulty.EASY
-            elif "medium" in response_text:
-                difficulty = Difficulty.MEDIUM
-            elif "hard" in response_text:
-                difficulty = Difficulty.HARD
+            # Match response against configured categories
+            matched = default_cat
+            for cat in categories:
+                if cat.lower() in response_text:
+                    matched = cat
+                    break
+
+            # Backward-compat: also set Difficulty enum if field == "difficulty"
+            if output_field == "difficulty":
+                try:
+                    difficulty_enum = Difficulty(matched)
+                    store_value = difficulty_enum
+                except ValueError:
+                    store_value = matched
             else:
-                difficulty = Difficulty.MEDIUM
+                store_value = matched
 
             logger.info(
-                f"[{context.session_id}] classify_difficulty: {difficulty.value}"
+                f"[{context.session_id}] classify: {matched} "
+                f"(field={output_field})"
             )
 
             result: Dict[str, Any] = {
-                "difficulty": difficulty,
-                "current_step": "difficulty_classified",
+                output_field: store_value,
+                "current_step": "classified",
                 "messages": [HumanMessage(content=input_text)],
                 "last_output": response.content,
             }
@@ -201,22 +423,55 @@ class ClassifyDifficultyNode(BaseNode):
             return result
 
         except Exception as e:
-            logger.exception(f"[{context.session_id}] classify_difficulty error: {e}")
+            logger.exception(f"[{context.session_id}] classify error: {e}")
             return {"error": str(e), "is_complete": True}
 
     def get_routing_function(
         self, config: Dict[str, Any],
     ) -> Optional[Callable[[Dict[str, Any]], str]]:
+        output_field = config.get("output_field", "difficulty")
+        categories = _parse_categories(
+            config.get("categories", "easy, medium, hard")
+        )
+
+        default_cat = config.get("default_category", "medium")
+        if default_cat not in categories:
+            default_cat = categories[1] if len(categories) > 1 else categories[0]
+
+        cat_set = {c.lower() for c in categories}
+
         def _route(state: Dict[str, Any]) -> str:
             if state.get("error"):
                 return "end"
-            difficulty = state.get("difficulty")
-            if difficulty == Difficulty.EASY:
-                return "easy"
-            elif difficulty == Difficulty.MEDIUM:
-                return "medium"
-            return "hard"
+            value = state.get(output_field)
+            if hasattr(value, "value"):  # Handle enums
+                value = value.value
+            if isinstance(value, str):
+                value = value.strip().lower()
+            if value in cat_set:
+                return value
+            return default_cat
+
         return _route
+
+    def get_dynamic_output_ports(
+        self, config: Dict[str, Any],
+    ) -> Optional[List[OutputPort]]:
+        """Generate output ports from configured categories."""
+        categories = _parse_categories(
+            config.get("categories", "easy, medium, hard")
+        )
+        ports = [
+            OutputPort(id=cat, label=cat.capitalize(), description=f"Route for '{cat}'")
+            for cat in categories
+        ]
+        ports.append(OutputPort(id="end", label="End", description="Error / early termination"))
+        return ports
+
+
+# Backward compatibility: old templates/workflows using "classify_difficulty"
+# still resolve to the same ClassifyNode instance.
+get_node_registry().register_alias("classify_difficulty", "classify")
 
 
 # ============================================================================
@@ -226,14 +481,19 @@ class ClassifyDifficultyNode(BaseNode):
 
 @register_node
 class DirectAnswerNode(BaseNode):
-    """Generate a direct answer for easy tasks. Single-shot, no review."""
+    """Generate a direct answer for easy tasks. Single-shot, no review.
+
+    Generalised: Configurable output fields and completion behaviour.
+    Can serve as a single-shot answer generator for any simple task.
+    """
 
     node_type = "direct_answer"
     label = "Direct Answer"
-    description = "Generate a direct answer for easy/simple tasks"
+    description = "Generates a single-shot direct answer without review. Best for easy tasks that need no quality checking. Writes the response to configurable output fields and can mark the workflow as complete."
     category = "model"
     icon = "⚡"
     color = "#10b981"
+    i18n = DIRECT_ANSWER_I18N
 
     parameters = [
         NodeParameter(
@@ -241,8 +501,27 @@ class DirectAnswerNode(BaseNode):
             label="Prompt Template",
             type="prompt_template",
             default="{input}",
-            description="Prompt template. {input} is the user request.",
+            description="Prompt template. Use {field_name} for state substitution.",
             group="prompt",
+        ),
+        NodeParameter(
+            name="output_fields",
+            label="Output Fields (JSON)",
+            type="json",
+            default='["answer", "final_answer"]',
+            description=(
+                "State fields to store the response in. "
+                'Example: ["answer", "final_answer", "summary"]'
+            ),
+            group="output",
+        ),
+        NodeParameter(
+            name="mark_complete",
+            label="Mark Complete",
+            type="boolean",
+            default=True,
+            description="Set is_complete=True after execution.",
+            group="output",
         ),
     ]
 
@@ -252,14 +531,22 @@ class DirectAnswerNode(BaseNode):
         context: ExecutionContext,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        input_text = state.get("input", "")
         template = config.get("prompt_template", "{input}")
+        mark_complete = config.get("mark_complete", True)
 
-        try:
-            prompt = template.format(input=input_text)
-        except (KeyError, IndexError):
-            prompt = input_text
+        # Parse output fields
+        of_raw = config.get("output_fields", '["answer", "final_answer"]')
+        if isinstance(of_raw, str):
+            try:
+                output_fields = json.loads(of_raw)
+            except (json.JSONDecodeError, TypeError):
+                output_fields = ["answer", "final_answer"]
+        else:
+            output_fields = of_raw
+        if not isinstance(output_fields, list):
+            output_fields = ["answer", "final_answer"]
 
+        prompt = _safe_format(template, state)
         messages = [HumanMessage(content=prompt)]
 
         try:
@@ -267,14 +554,16 @@ class DirectAnswerNode(BaseNode):
                 messages, "direct_answer"
             )
             answer = response.content
+
             result: Dict[str, Any] = {
-                "answer": answer,
-                "final_answer": answer,
                 "messages": [response],
                 "last_output": answer,
                 "current_step": "direct_answer_complete",
-                "is_complete": True,
             }
+            for f in output_fields:
+                result[f] = answer
+            if mark_complete:
+                result["is_complete"] = True
             result.update(fallback)
             return result
         except Exception as e:
@@ -289,15 +578,17 @@ class DirectAnswerNode(BaseNode):
 
 @register_node
 class AnswerNode(BaseNode):
-    """Generate an answer for medium-complexity tasks.
+    """Generate an answer with optional review feedback integration.
 
-    Incorporates review feedback on retries.
+    Generalised: Configurable feedback/count fields and output
+    targets. Works in any review-retry loop, not just the medium path.
     """
 
     node_type = "answer"
     label = "Answer"
-    description = "Generate an answer with optional review feedback integration"
+    description = "Generates an answer with optional review feedback integration for iterative improvement. On the first pass, uses the primary prompt; on retry, automatically switches to the retry template with feedback context. Budget-aware prompt compaction when context window is tight."
     category = "model"
+    i18n = ANSWER_I18N
     icon = "💬"
     color = "#f59e0b"
 
@@ -318,6 +609,30 @@ class AnswerNode(BaseNode):
             description="Prompt template when retrying after review rejection.",
             group="prompt",
         ),
+        NodeParameter(
+            name="feedback_field",
+            label="Feedback State Field",
+            type="string",
+            default="review_feedback",
+            description="State field containing review feedback.",
+            group="state_fields",
+        ),
+        NodeParameter(
+            name="count_field",
+            label="Review Count State Field",
+            type="string",
+            default="review_count",
+            description="State field tracking the number of review cycles.",
+            group="state_fields",
+        ),
+        NodeParameter(
+            name="output_fields",
+            label="Output Fields (JSON)",
+            type="json",
+            default='["answer"]',
+            description="State fields to store the response in.",
+            group="output",
+        ),
     ]
 
     async def execute(
@@ -327,8 +642,22 @@ class AnswerNode(BaseNode):
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
         input_text = state.get("input", "")
-        review_count = state.get("review_count", 0)
-        previous_feedback = state.get("review_feedback")
+        feedback_field = config.get("feedback_field", "review_feedback")
+        count_field = config.get("count_field", "review_count")
+        review_count = state.get(count_field, 0)
+        previous_feedback = state.get(feedback_field)
+
+        # Parse output fields
+        of_raw = config.get("output_fields", '["answer"]')
+        if isinstance(of_raw, str):
+            try:
+                output_fields = json.loads(of_raw)
+            except (json.JSONDecodeError, TypeError):
+                output_fields = ["answer"]
+        else:
+            output_fields = of_raw
+        if not isinstance(output_fields, list):
+            output_fields = ["answer"]
 
         try:
             if previous_feedback and review_count > 0:
@@ -348,21 +677,19 @@ class AnswerNode(BaseNode):
                     prompt = input_text
             else:
                 template = config.get("prompt_template", "{input}")
-                try:
-                    prompt = template.format(input=input_text)
-                except (KeyError, IndexError):
-                    prompt = input_text
+                prompt = _safe_format(template, state)
 
             messages = [HumanMessage(content=prompt)]
             response, fallback = await context.resilient_invoke(messages, "answer")
             answer = response.content
 
             result: Dict[str, Any] = {
-                "answer": answer,
                 "messages": [response],
                 "last_output": answer,
                 "current_step": "answer_generated",
             }
+            for f in output_fields:
+                result[f] = answer
             result.update(fallback)
             return result
 
@@ -381,14 +708,19 @@ class ReviewNode(BaseNode):
     """Review a generated answer and emit approved/rejected verdict.
 
     Conditional node — outputs to approved / retry / end.
+
+    Generalised: Configurable parsing prefixes, verdict/rejection
+    keywords, answer field, and review counter field. Works for any
+    quality-gate pattern, not just the medium-path review loop.
     """
 
     node_type = "review"
     label = "Review"
-    description = "Quality review of a generated answer"
+    description = "Quality gate that reviews a generated answer and emits an approved/rejected verdict. Parses structured VERDICT/FEEDBACK lines from the model response using configurable prefixes and keywords. Forces approval after a configurable max retry count to prevent infinite loops."
     category = "model"
     icon = "📋"
     color = "#f59e0b"
+    i18n = REVIEW_I18N
 
     parameters = [
         NodeParameter(
@@ -396,7 +728,10 @@ class ReviewNode(BaseNode):
             label="Review Prompt",
             type="prompt_template",
             default=AutonomousPrompts.review(),
-            description="Prompt template for the quality review.",
+            description=(
+                "Prompt template for the quality review. "
+                "Use {question} and {answer} for substitution."
+            ),
             group="prompt",
         ),
         NodeParameter(
@@ -408,6 +743,54 @@ class ReviewNode(BaseNode):
             max=10,
             description="Force approval after this many retries.",
             group="behavior",
+        ),
+        NodeParameter(
+            name="verdict_prefix",
+            label="Verdict Prefix",
+            type="string",
+            default="VERDICT:",
+            description="Line prefix the LLM uses to emit the verdict.",
+            group="parsing",
+        ),
+        NodeParameter(
+            name="feedback_prefix",
+            label="Feedback Prefix",
+            type="string",
+            default="FEEDBACK:",
+            description="Line prefix the LLM uses to emit detailed feedback.",
+            group="parsing",
+        ),
+        NodeParameter(
+            name="approved_keywords",
+            label="Approved Keywords (JSON)",
+            type="json",
+            default='["approved"]',
+            description='Keywords in the verdict line that signal approval.',
+            group="parsing",
+        ),
+        NodeParameter(
+            name="rejected_keywords",
+            label="Rejected Keywords (JSON)",
+            type="json",
+            default='["rejected"]',
+            description='Keywords in the verdict line that signal rejection.',
+            group="parsing",
+        ),
+        NodeParameter(
+            name="answer_field",
+            label="Answer State Field",
+            type="string",
+            default="answer",
+            description="State field containing the answer to review.",
+            group="state_fields",
+        ),
+        NodeParameter(
+            name="count_field",
+            label="Review Count State Field",
+            type="string",
+            default="review_count",
+            description="State field tracking the review cycle count.",
+            group="state_fields",
         ),
     ]
 
@@ -423,12 +806,32 @@ class ReviewNode(BaseNode):
         context: ExecutionContext,
         config: Dict[str, Any],
     ) -> Dict[str, Any]:
-        review_count = state.get("review_count", 0) + 1
+        count_field = config.get("count_field", "review_count")
+        review_count = state.get(count_field, 0) + 1
         max_retries = int(config.get("max_retries", 3))
+
+        answer_field = config.get("answer_field", "answer")
+        verdict_prefix = config.get("verdict_prefix", "VERDICT:")
+        feedback_prefix = config.get("feedback_prefix", "FEEDBACK:")
+
+        # Parse keyword lists
+        def _parse_keywords(key: str, default: List[str]) -> List[str]:
+            raw = config.get(key, json.dumps(default))
+            if isinstance(raw, str):
+                try:
+                    kw = json.loads(raw)
+                except (json.JSONDecodeError, TypeError):
+                    kw = default
+            else:
+                kw = raw
+            return kw if isinstance(kw, list) else default
+
+        approved_kw = _parse_keywords("approved_keywords", ["approved"])
+        rejected_kw = _parse_keywords("rejected_keywords", ["rejected"])
 
         try:
             input_text = state.get("input", "")
-            answer = state.get("answer", "")
+            answer = state.get(answer_field, "")
             template = config.get("prompt_template", AutonomousPrompts.review())
 
             try:
@@ -443,15 +846,17 @@ class ReviewNode(BaseNode):
             review_result = ReviewResult.APPROVED
             feedback = ""
 
-            if "VERDICT:" in review_text:
+            if verdict_prefix in review_text:
                 lines = review_text.split("\n")
                 for line in lines:
-                    if line.startswith("VERDICT:"):
-                        verdict = line.replace("VERDICT:", "").strip().lower()
-                        if "rejected" in verdict:
+                    if line.startswith(verdict_prefix):
+                        verdict_str = line.replace(verdict_prefix, "").strip().lower()
+                        if any(kw.lower() in verdict_str for kw in rejected_kw):
                             review_result = ReviewResult.REJECTED
-                    elif line.startswith("FEEDBACK:"):
-                        feedback = line.replace("FEEDBACK:", "").strip()
+                        elif any(kw.lower() in verdict_str for kw in approved_kw):
+                            review_result = ReviewResult.APPROVED
+                    elif line.startswith(feedback_prefix):
+                        feedback = line.replace(feedback_prefix, "").strip()
                         idx = lines.index(line)
                         feedback = "\n".join([feedback] + lines[idx + 1:])
                         break
@@ -471,7 +876,7 @@ class ReviewNode(BaseNode):
             result: Dict[str, Any] = {
                 "review_result": review_result,
                 "review_feedback": feedback,
-                "review_count": review_count,
+                count_field: review_count,
                 "messages": [response],
                 "last_output": review_text,
                 "current_step": "review_complete",

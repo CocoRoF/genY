@@ -422,6 +422,7 @@ const ko: Translations = {
     promptHelp: '상태 변수 치환을 위해 {field}를 사용하세요. 사용 가능: input, answer, review_feedback, last_output',
     invalidJson: '유효하지 않은 JSON',
     select: '선택…',
+    helpTooltip: '상세 사용 가이드 보기',
   },
 
   // ─── Create Session Modal ───

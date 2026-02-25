@@ -422,6 +422,7 @@ const en = {
     promptHelp: 'Use {field} for state variable substitution. Available: input, answer, review_feedback, last_output',
     invalidJson: 'Invalid JSON',
     select: 'Select…',
+    helpTooltip: 'View detailed usage guide',
   },
 
   // ─── Create Session Modal ───

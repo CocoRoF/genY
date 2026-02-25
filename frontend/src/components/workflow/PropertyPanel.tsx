@@ -3,7 +3,36 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useWorkflowStore, type WorkflowNodeData } from '@/store/useWorkflowStore';
 import { useI18n } from '@/lib/i18n';
-import type { WfNodeParameter, WfNodeTypeDef } from '@/types/workflow';
+import type { WfNodeParameter, WfNodeTypeDef, WfNodeI18n } from '@/types/workflow';
+import NodeHelpModal from './NodeHelpModal';
+
+// ========== i18n Helper ==========
+
+/**
+ * Resolve a localised value from a node's i18n data.
+ * Falls back to the original English value when no translation exists.
+ */
+function useNodeI18n(typeDef?: WfNodeTypeDef): WfNodeI18n | undefined {
+  const { locale } = useI18n();
+  return useMemo(() => {
+    if (!typeDef?.i18n) return undefined;
+    return typeDef.i18n[locale] ?? typeDef.i18n['ko'] ?? undefined;
+  }, [typeDef, locale]);
+}
+
+/** Return a localised parameter label/description, falling back to the English defaults. */
+function getParamI18n(param: WfNodeParameter, i18n?: WfNodeI18n) {
+  const pI18n = i18n?.parameters?.[param.name];
+  return {
+    label: pI18n?.label || param.label,
+    description: pI18n?.description || param.description,
+  };
+}
+
+/** Return a localised group name. */
+function getGroupI18n(group: string, i18n?: WfNodeI18n): string {
+  return i18n?.groups?.[group] || group;
+}
 
 // ========== Field Renderers ==========
 
@@ -151,13 +180,19 @@ function JsonField({ param, value, onChange }: {
 
   const handleChange = useCallback((v: string) => {
     onChange(v);
+    // Skip JSON validation for generates_ports params — they accept
+    // comma-separated text (e.g. "easy, medium, hard") as well as JSON.
+    if (param.generates_ports) {
+      setError('');
+      return;
+    }
     try {
       if (v.trim()) JSON.parse(v);
       setError('');
     } catch {
       setError(t('propertyPanel.invalidJson'));
     }
-  }, [onChange]);
+  }, [onChange, param.generates_ports]);
 
   return (
     <div className="space-y-1">
@@ -211,7 +246,8 @@ function ParameterField({ param, value, onChange }: {
 
 export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { selectedNodeId, nodes, nodeCatalog, updateNodeConfig, updateNodeLabel, deleteSelectedNode } = useWorkflowStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const [showHelp, setShowHelp] = useState(false);
 
   const selectedNode = useMemo(
     () => nodes.find(n => n.id === selectedNodeId),
@@ -227,6 +263,16 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
     }
     return undefined;
   }, [selectedNode, nodeCatalog]);
+
+  // Resolve i18n for the current locale
+  const nodeI18n = useNodeI18n(typeDef);
+
+  // Help content for the current locale
+  const helpData = useMemo(() => {
+    if (!typeDef?.i18n) return undefined;
+    const localeI18n = typeDef.i18n[locale] ?? typeDef.i18n['en'];
+    return localeI18n?.help;
+  }, [typeDef, locale]);
 
   const handleConfigChange = useCallback(
     (paramName: string, value: unknown) => {
@@ -261,6 +307,10 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
   const isStartOrEnd = data.nodeType === 'start' || data.nodeType === 'end';
   const parameters = typeDef?.parameters || [];
 
+  // Localised label & description for the header
+  const nodeLabel = nodeI18n?.label || typeDef?.label || data.nodeType;
+  const nodeDescription = nodeI18n?.description || typeDef?.description || '';
+
   // Group parameters
   const groups: Record<string, WfNodeParameter[]> = {};
   for (const p of parameters) {
@@ -292,6 +342,23 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
               {data.nodeType}
             </div>
           </div>
+          {/* Help button — only shown for nodes with help content */}
+          {helpData && (
+            <button
+              onClick={() => setShowHelp(true)}
+              title={t('propertyPanel.helpTooltip')}
+              className="
+                flex items-center justify-center w-6 h-6 rounded-md shrink-0
+                text-[11px] font-bold
+                text-[var(--primary-color)] bg-[rgba(99,102,241,0.1)]
+                hover:bg-[rgba(99,102,241,0.2)]
+                border border-[rgba(99,102,241,0.2)]
+                transition-colors duration-150
+              "
+            >
+              ?
+            </button>
+          )}
         </div>
       </div>
 
@@ -328,20 +395,21 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
           </div>
         </div>
 
-        {/* Parameters by group */}
+        {/* Parameters by group — with i18n labels */}
         {!isStartOrEnd && sortedGroups.map(group => (
           <div key={group}>
             <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 pb-1 border-b border-[var(--border-color)]">
-              {group}
+              {getGroupI18n(group, nodeI18n)}
             </div>
             <div className={`space-y-3 ${readOnly ? 'opacity-70 pointer-events-none' : ''}`}>
               {groups[group].map(param => {
                 const val = data.config?.[param.name] ?? param.default;
+                const pi18n = getParamI18n(param, nodeI18n);
                 return (
                   <div key={param.name}>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold text-[var(--text-secondary)]">
-                        {param.label}
+                        {pi18n.label}
                         {param.required && <span className="text-[var(--danger-color)] ml-0.5">*</span>}
                       </label>
                       {param.type === 'boolean' && (
@@ -352,9 +420,9 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
                         />
                       )}
                     </div>
-                    {param.description && (
+                    {pi18n.description && (
                       <div className="text-[10px] text-[var(--text-muted)] mb-1.5 leading-relaxed">
-                        {param.description}
+                        {pi18n.description}
                       </div>
                     )}
                     {param.type !== 'boolean' && (
@@ -371,26 +439,31 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
           </div>
         ))}
 
-        {/* Output ports info */}
+        {/* Output ports info — with i18n labels */}
         {data.isConditional && data.outputPorts && (
           <div>
             <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider mb-2 pb-1 border-b border-[var(--border-color)]">
               {t('propertyPanel.outputPorts')}
             </div>
             <div className="space-y-1">
-              {data.outputPorts.map(port => (
-                <div
-                  key={port.id}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--bg-tertiary)] text-[11px]"
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: data.color }}
-                  />
-                  <span className="font-medium text-[var(--text-primary)]">{port.label}</span>
-                  <span className="text-[var(--text-muted)] font-mono">({port.id})</span>
-                </div>
-              ))}
+              {data.outputPorts.map(port => {
+                const portI18n = nodeI18n?.output_ports?.[port.id];
+                return (
+                  <div
+                    key={port.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-[var(--bg-tertiary)] text-[11px]"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: data.color }}
+                    />
+                    <span className="font-medium text-[var(--text-primary)]">
+                      {portI18n?.label || port.label}
+                    </span>
+                    <span className="text-[var(--text-muted)] font-mono">({port.id})</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -415,6 +488,16 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
             {t('propertyPanel.deleteNode')}
           </button>
         </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelp && helpData && (
+        <NodeHelpModal
+          help={helpData}
+          icon={data.icon}
+          color={data.color}
+          onClose={() => setShowHelp(false)}
+        />
       )}
     </div>
   );

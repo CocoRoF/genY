@@ -3,11 +3,18 @@
 import Image from 'next/image';
 import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
+import { configApi } from '@/lib/api';
 
 type SectionItem = { title: string; body: string | string[] };
 
 export default function MainTab() {
   const { t, tRaw, locale, setLocale } = useI18n();
+
+  /** Switch locale, persisting to backend LanguageConfig */
+  const switchLocale = (lang: Locale) => {
+    setLocale(lang);
+    configApi.update('language', { language: lang }).catch(() => {});
+  };
   const sections = tRaw<SectionItem[]>('main.sections');
   const tips = tRaw<string[]>('main.tips');
 
@@ -18,7 +25,7 @@ export default function MainTab() {
         <div className="flex justify-end mb-6">
           <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
             <button
-              onClick={() => setLocale('en')}
+              onClick={() => switchLocale('en')}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 border-none cursor-pointer ${
                 locale === 'en'
                   ? 'bg-[var(--primary-color)] text-white shadow-sm'
@@ -28,7 +35,7 @@ export default function MainTab() {
               ENG
             </button>
             <button
-              onClick={() => setLocale('ko')}
+              onClick={() => switchLocale('ko')}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all duration-150 border-none cursor-pointer ${
                 locale === 'ko'
                   ? 'bg-[var(--primary-color)] text-white shadow-sm'

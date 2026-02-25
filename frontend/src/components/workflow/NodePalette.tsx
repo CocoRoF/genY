@@ -1,9 +1,21 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 import { useI18n } from '@/lib/i18n';
 import { CATEGORY_INFO, type WfNodeTypeDef } from '@/types/workflow';
+
+/** Resolve i18n label/description for a node, falling back to the English defaults */
+function useLocalizedNode(nodeDef: WfNodeTypeDef): { label: string; description: string } {
+  const { locale } = useI18n();
+  return useMemo(() => {
+    const i18n = nodeDef.i18n?.[locale] ?? nodeDef.i18n?.['en'];
+    return {
+      label: i18n?.label || nodeDef.label,
+      description: i18n?.description || nodeDef.description,
+    };
+  }, [nodeDef, locale]);
+}
 
 // ========== Special pseudo-nodes (frontend-only) ==========
 
@@ -38,6 +50,7 @@ function getSpecialNodes(t: (key: string) => string): WfNodeTypeDef[] {
 
 function PaletteItem({ nodeDef }: { nodeDef: WfNodeTypeDef }) {
   const { setPaletteDragging } = useWorkflowStore();
+  const loc = useLocalizedNode(nodeDef);
 
   const onDragStart = useCallback(
     (e: React.DragEvent) => {
@@ -65,7 +78,7 @@ function PaletteItem({ nodeDef }: { nodeDef: WfNodeTypeDef }) {
         transition-all duration-150 select-none
         active:cursor-grabbing active:scale-[0.97]
       "
-      title={nodeDef.description}
+      title={loc.description}
     >
       {/* Icon */}
       <span
@@ -78,10 +91,10 @@ function PaletteItem({ nodeDef }: { nodeDef: WfNodeTypeDef }) {
       {/* Label + description */}
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-semibold text-[var(--text-primary)] truncate">
-          {nodeDef.label}
+          {loc.label}
         </div>
         <div className="text-[10px] text-[var(--text-muted)] truncate leading-tight mt-0.5">
-          {nodeDef.description}
+          {loc.description}
         </div>
       </div>
 
@@ -152,7 +165,7 @@ function CategorySection({
 
 export default function NodePalette() {
   const { nodeCatalog } = useWorkflowStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [openCategories, setOpenCategories] = useState<Set<string>>(
     new Set(['special', 'model', 'task', 'logic', 'memory', 'resilience']),
   );
@@ -181,12 +194,19 @@ export default function NodePalette() {
     allCategories[cat] = nodes;
   }
 
-  // Filter by search
+  // Filter by search — match both original and i18n labels
   const filtered: Record<string, WfNodeTypeDef[]> = {};
   const q = search.toLowerCase();
   for (const [cat, nodes] of Object.entries(allCategories)) {
     const matching = q
-      ? nodes.filter(n => n.label.toLowerCase().includes(q) || n.description.toLowerCase().includes(q))
+      ? nodes.filter(n => {
+          const i18n = n.i18n?.[locale] ?? n.i18n?.['en'];
+          const label = (i18n?.label || n.label).toLowerCase();
+          const desc = (i18n?.description || n.description).toLowerCase();
+          // Also match original English for bilingual search
+          return label.includes(q) || desc.includes(q) ||
+                 n.label.toLowerCase().includes(q) || n.description.toLowerCase().includes(q);
+        })
       : nodes;
     if (matching.length > 0) filtered[cat] = matching;
   }

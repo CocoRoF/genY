@@ -15,7 +15,8 @@ async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {})
     let message: string;
     try {
       const json = JSON.parse(body);
-      message = json.detail || json.message || json.error || `HTTP ${res.status}`;
+      const raw = json.detail || json.message || json.error;
+      message = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : `HTTP ${res.status}`;
     } catch {
       message = body || `HTTP ${res.status}`;
     }
@@ -157,7 +158,7 @@ export const configApi = {
   update: (name: string, values: Record<string, unknown>) =>
     apiCall<{ success: boolean }>(`/api/config/${encodeURIComponent(name)}`, {
       method: 'PUT',
-      body: JSON.stringify(values),
+      body: JSON.stringify({ values }),
     }),
 
   /** DELETE /api/config/{name} — reset config to defaults */

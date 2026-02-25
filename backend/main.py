@@ -30,14 +30,14 @@ try:
     env_path = Path(__file__).parent / ".env"
     if env_path.exists():
         load_dotenv(env_path)
-        print(f"✅ Loaded environment from {env_path}")
+        print(f"[OK] Loaded environment from {env_path}")
     else:
         # Show info message if .env.example exists
         example_path = Path(__file__).parent / ".env.example"
         if example_path.exists():
-            print(f"ℹ️  No .env file found. Copy .env.example to .env and configure it.")
+            print("[INFO] No .env file found. Copy .env.example to .env and configure it.")
 except ImportError:
-    print("⚠️  python-dotenv not installed. Environment variables must be set manually.")
+    print("[WARN] python-dotenv not installed. Environment variables must be set manually.")
 
 # Configure GitHub CLI authentication from GITHUB_TOKEN
 # This allows gh CLI to work without interactive login

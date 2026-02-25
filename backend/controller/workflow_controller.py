@@ -105,6 +105,32 @@ async def list_node_types():
     }
 
 
+@router.get("/nodes/{node_type}/help")
+async def get_node_help(node_type: str, locale: str = "en"):
+    """Return detailed help content for a specific node type.
+
+    Query params:
+        locale — 'en' or 'ko' (default: 'en')
+    """
+    registry = get_node_registry()
+    node = registry.get(node_type)
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Unknown node type: {node_type}")
+
+    help_data = node.get_help(locale)
+    if not help_data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No help content for node '{node_type}' in locale '{locale}'",
+        )
+
+    return {
+        "node_type": node_type,
+        "locale": locale,
+        "help": help_data,
+    }
+
+
 # ============================================================================
 # CRUD
 # ============================================================================
