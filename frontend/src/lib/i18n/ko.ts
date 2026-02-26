@@ -282,6 +282,14 @@ const ko: Translations = {
     autoRefresh: '자동 새로고침',
     refresh: '새로고침',
     noLogs: '로그 항목 없음',
+    groupBrief: '간략',
+    groupBriefDesc: '핵심 활동만',
+    groupDefault: '기본',
+    groupDefaultDesc: '도구 호출 & 반복',
+    groupDetail: '상세',
+    groupDetailDesc: '그래프 실행 흐름',
+    groupAll: '전체',
+    groupAllDesc: '모든 로그 (디버그 포함)',
   },
 
   // ─── Storage Tab ───

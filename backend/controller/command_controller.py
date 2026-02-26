@@ -358,21 +358,28 @@ async def list_all_session_logs():
 async def get_session_logs(
     session_id: str,
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of log entries"),
-    level: Optional[str] = Query(None, description="Filter by log level (DEBUG, INFO, WARNING, ERROR, COMMAND, RESPONSE)")
+    level: Optional[str] = Query(None, description="Filter by log level. Single level (e.g. 'INFO') or comma-separated (e.g. 'INFO,COMMAND,RESPONSE')")
 ):
     """
     Get log entries for a specific session.
 
     Reads logs from persistent log files. Logs are preserved even after session deletion.
-    Supports filtering by log level.
+    Supports filtering by a single level or multiple comma-separated levels.
     """
-    # Parse level filter
+    # Parse level filter — supports single level or comma-separated set
     level_filter = None
     if level:
-        try:
-            level_filter = LogLevel(level.upper())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid log level: {level}")
+        raw_levels = [lv.strip().upper() for lv in level.split(",") if lv.strip()]
+        parsed = set()
+        for lv in raw_levels:
+            try:
+                parsed.add(LogLevel(lv))
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid log level: {lv}")
+        if len(parsed) == 1:
+            level_filter = parsed.pop()          # single LogLevel
+        elif parsed:
+            level_filter = parsed                 # set[LogLevel]
 
     # First check if log file exists
     log_file_path = get_log_file_path(session_id)

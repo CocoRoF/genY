@@ -282,6 +282,14 @@ const en = {
     autoRefresh: 'Auto-refresh',
     refresh: 'Refresh',
     noLogs: 'No log entries',
+    groupBrief: 'Brief',
+    groupBriefDesc: 'Core activity only',
+    groupDefault: 'Default',
+    groupDefaultDesc: 'Tools & iterations',
+    groupDetail: 'Detail',
+    groupDetailDesc: 'Graph execution flow',
+    groupAll: 'All',
+    groupAllDesc: 'Everything (incl. debug)',
   },
 
   // ─── Storage Tab ───

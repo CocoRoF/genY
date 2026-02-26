@@ -914,7 +914,7 @@ class SessionLogger:
     def get_logs(
         self,
         limit: int = 100,
-        level: Optional[LogLevel] = None,
+        level: Optional["LogLevel | set[LogLevel]"] = None,
         from_cache: bool = True
     ) -> List[Dict[str, Any]]:
         """
@@ -922,7 +922,7 @@ class SessionLogger:
 
         Args:
             limit: Maximum number of entries to return
-            level: Filter by log level
+            level: Filter by a single LogLevel or a set of LogLevels
             from_cache: If True, read from cache; if False, read from file
 
         Returns:
@@ -932,7 +932,10 @@ class SessionLogger:
             with self._lock:
                 entries = self._log_cache[-limit:]
                 if level:
-                    entries = [e for e in entries if e.level == level]
+                    if isinstance(level, set):
+                        entries = [e for e in entries if e.level in level]
+                    else:
+                        entries = [e for e in entries if e.level == level]
                 return [e.to_dict() for e in entries]
         else:
             # Read from file
@@ -1104,7 +1107,7 @@ def list_session_logs() -> List[Dict[str, Any]]:
 def read_logs_from_file(
     session_id: str,
     limit: int = 100,
-    level: Optional[LogLevel] = None
+    level: Optional["LogLevel | set[LogLevel]"] = None
 ) -> List[Dict[str, Any]]:
     """
     Read log entries directly from a log file.
@@ -1115,11 +1118,19 @@ def read_logs_from_file(
     Args:
         session_id: Session ID (used to find the log file)
         limit: Maximum number of entries to return
-        level: Filter by log level
+        level: Filter by a single LogLevel or a set of LogLevels
 
     Returns:
         List of log entries as dictionaries
     """
+    # Build a set of allowed level value strings for fast checking
+    allowed_values: Optional[set] = None
+    if level:
+        if isinstance(level, set):
+            allowed_values = {lv.value for lv in level}
+        else:
+            allowed_values = {level.value}
+
     logs_dir = Path(__file__).parent.parent.parent / "logs"
     log_file = logs_dir / f"{session_id}.log"
 
@@ -1145,7 +1156,7 @@ def read_logs_from_file(
                             log_level = rest[:level_end].strip()
 
                             # Check level filter
-                            if level and log_level != level.value:
+                            if allowed_values and log_level not in allowed_values:
                                 continue
 
                             message_part = rest[level_end + 2:].strip()
