@@ -192,6 +192,31 @@ async def get_stored_session_info(
 
 
 # ============================================================================
+# Manager/Worker API (must be before /{session_id} routes)
+# ============================================================================
+
+
+@router.get("/managers", response_model=List[SessionInfo])
+async def list_agent_managers():
+    """
+    Get all AgentSession managers.
+    """
+    managers = agent_manager.get_agent_managers()
+    return [m.get_session_info() for m in managers]
+
+
+@router.get("/{manager_id}/workers", response_model=List[SessionInfo])
+async def get_agent_workers(
+    manager_id: str = Path(..., description="Manager session ID")
+):
+    """
+    Get workers under a manager AgentSession.
+    """
+    workers = agent_manager.get_agent_workers_by_manager(manager_id)
+    return [w.get_session_info() for w in workers]
+
+
+# ============================================================================
 # Session CRUD (with /{session_id} path parameter)
 # ============================================================================
 
@@ -580,31 +605,6 @@ async def upgrade_to_agent_session(
 
     logger.info(f"✅ Session upgraded to AgentSession: {session_id}")
     return agent.get_session_info()
-
-
-# ============================================================================
-# Manager/Worker API
-# ============================================================================
-
-
-@router.get("/managers", response_model=List[SessionInfo])
-async def list_agent_managers():
-    """
-    Get all AgentSession managers.
-    """
-    managers = agent_manager.get_agent_managers()
-    return [m.get_session_info() for m in managers]
-
-
-@router.get("/{manager_id}/workers", response_model=List[SessionInfo])
-async def get_agent_workers(
-    manager_id: str = Path(..., description="Manager session ID")
-):
-    """
-    Get workers under a manager AgentSession.
-    """
-    workers = agent_manager.get_agent_workers_by_manager(manager_id)
-    return [w.get_session_info() for w in workers]
 
 
 # ============================================================================

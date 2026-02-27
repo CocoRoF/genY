@@ -102,12 +102,13 @@ async def get_session(
 @router.delete("/{session_id}")
 async def delete_session(
     session_id: str = Path(..., description="Session ID"),
-    cleanup_storage: bool = Query(True, description="Also delete storage")
+    cleanup_storage: bool = Query(False, description="Also delete storage (default: False to preserve files)")
 ):
     """
-    Delete session.
+    Delete session (soft-delete).
 
-    Terminates the session and cleans up related resources.
+    Terminates the session process. Storage is preserved by default
+    so the session can be restored later.
     """
     success = await session_manager.delete_session(session_id, cleanup_storage)
     if not success:

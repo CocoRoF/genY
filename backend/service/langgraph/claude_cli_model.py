@@ -232,11 +232,11 @@ class ClaudeCLIChatModel(BaseChatModel):
         """
         세션 정리.
 
-        ClaudeProcess를 정리하고 리소스를 해제합니다.
+        ClaudeProcess를 정지하고 리소스를 해제합니다.
+        스토리지는 보존됩니다 (완전 삭제 시에만 제거).
         """
         if self._process:
             await self._process.stop()
-            await self._process.cleanup_storage()
             self._process = None
             self._initialized = False
             logger.info(f"ClaudeCLIChatModel cleaned up: {self.session_id}")

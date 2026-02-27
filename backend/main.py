@@ -188,22 +188,28 @@ async def lifespan(app: FastAPI):
     proxy = get_internal_proxy()
     await proxy.close()
 
-    # Cleanup all sessions (10 second total timeout)
-    async def cleanup_all_sessions():
+    # Stop all active sessions (processes only — storage preserved)
+    async def stop_all_sessions():
         sessions = agent_manager.list_sessions()
-        # Cleanup sessions in parallel
-        cleanup_tasks = [
-            agent_manager.delete_session(session.session_id)
-            for session in sessions
-        ]
-        if cleanup_tasks:
-            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+        # Stop processes in parallel (no storage cleanup)
+        stop_tasks = []
+        for session in sessions:
+            agent = agent_manager.get_agent(session.session_id)
+            if agent:
+                stop_tasks.append(agent.cleanup())
+            else:
+                # Legacy process — just stop, don't delete storage
+                process = agent_manager._local_processes.get(session.session_id)
+                if process:
+                    stop_tasks.append(process.stop())
+        if stop_tasks:
+            await asyncio.gather(*stop_tasks, return_exceptions=True)
 
     try:
-        await asyncio.wait_for(cleanup_all_sessions(), timeout=10.0)
-        logger.info("All sessions cleaned up successfully")
+        await asyncio.wait_for(stop_all_sessions(), timeout=10.0)
+        logger.info("All session processes stopped (storage preserved)")
     except asyncio.TimeoutError:
-        logger.warning("Session cleanup timed out, some processes may still be running")
+        logger.warning("Session stop timed out, some processes may still be running")
 
 
 # Create FastAPI app
