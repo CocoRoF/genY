@@ -57,7 +57,7 @@ class ConditionalRouterNode(BaseNode):
     label = "Conditional Router"
     description = "Pure state-based routing node. Reads a specified state field and maps its value to output ports via a configurable JSON route map. Handles enums, strings, and other types with automatic normalization. Essential for building branching workflows where routing decisions are separated from node execution."
     category = "logic"
-    icon = "🔀"
+    icon = "git-branch"
     color = "#6366f1"
     i18n = CONDITIONAL_ROUTER_I18N
 
@@ -178,7 +178,7 @@ class IterationGateNode(BaseNode):
     label = "Iteration Gate"
     description = "Loop prevention guard that checks multiple stop conditions: iteration count vs limit, context window budget status, completion signals, and an optional custom state field. When any limit is exceeded, sets is_complete=True and routes to the 'stop' port. Place before loop-back edges to prevent infinite execution."
     category = "logic"
-    icon = "🚧"
+    icon = "fence"
     color = "#6366f1"
     i18n = ITERATION_GATE_I18N
 
@@ -321,7 +321,7 @@ class CheckProgressNode(BaseNode):
     label = "Check Progress"
     description = "Checks completion progress of a configurable list field. Compares the current index against the list length and counts completed/failed items. Routes to 'continue' when items remain or 'complete' when all items are processed. Also respects completion signals and error flags."
     category = "logic"
-    icon = "📊"
+    icon = "bar-chart"
     color = "#6366f1"
     i18n = CHECK_PROGRESS_I18N
 
@@ -439,7 +439,7 @@ class StateSetterNode(BaseNode):
     label = "State Setter"
     description = "Directly manipulates state fields by setting them to configured JSON values. Useful for initializing state, resetting counters, setting flags, or injecting static configuration into the workflow at specific points."
     category = "logic"
-    icon = "✏️"
+    icon = "pen-line"
     color = "#6366f1"
     i18n = STATE_SETTER_I18N
 

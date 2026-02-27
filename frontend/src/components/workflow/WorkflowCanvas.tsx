@@ -18,6 +18,7 @@ import '@xyflow/react/dist/style.css';
 import { useWorkflowStore, type WorkflowNodeData } from '@/store/useWorkflowStore';
 import { useI18n } from '@/lib/i18n';
 import { workflowNodeTypes } from './CustomNodes';
+import { NodeIcon } from './icons';
 
 export default function WorkflowCanvas({ readOnly = false }: { readOnly?: boolean }) {
   const rfRef = useRef<ReactFlowInstance<Node<WorkflowNodeData>, Edge> | null>(null);
@@ -202,7 +203,7 @@ export default function WorkflowCanvas({ readOnly = false }: { readOnly?: boolea
       {nodes.length === 0 && !readOnly && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div className="text-center p-6 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] shadow-lg">
-            <div className="text-[28px] mb-2">🎨</div>
+            <NodeIcon name="workflow" size={28} className="mb-2 text-[var(--text-muted)] opacity-60" />
             <div className="text-[13px] font-semibold text-[var(--text-secondary)] mb-1">
               {t('workflowEditor.designTitle')}
             </div>

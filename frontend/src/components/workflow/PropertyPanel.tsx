@@ -5,6 +5,7 @@ import { useWorkflowStore, type WorkflowNodeData } from '@/store/useWorkflowStor
 import { useI18n } from '@/lib/i18n';
 import type { WfNodeParameter, WfNodeTypeDef, WfNodeI18n, WfStructuredOutputSchema } from '@/types/workflow';
 import NodeHelpModal from './NodeHelpModal';
+import { NodeIcon } from './icons';
 
 // ========== i18n Helper ==========
 
@@ -262,7 +263,7 @@ function StructuredOutputPreview({ schema, color }: {
           transition-colors duration-150
         "
       >
-        <span className="text-[13px]">📐</span>
+        <NodeIcon name="ruler" size={13} className="text-[var(--primary-color)]" />
         <div className="flex-1 min-w-0">
           <div className="text-[10px] font-bold text-[var(--primary-color)] uppercase tracking-wider">
             {t('propertyPanel.structuredOutput')}
@@ -317,7 +318,7 @@ function StructuredOutputPreview({ schema, color }: {
                 </div>
                 {field.dynamic_note && (
                   <div className="text-[9px] text-[var(--primary-color)] leading-snug flex items-start gap-1">
-                    <span className="shrink-0 mt-px">⚡</span>
+                    <NodeIcon name="zap" size={10} className="shrink-0 mt-px text-[var(--primary-color)]" />
                     <span>{field.dynamic_note}</span>
                   </div>
                 )}
@@ -421,7 +422,7 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
   if (!selectedNode) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <div className="text-[24px] mb-2 opacity-40">🔧</div>
+        <NodeIcon name="settings" size={24} className="mb-2 opacity-40 text-[var(--text-muted)]" />
         <div className="text-[12px] text-[var(--text-muted)]">
           {t('propertyPanel.selectNode')}
         </div>
@@ -455,10 +456,10 @@ export default function PropertyPanel({ readOnly = false }: { readOnly?: boolean
       <div className="px-3 py-2.5 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2">
           <span
-            className="flex items-center justify-center w-7 h-7 rounded-md text-[14px]"
+            className="flex items-center justify-center w-7 h-7 rounded-md"
             style={{ background: `${data.color}20` }}
           >
-            {data.icon}
+            <NodeIcon name={data.icon} size={14} style={{ color: data.color }} />
           </span>
           <div className="flex-1 min-w-0">
             <div className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">

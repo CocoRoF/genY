@@ -1,15 +1,162 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 import NodePalette from '@/components/workflow/NodePalette';
 import PropertyPanel from '@/components/workflow/PropertyPanel';
 import WorkflowCanvas from '@/components/workflow/WorkflowCanvas';
 import CompiledViewModal from '@/components/modals/CompiledViewModal';
+import { NodeIcon } from '@/components/workflow/icons';
 import { workflowApi } from '@/lib/workflowApi';
 import { useI18n } from '@/lib/i18n';
 import type { WorkflowDefinition } from '@/types/workflow';
+
+// ==================== Workflow Meta Editor ====================
+
+function WorkflowMetaEditor() {
+  const { currentWorkflow, updateWorkflowMeta } = useWorkflowStore();
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [desc, setDesc] = useState('');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  // Sync local state when workflow changes or panel opens
+  useEffect(() => {
+    if (currentWorkflow && open) {
+      setName(currentWorkflow.name);
+      setDesc(currentWorkflow.description || '');
+    }
+  }, [currentWorkflow, open]);
+
+  // Close on click outside
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as HTMLElement) &&
+        btnRef.current && !btnRef.current.contains(e.target as HTMLElement)
+      ) {
+        // Apply changes before closing
+        applyAndClose();
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  });
+
+  const applyAndClose = useCallback(() => {
+    if (currentWorkflow && !currentWorkflow.is_template) {
+      const trimmedName = name.trim();
+      if (trimmedName && (trimmedName !== currentWorkflow.name || desc !== (currentWorkflow.description || ''))) {
+        updateWorkflowMeta(trimmedName, desc);
+      }
+    }
+    setOpen(false);
+  }, [currentWorkflow, name, desc, updateWorkflowMeta]);
+
+  if (!currentWorkflow) return null;
+
+  const isTemplate = currentWorkflow.is_template;
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        onClick={() => setOpen(!open)}
+        title={t('workflowEditor.editMetaTooltip')}
+        className={`
+          h-7 px-2 text-[11px] font-medium rounded-md
+          border transition-colors duration-150 whitespace-nowrap
+          ${open
+            ? 'text-[var(--primary-color)] border-[rgba(59,130,246,0.3)] bg-[rgba(59,130,246,0.1)]'
+            : 'text-[var(--text-secondary)] border-[var(--border-color)] bg-[var(--bg-tertiary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)]'
+          }
+        `}
+      >
+        <NodeIcon name="pencil" size={13} className="inline -mt-px" />
+        <span className="ml-1">{t('workflowEditor.editMeta')}</span>
+      </button>
+
+      {open && (
+        <div
+          ref={panelRef}
+          className="
+            absolute top-full left-0 mt-1 z-50 w-[320px]
+            bg-[var(--bg-secondary)] border border-[var(--border-color)]
+            rounded-lg shadow-xl p-3
+          "
+        >
+          {/* Name field */}
+          <label className="block text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1">
+            {t('workflowEditor.metaName')}
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') applyAndClose(); if (e.key === 'Escape') { setOpen(false); } }}
+            disabled={isTemplate}
+            autoFocus
+            className="
+              w-full h-8 px-2.5 text-[12px]
+              bg-[var(--bg-tertiary)] border border-[var(--border-color)]
+              rounded-md text-[var(--text-primary)]
+              focus:outline-none focus:border-[var(--primary-color)]
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          />
+
+          {/* Description field */}
+          <label className="block text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-1 mt-3">
+            {t('workflowEditor.metaDescription')}
+          </label>
+          <textarea
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); } }}
+            disabled={isTemplate}
+            rows={3}
+            className="
+              w-full px-2.5 py-1.5 text-[12px] resize-y
+              bg-[var(--bg-tertiary)] border border-[var(--border-color)]
+              rounded-md text-[var(--text-primary)]
+              focus:outline-none focus:border-[var(--primary-color)]
+              disabled:opacity-50 disabled:cursor-not-allowed
+            "
+          />
+
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-3">
+            {isTemplate && (
+              <span className="text-[10px] text-[var(--text-muted)] italic">
+                {t('workflowEditor.metaTemplateReadonly')}
+              </span>
+            )}
+            {!isTemplate && (
+              <span className="text-[10px] text-[var(--text-muted)]">
+                {t('workflowEditor.metaHint')}
+              </span>
+            )}
+            <button
+              onClick={applyAndClose}
+              className="
+                h-6 px-3 text-[11px] font-medium rounded-md
+                text-[var(--primary-color)] border border-[rgba(59,130,246,0.3)]
+                bg-[rgba(59,130,246,0.1)] hover:bg-[rgba(59,130,246,0.18)]
+                transition-colors duration-150
+              "
+            >
+              {isTemplate ? t('common.close') : t('workflowEditor.metaApply')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ==================== Toolbar ====================
 
@@ -96,22 +243,24 @@ function WorkflowToolbar() {
             className="h-7 px-2 text-[11px] w-[130px] bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary-color)]"
           />
           <ToolbarBtn onClick={handleCreate} title={t('workflowEditor.confirm')} disabled={!newName.trim()}>
-            ✓
+            <NodeIcon name="check" size={14} />
           </ToolbarBtn>
           <ToolbarBtn onClick={() => setShowCreate(false)} title={t('common.cancel')}>
-            ✕
+            <NodeIcon name="x" size={14} />
           </ToolbarBtn>
         </div>
       ) : (
         <ToolbarBtn onClick={() => setShowCreate(true)} title={t('workflowEditor.newWorkflowTooltip')}>
-          {t('workflowEditor.new')}
+          <NodeIcon name="plus" size={14} className="inline -mt-px" />
+          <span className="ml-1">{t('workflowEditor.new')}</span>
         </ToolbarBtn>
       )}
 
       {/* Templates */}
       <div className="relative">
         <ToolbarBtn onClick={() => setShowTemplates(!showTemplates)} title={t('workflowEditor.loadTemplateTooltip')}>
-          {t('workflowEditor.saveTemplate')}
+          <NodeIcon name="layout-list" size={13} className="inline -mt-px" />
+          <span className="ml-1">{t('workflowEditor.saveTemplate')}</span>
         </ToolbarBtn>
         {showTemplates && templates.length > 0 && (
           <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg shadow-xl overflow-hidden">
@@ -138,27 +287,34 @@ function WorkflowToolbar() {
         title={t('workflowEditor.saveTooltip')}
         accent={isDirty}
       >
-        {isDirty ? t('workflowEditor.saveDirty') : t('workflowEditor.save')}
+        <NodeIcon name="save" size={13} className="inline -mt-px" />
+        <span className="ml-1">{isDirty ? t('workflowEditor.saveDirty') : t('workflowEditor.save')}</span>
       </ToolbarBtn>
 
       {/* Clone */}
       {currentWorkflow && (
         <ToolbarBtn onClick={() => cloneWorkflow(currentWorkflow.id)} title={t('workflowEditor.cloneTooltip')}>
-          {t('workflowEditor.clone')}
+          <NodeIcon name="copy" size={13} className="inline -mt-px" />
+          <span className="ml-1">{t('workflowEditor.clone')}</span>
         </ToolbarBtn>
       )}
+
+      {/* Edit name / description */}
+      {currentWorkflow && <WorkflowMetaEditor />}
 
       {/* View Compiled */}
       {currentWorkflow && (
         <ToolbarBtn onClick={() => setShowCompiledView(true)} title={t('workflowEditor.viewCompiledTooltip')}>
-          {t('workflowEditor.viewCompiled')}
+          <NodeIcon name="scan-search" size={13} className="inline -mt-px" />
+          <span className="ml-1">{t('workflowEditor.viewCompiled')}</span>
         </ToolbarBtn>
       )}
 
       {/* Delete */}
       {currentWorkflow && !currentWorkflow.is_template && (
         <ToolbarBtn onClick={handleDelete} danger title={t('workflowEditor.deleteTooltip')}>
-          {t('workflowEditor.deleteBtn')}
+          <NodeIcon name="trash" size={13} className="inline -mt-px" />
+          <span className="ml-1">{t('workflowEditor.deleteBtn')}</span>
         </ToolbarBtn>
       )}
 
@@ -170,8 +326,8 @@ function WorkflowToolbar() {
         <span className="text-[10px] text-[var(--text-muted)] animate-pulse">{t('workflowEditor.loading')}</span>
       )}
       {error && (
-        <span className="text-[10px] text-[var(--danger-color)] max-w-[200px] truncate" title={error}>
-          ⚠ {error}
+        <span className="text-[10px] text-[var(--danger-color)] max-w-[200px] truncate inline-flex items-center gap-1" title={error}>
+          <NodeIcon name="alert-triangle" size={12} /> {error}
         </span>
       )}
 
@@ -215,6 +371,7 @@ function ToolbarBtn({
       disabled={disabled}
       title={title}
       className={`
+        inline-flex items-center gap-0.5
         h-7 px-2.5 text-[11px] font-medium rounded-md
         border transition-colors duration-150 whitespace-nowrap
         disabled:opacity-40 disabled:cursor-not-allowed

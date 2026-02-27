@@ -73,6 +73,9 @@ interface WorkflowEditorState {
   updateNodeLabel: (nodeId: string, label: string) => void;
   deleteSelectedNode: () => void;
 
+  // Actions — Workflow metadata
+  updateWorkflowMeta: (name: string, description: string) => void;
+
   // Actions — Data
   loadCatalog: () => Promise<void>;
   loadWorkflows: () => Promise<void>;
@@ -223,7 +226,7 @@ function wfNodeToReactFlow(
     data: {
       label: inst.label || typeDef?.label || inst.node_type,
       nodeType: inst.node_type,
-      icon: isStart ? '▶' : isEnd ? '⏹' : (typeDef?.icon || '⚡'),
+      icon: isStart ? 'play' : isEnd ? 'square' : (typeDef?.icon || 'zap'),
       color: isStart ? '#10b981' : isEnd ? '#6b7280' : (typeDef?.color || '#3b82f6'),
       category: typeDef?.category || 'general',
       isConditional: typeDef?.is_conditional || false,
@@ -343,7 +346,7 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       data: {
         label: nodeType.label,
         nodeType: nodeType.node_type,
-        icon: isStart ? '▶' : isEnd ? '⏹' : nodeType.icon,
+        icon: isStart ? 'play' : isEnd ? 'square' : nodeType.icon,
         color: isStart ? '#10b981' : isEnd ? '#6b7280' : nodeType.color,
         category: nodeType.category,
         isConditional: nodeType.is_conditional,
@@ -402,6 +405,19 @@ export const useWorkflowStore = create<WorkflowEditorState>((set, get) => ({
       nodes: nodes.filter(n => n.id !== selectedNodeId),
       edges: edges.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId),
       selectedNodeId: null,
+      isDirty: true,
+    });
+  },
+
+  // ── Workflow metadata ──
+
+  updateWorkflowMeta: (name, description) => {
+    const { currentWorkflow, workflows } = get();
+    if (!currentWorkflow) return;
+    const updated = { ...currentWorkflow, name, description };
+    set({
+      currentWorkflow: updated,
+      workflows: workflows.map(w => w.id === updated.id ? { ...w, name, description } : w),
       isDirty: true,
     });
   },

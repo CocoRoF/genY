@@ -49,7 +49,7 @@ class MemoryInjectNode(BaseNode):
     label = "Memory Inject"
     description = "Loads relevant memories from the session memory manager at workflow start. Searches for memories related to the input text and injects MemoryRef entries into state for traceability. Also optionally records the user input to the short-term transcript. Place at graph start for context-aware execution."
     category = "memory"
-    icon = "🧠"
+    icon = "brain"
     color = "#ec4899"
     i18n = MEMORY_INJECT_I18N
 
@@ -160,7 +160,7 @@ class TranscriptRecordNode(BaseNode):
     label = "Transcript Record"
     description = "Records a state field's content to the short-term memory transcript with a configurable message role (assistant/user/system). Use for explicit transcript control when the built-in recording in PostModel is insufficient."
     category = "memory"
-    icon = "📝"
+    icon = "file-text"
     color = "#ec4899"
     i18n = TRANSCRIPT_RECORD_I18N
 

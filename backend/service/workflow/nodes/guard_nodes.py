@@ -52,7 +52,7 @@ class ContextGuardNode(BaseNode):
     label = "Context Guard"
     description = "Checks context window token budget before model calls. Estimates token usage from accumulated messages and writes budget status (safe/warning/block/overflow) to state. Downstream model nodes read this to compact prompts when budget is tight. Place before every model-calling node for resilience."
     category = "resilience"
-    icon = "🛡️"
+    icon = "shield-check"
     color = "#6b7280"
     i18n = CONTEXT_GUARD_I18N
 
@@ -143,7 +143,7 @@ class PostModelNode(BaseNode):
     label = "Post Model"
     description = "Post-processing node placed after every model call. Performs three sequential concerns: (1) increments the configurable iteration counter, (2) optionally detects structured completion signals from the output, and (3) optionally records the output to the short-term memory transcript. Essential resilience infrastructure for any model-calling workflow."
     category = "resilience"
-    icon = "📌"
+    icon = "pin"
     color = "#6b7280"
     i18n = POST_MODEL_I18N
 

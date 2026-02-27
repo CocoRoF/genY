@@ -93,7 +93,7 @@ class CreateTodosNode(BaseNode):
     label = "Create TODOs"
     description = "Breaks a complex task into a structured JSON TODO list via LLM. Uses Pydantic-validated structured output for reliable parsing. Converts items to TodoItem format with id/title/description/status/result, and caps the count to prevent runaway execution."
     category = "task"
-    icon = "📝"
+    icon = "list-todo"
     color = "#ef4444"
     i18n = CREATE_TODOS_I18N
 
@@ -234,7 +234,7 @@ class ExecuteTodoNode(BaseNode):
     label = "Execute TODO"
     description = "Executes a single TODO item from the plan. Builds a prompt with the item's title, description, and budget-aware context from previously completed items. Marks the item as completed (or failed on error) and advances the index. Designed to run in a loop with CheckProgress."
     category = "task"
-    icon = "🔨"
+    icon = "hammer"
     color = "#ef4444"
     i18n = EXECUTE_TODO_I18N
 
@@ -392,7 +392,7 @@ class FinalReviewNode(BaseNode):
     label = "Final Review"
     description = "Comprehensive review of all completed list item results using Pydantic-validated structured output. Evaluates overall quality, summarizes accomplishments, identifies issues, and provides actionable recommendations. Stores structured review for use by the final answer synthesis."
     category = "task"
-    icon = "✅"
+    icon = "badge-check"
     color = "#ef4444"
     i18n = FINAL_REVIEW_I18N
 
@@ -585,7 +585,7 @@ class FinalAnswerNode(BaseNode):
     label = "Final Answer"
     description = "Synthesizes the final comprehensive answer from all list item results and review feedback. Combines completed work into a coherent response with budget-aware truncation. Marks the workflow as complete upon success."
     category = "task"
-    icon = "🎯"
+    icon = "target"
     color = "#ef4444"
     i18n = FINAL_ANSWER_I18N
 

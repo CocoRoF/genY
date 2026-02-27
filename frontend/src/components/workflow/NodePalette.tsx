@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 import { useI18n } from '@/lib/i18n';
 import { CATEGORY_INFO, type WfNodeTypeDef } from '@/types/workflow';
+import { NodeIcon } from './icons';
 
 /** Resolve i18n label/description for a node, falling back to the English defaults */
 function useLocalizedNode(nodeDef: WfNodeTypeDef): { label: string; description: string } {
@@ -26,7 +27,7 @@ function getSpecialNodes(t: (key: string) => string): WfNodeTypeDef[] {
       label: t('nodePalette.startNode'),
       description: t('nodePalette.startDesc'),
       category: 'special',
-      icon: '▶',
+      icon: 'play',
       color: '#10b981',
       is_conditional: false,
       parameters: [],
@@ -37,7 +38,7 @@ function getSpecialNodes(t: (key: string) => string): WfNodeTypeDef[] {
       label: t('nodePalette.endNode'),
       description: t('nodePalette.endDesc'),
       category: 'special',
-      icon: '⏹',
+      icon: 'square',
       color: '#6b7280',
       is_conditional: false,
       parameters: [],
@@ -82,10 +83,10 @@ function PaletteItem({ nodeDef }: { nodeDef: WfNodeTypeDef }) {
     >
       {/* Icon */}
       <span
-        className="flex items-center justify-center w-7 h-7 rounded-md text-[14px] shrink-0"
+        className="flex items-center justify-center w-7 h-7 rounded-md shrink-0"
         style={{ background: `${nodeDef.color}20` }}
       >
-        {nodeDef.icon}
+        <NodeIcon name={nodeDef.icon} size={14} style={{ color: nodeDef.color }} />
       </span>
 
       {/* Label + description */}
@@ -100,7 +101,7 @@ function PaletteItem({ nodeDef }: { nodeDef: WfNodeTypeDef }) {
 
       {/* Conditional badge */}
       {nodeDef.is_conditional && (
-        <span className="text-[10px] text-[var(--text-muted)] shrink-0 font-mono">◆</span>
+        <NodeIcon name="diamond" size={10} className="text-[var(--text-muted)] shrink-0" />
       )}
     </div>
   );
@@ -120,7 +121,7 @@ function CategorySection({
   onToggle: () => void;
 }) {
   const { t } = useI18n();
-  const info = CATEGORY_INFO[category] || { label: category, icon: '📦', color: '#64748b' };
+  const info = CATEGORY_INFO[category] || { label: category, icon: 'zap', color: '#64748b' };
   const label = t(`nodePalette.categories.${category}`) || info.label;
 
   return (
@@ -133,7 +134,7 @@ function CategorySection({
         "
         onClick={onToggle}
       >
-        <span className="text-[13px]">{info.icon}</span>
+        <NodeIcon name={info.icon} size={13} style={{ color: info.color }} />
         <span className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-wider flex-1">
           {label}
         </span>

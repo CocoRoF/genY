@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { WorkflowNodeData } from '@/store/useWorkflowStore';
+import { NodeIcon } from './icons';
 
 // ========== Start Node ==========
 
@@ -19,7 +20,7 @@ export const StartNode = memo(({ data, selected }: NodeProps) => {
       `}
       style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))' }}
     >
-      <span className="text-[16px] mr-1.5">▶</span>
+      <NodeIcon name="play" size={16} className="text-[#10b981] mr-1.5" />
       <span className="text-[13px] font-semibold text-[#10b981]">{d.label}</span>
       <Handle
         type="source"
@@ -52,7 +53,7 @@ export const EndNode = memo(({ data, selected }: NodeProps) => {
         position={Position.Top}
         className="!w-3 !h-3 !bg-[#6b7280] !border-2 !border-[#18181b] !-top-1.5"
       />
-      <span className="text-[16px] mr-1.5">⏹</span>
+      <NodeIcon name="square" size={16} className="text-[#6b7280] mr-1.5" />
       <span className="text-[13px] font-semibold text-[#6b7280]">{d.label}</span>
     </div>
   );
@@ -90,7 +91,7 @@ export const WorkflowNode = memo(({ data, selected }: NodeProps) => {
         className="flex items-center gap-2 px-3 py-2 rounded-t-[5px]"
         style={{ background: `${borderColor}15` }}
       >
-        <span className="text-[14px] leading-none">{d.icon}</span>
+        <NodeIcon name={d.icon} size={14} style={{ color: borderColor }} />
         <span
           className="text-[12px] font-semibold truncate"
           style={{ color: borderColor }}
@@ -113,7 +114,7 @@ export const WorkflowNode = memo(({ data, selected }: NodeProps) => {
             style={{ background: 'rgba(139,92,246,0.15)', color: 'rgba(139,92,246,0.85)' }}
             title="Structured Output"
           >
-            📐
+            <NodeIcon name="ruler" size={10} />
           </span>
         )}
       </div>
@@ -163,14 +164,14 @@ export const ConditionalNode = memo(({ data, selected }: NodeProps) => {
         className="flex items-center gap-2 px-3 py-2 rounded-t-[5px]"
         style={{ background: `${borderColor}15` }}
       >
-        <span className="text-[14px] leading-none">{d.icon}</span>
+        <NodeIcon name={d.icon} size={14} style={{ color: borderColor }} />
         <span
           className="text-[12px] font-semibold truncate"
           style={{ color: borderColor }}
         >
           {d.label}
         </span>
-        <span className="ml-auto text-[10px] text-[var(--text-muted)]">◆</span>
+        <NodeIcon name="diamond" size={10} className="ml-auto text-[var(--text-muted)]" />
       </div>
 
       {/* Category badge + structured output indicator */}
@@ -187,7 +188,7 @@ export const ConditionalNode = memo(({ data, selected }: NodeProps) => {
             style={{ background: 'rgba(139,92,246,0.15)', color: 'rgba(139,92,246,0.85)' }}
             title="Structured Output"
           >
-            📐
+            <NodeIcon name="ruler" size={10} />
           </span>
         )}
       </div>

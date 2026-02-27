@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { workflowApi } from '@/lib/workflowApi';
 import { useI18n } from '@/lib/i18n';
+import { NodeIcon } from '@/components/workflow/icons';
 import type { CompileViewResponse, CompileViewNodeDetail, CompileViewEdgeDetail } from '@/types/workflow';
 
 interface Props {
@@ -125,7 +126,7 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
                 }`}
               >
                 {tab === 'code' ? `⟨/⟩ ${t('compiledView.tabCode')}` :
-                 tab === 'nodes' ? `◆ ${t('compiledView.tabNodes')}` :
+                 tab === 'nodes' ? `◇ ${t('compiledView.tabNodes')}` :
                  `→ ${t('compiledView.tabEdges')}`}
               </button>
             ))}
@@ -143,8 +144,9 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
           {activeTab === 'code' && (
             <button
               onClick={handleCopyCode}
-              className="h-7 px-2.5 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
+              className="inline-flex items-center gap-1 h-7 px-2.5 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             >
+              <NodeIcon name="copy" size={12} />
               {t('compiledView.copyCode')}
             </button>
           )}
@@ -358,7 +360,7 @@ function NodesView({
               onClick={() => toggleNode(node.id)}
               className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer bg-transparent border-none"
             >
-              <span className="text-[10px] opacity-40 w-3">{isExpanded ? '▼' : '▶'}</span>
+              <NodeIcon name={isExpanded ? 'chevron-down' : 'chevron-right'} size={10} className="opacity-40 w-3" />
               <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">
                 {node.label}
               </span>

@@ -142,7 +142,7 @@ class LLMCallNode(BaseNode):
     label = "LLM Call"
     description = "Universal LLM invocation node. Sends a configurable prompt template to the model with {field} state variable substitution. Supports conditional prompt switching, multiple output field mappings, and an optional completion flag. Can replicate most specialized model nodes through configuration alone."
     category = "model"
-    icon = "🤖"
+    icon = "bot"
     color = "#8b5cf6"
     i18n = LLM_CALL_I18N
 
@@ -309,7 +309,7 @@ class ClassifyNode(BaseNode):
     label = "Classify"
     description = "General-purpose LLM classification node. Sends a configurable prompt to the model, parses the response into one of the configured categories, stores the result in a state field, and routes execution directly through the matching output port. Default categories are easy/medium/hard but fully customizable to any set of labels."
     category = "model"
-    icon = "🔀"
+    icon = "split"
     color = "#3b82f6"
     i18n = CLASSIFY_I18N
 
@@ -507,7 +507,7 @@ class DirectAnswerNode(BaseNode):
     label = "Direct Answer"
     description = "Generates a single-shot direct answer without review. Best for easy tasks that need no quality checking. Writes the response to configurable output fields and can mark the workflow as complete."
     category = "model"
-    icon = "⚡"
+    icon = "zap"
     color = "#10b981"
     i18n = DIRECT_ANSWER_I18N
 
@@ -605,7 +605,7 @@ class AnswerNode(BaseNode):
     description = "Generates an answer with optional review feedback integration for iterative improvement. On the first pass, uses the primary prompt; on retry, automatically switches to the retry template with feedback context. Budget-aware prompt compaction when context window is tight."
     category = "model"
     i18n = ANSWER_I18N
-    icon = "💬"
+    icon = "message-circle"
     color = "#f59e0b"
 
     parameters = [
@@ -754,7 +754,7 @@ class ReviewNode(BaseNode):
         "Forces the first verdict after max retries to prevent infinite loops."
     )
     category = "model"
-    icon = "📋"
+    icon = "clipboard-check"
     color = "#f59e0b"
     i18n = REVIEW_I18N
 

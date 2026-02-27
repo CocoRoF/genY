@@ -194,10 +194,10 @@ export interface CompileViewResponse {
 // ==================== Category Display Info ====================
 
 export const CATEGORY_INFO: Record<string, { label: string; icon: string; color: string }> = {
-  special: { label: 'Special', icon: '⚡', color: '#10b981' },
-  model: { label: 'Model', icon: '🤖', color: '#8b5cf6' },
-  task: { label: 'Task', icon: '📋', color: '#ef4444' },
-  logic: { label: 'Logic', icon: '🔀', color: '#6366f1' },
-  memory: { label: 'Memory', icon: '🧠', color: '#ec4899' },
-  resilience: { label: 'Resilience', icon: '🛡️', color: '#6b7280' },
+  special: { label: 'Special', icon: 'zap', color: '#10b981' },
+  model: { label: 'Model', icon: 'bot', color: '#8b5cf6' },
+  task: { label: 'Task', icon: 'list-todo', color: '#ef4444' },
+  logic: { label: 'Logic', icon: 'git-branch', color: '#6366f1' },
+  memory: { label: 'Memory', icon: 'brain', color: '#ec4899' },
+  resilience: { label: 'Resilience', icon: 'shield-check', color: '#6b7280' },
 };
