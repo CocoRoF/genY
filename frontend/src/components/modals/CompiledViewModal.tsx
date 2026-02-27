@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { workflowApi } from '@/lib/workflowApi';
 import { useI18n } from '@/lib/i18n';
 import { NodeIcon } from '@/components/workflow/icons';
+import { Search, X, ArrowRight, AlertTriangle, Diamond, Code2 } from 'lucide-react';
 import type { CompileViewResponse, CompileViewNodeDetail, CompileViewEdgeDetail } from '@/types/workflow';
 
 interface Props {
@@ -79,7 +80,7 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
         {/* Header */}
         <div className="flex items-center justify-between py-3 px-5 border-b border-[var(--border-color)] shrink-0">
           <div className="flex items-center gap-3">
-            <span className="text-base">🔍</span>
+            <Search size={18} className="text-[var(--text-muted)]" />
             <div>
               <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">
                 {t('compiledView.title')}
@@ -104,10 +105,10 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
               </span>
             )}
             <button
-              className="flex items-center justify-center w-8 h-8 rounded-lg bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg"
+              className="flex items-center justify-center w-8 h-8 rounded-lg bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer"
               onClick={onClose}
             >
-              ×
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -125,9 +126,9 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
                     : 'bg-transparent text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
-                {tab === 'code' ? `⟨/⟩ ${t('compiledView.tabCode')}` :
-                 tab === 'nodes' ? `◇ ${t('compiledView.tabNodes')}` :
-                 `→ ${t('compiledView.tabEdges')}`}
+                {tab === 'code' ? <><Code2 size={11} className="inline -mt-px mr-1" />{t('compiledView.tabCode')}</> :
+                 tab === 'nodes' ? <><Diamond size={11} className="inline -mt-px mr-1" />{t('compiledView.tabNodes')}</> :
+                 <><ArrowRight size={11} className="inline -mt-px mr-1" />{t('compiledView.tabEdges')}</>}
               </button>
             ))}
           </div>
@@ -160,7 +161,7 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-full text-[var(--danger-color)] text-[0.875rem]">
-              ⚠ {error}
+              <AlertTriangle size={14} className="inline -mt-px mr-1" /> {error}
             </div>
           ) : data ? (
             <>
@@ -401,7 +402,7 @@ function NodesView({
                           className="text-[10px] font-mono py-0.5 px-2 rounded-md bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border-color)]"
                           title={port.description}
                         >
-                          {port.id} → {port.label}
+                          {port.id} <ArrowRight size={10} className="inline mx-0.5" /> {port.label}
                         </span>
                       ))}
                     </div>
@@ -432,7 +433,7 @@ function NodesView({
                           <span className="font-mono text-[#f59e0b] bg-[rgba(245,158,11,0.08)] px-1.5 py-0.5 rounded">
                             {tgt.port}
                           </span>
-                          <span className="text-[var(--text-muted)]">→</span>
+                          <ArrowRight size={10} className="text-[var(--text-muted)]" />
                           <span className="font-semibold text-[var(--text-primary)]">{tgt.target_label}</span>
                           {tgt.label && (
                             <span className="text-[var(--text-muted)]">({tgt.label})</span>
@@ -504,7 +505,7 @@ function EdgesView({ edges }: { edges: CompileViewEdgeDetail[] }) {
               </span>
               {!isConditional && (
                 <>
-                  <span className="text-[var(--text-muted)]">→</span>
+                  <ArrowRight size={12} className="text-[var(--text-muted)]" />
                   <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">
                     {edge.target_label}
                   </span>
@@ -530,7 +531,7 @@ function EdgesView({ edges }: { edges: CompileViewEdgeDetail[] }) {
                     <span className="font-mono text-[#f59e0b] bg-[rgba(245,158,11,0.08)] px-1.5 py-0.5 rounded">
                       {br.port}
                     </span>
-                    <span className="text-[var(--text-muted)]">→</span>
+                    <ArrowRight size={10} className="text-[var(--text-muted)]" />
                     <span className="font-semibold text-[var(--text-primary)]">{br.target_label}</span>
                     {br.label && (
                       <span className="text-[var(--text-muted)]">({br.label})</span>

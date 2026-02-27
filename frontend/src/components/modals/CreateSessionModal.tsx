@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { workflowApi } from '@/lib/workflowApi';
 import NumberStepper from '@/components/ui/NumberStepper';
+import { X, Circle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import type { CreateAgentRequest, SessionInfo } from '@/types';
 import type { WorkflowDefinition } from '@/types/workflow';
@@ -106,7 +107,7 @@ export default function CreateSessionModal({ onClose }: Props) {
         {/* Header */}
         <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
           <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('createSession.title')}</h3>
-          <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={onClose}>×</button>
+          <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer" onClick={onClose}><X size={16} /></button>
         </div>
 
         {/* Body */}
@@ -148,10 +149,10 @@ export default function CreateSessionModal({ onClose }: Props) {
               <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={formState.manager_id || ''} onChange={e => setFormState(f => ({ ...f, manager_id: e.target.value }))}>
                 <option value="">{t('createSession.noneStandalone')}</option>
                 {availableManagers.map(m => {
-                  const statusIcon = m.status === 'running' ? '🟢' : '⚪';
+                  const isRunning = m.status === 'running';
                   return (
-                    <option key={m.session_id} value={m.session_id} disabled={m.status !== 'running'}>
-                      {statusIcon} {m.session_name || m.session_id.substring(0, 12)}
+                    <option key={m.session_id} value={m.session_id} disabled={!isRunning}>
+                      {isRunning ? '●' : '○'} {m.session_name || m.session_id.substring(0, 12)}
                     </option>
                   );
                 })}

@@ -97,7 +97,7 @@ export default function MainTab() {
               {tips.map((tip, i) => (
                 <li
                   key={i}
-                  className="text-[0.8125rem] text-[var(--text-secondary)] leading-[1.7] pl-4 relative before:content-['▸'] before:absolute before:left-0 before:text-[var(--primary-color)]"
+                  className="text-[0.8125rem] text-[var(--text-secondary)] leading-[1.7] pl-4 relative before:content-['›'] before:absolute before:left-0 before:text-[var(--primary-color)] before:font-bold"
                 >
                   {tip}
                 </li>

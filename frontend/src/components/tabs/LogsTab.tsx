@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { commandApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
+import { ClipboardList, Wrench, Search, BookOpen, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
 import type { LogEntry } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -22,8 +23,8 @@ interface LogGroup {
   descKey: string;
   /** Levels included in this group */
   levels: string[];
-  /** Icon/emoji for quick scanning */
-  icon: string;
+  /** Icon component for quick scanning */
+  Icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
 const LOG_GROUPS: LogGroup[] = [
@@ -32,28 +33,28 @@ const LOG_GROUPS: LogGroup[] = [
     labelKey: 'groupBrief',
     descKey: 'groupBriefDesc',
     levels: ['INFO', 'COMMAND', 'RESPONSE', 'ERROR', 'WARNING'],
-    icon: '📋',
+    Icon: ClipboardList,
   },
   {
     id: 'default',
     labelKey: 'groupDefault',
     descKey: 'groupDefaultDesc',
     levels: ['INFO', 'COMMAND', 'RESPONSE', 'ERROR', 'WARNING', 'TOOL', 'TOOL_RES', 'ITER'],
-    icon: '🔧',
+    Icon: Wrench,
   },
   {
     id: 'detail',
     labelKey: 'groupDetail',
     descKey: 'groupDetailDesc',
     levels: ['INFO', 'COMMAND', 'RESPONSE', 'ERROR', 'WARNING', 'TOOL', 'TOOL_RES', 'ITER', 'GRAPH', 'STREAM'],
-    icon: '🔍',
+    Icon: Search,
   },
   {
     id: 'all',
     labelKey: 'groupAll',
     descKey: 'groupAllDesc',
     levels: [],  // empty = all levels, no filter
-    icon: '📑',
+    Icon: BookOpen,
   },
 ];
 
@@ -148,7 +149,7 @@ export default function LogsTab() {
             {/* ── Groups ── */}
             {LOG_GROUPS.map(g => (
               <option key={g.id} value={`group:${g.id}`}>
-                {g.icon} {t(`logsTab.${g.labelKey}`)} — {t(`logsTab.${g.descKey}`)}
+                {t(`logsTab.${g.labelKey}`)} — {t(`logsTab.${g.descKey}`)}
               </option>
             ))}
             {/* ── Separator ── */}
@@ -166,11 +167,11 @@ export default function LogsTab() {
           <button
             className={cn(
               "py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]",
-              "!py-1.5 !px-3 text-[0.75rem]",
+              "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5",
             )}
             onClick={fetchLogs}
           >
-            ↻ {t('common.refresh')}
+            <RefreshCw size={12} /> {t('common.refresh')}
           </button>
         </div>
       </div>
@@ -201,7 +202,7 @@ export default function LogsTab() {
                   </span>
                   {isExpandable && (
                     <span className={`text-[0.75rem] transition-transform ${isExpanded ? 'text-[var(--primary-color)]' : 'text-[var(--text-muted)]'}`}>
-                      {isExpanded ? '▼' : '▶'}
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </span>
                   )}
                 </div>

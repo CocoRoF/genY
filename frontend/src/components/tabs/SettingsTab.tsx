@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { configApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, AlertTriangle, X } from 'lucide-react';
 import NumberStepper from '@/components/ui/NumberStepper';
 import InfoTooltip from '@/components/ui/InfoTooltip';
 import { useI18n, type Locale } from '@/lib/i18n';
@@ -217,7 +217,7 @@ export default function SettingsTab() {
                     </div>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--border-color)]">
                       <span className="text-[0.75rem] text-[var(--text-muted)]">{t('settings.fieldsConfigured', { count: configured, total })}</span>
-                      {!config.valid && <span className="text-[0.75rem] text-[var(--warning-color)]">⚠️ {t('settings.issues', { count: config.errors?.length || 0 })}</span>}
+                      {!config.valid && <span className="text-[0.75rem] text-[var(--warning-color)] inline-flex items-center gap-1"><AlertTriangle size={12} /> {t('settings.issues', { count: config.errors?.length || 0 })}</span>}
                     </div>
                   </div>
                 );
@@ -233,7 +233,7 @@ export default function SettingsTab() {
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-[600px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
               <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.editPrefix')}{getLocalizedSchema(editing.schema, locale).display_name}</h3>
-              <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setEditing(null)}>×</button>
+              <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer" onClick={() => setEditing(null)}><X size={16} /></button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5">
               <form id="config-form" className="flex flex-col gap-6">
@@ -279,7 +279,7 @@ export default function SettingsTab() {
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[520px] max-h-[85vh] flex flex-col shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
               <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.importTitle')}</h3>
-              <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setImportOpen(false)}>×</button>
+              <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer" onClick={() => setImportOpen(false)}><X size={16} /></button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
               <textarea

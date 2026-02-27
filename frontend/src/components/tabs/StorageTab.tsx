@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
+import { ChevronDown, ChevronRight, FolderOpen, RefreshCw, FileJson, FileText, FileCode, Globe, Palette, ScrollText, Settings, File } from 'lucide-react';
 import type { StorageFile } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -38,13 +39,22 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-function getFileIcon(name: string): string {
+function getFileIcon(name: string): React.ReactNode {
   const ext = name.split('.').pop()?.toLowerCase();
-  const map: Record<string, string> = {
-    json: '📄', md: '📝', txt: '📄', py: '🐍', js: '📜', ts: '📜',
-    html: '🌐', css: '🎨', log: '📋', yaml: '⚙️', yml: '⚙️',
+  const map: Record<string, React.ReactNode> = {
+    json: <FileJson size={14} className="text-[#f59e0b]" />,
+    md: <FileText size={14} className="text-[#60a5fa]" />,
+    txt: <FileText size={14} className="text-[var(--text-muted)]" />,
+    py: <FileCode size={14} className="text-[#22c55e]" />,
+    js: <FileCode size={14} className="text-[#facc15]" />,
+    ts: <FileCode size={14} className="text-[#3b82f6]" />,
+    html: <Globe size={14} className="text-[#f97316]" />,
+    css: <Palette size={14} className="text-[#a855f7]" />,
+    log: <ScrollText size={14} className="text-[var(--text-muted)]" />,
+    yaml: <Settings size={14} className="text-[#6b7280]" />,
+    yml: <Settings size={14} className="text-[#6b7280]" />,
   };
-  return map[ext || ''] || '📄';
+  return map[ext || ''] || <File size={14} className="text-[var(--text-muted)]" />;
 }
 
 function FolderNode({ name, node, onSelect, activePath }: {
@@ -55,8 +65,8 @@ function FolderNode({ name, node, onSelect, activePath }: {
     <div className="mb-1">
       <div className="flex items-center gap-1.5 py-1.5 px-2 cursor-pointer text-[13px] font-medium text-[var(--text-primary)] rounded hover:bg-[var(--bg-hover)]"
            onClick={() => setOpen(!open)}>
-        <span className={`text-[10px] transition-transform ${open ? '' : '-rotate-90'}`}>▼</span>
-        <span>📁</span>
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <FolderOpen size={14} className="text-[#f59e0b]" />
         <span>{name}</span>
       </div>
       {open && (
@@ -78,7 +88,7 @@ function TreeView({ node, onSelect, activePath }: { node: TreeNode; onSelect: (p
         <div key={f.path}
             className={`flex items-center gap-2 py-1.5 px-2.5 cursor-pointer rounded text-[13px] transition-colors hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] ${activePath === f.path ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)]'}`}
             onClick={() => onSelect(f.path)}>
-          <span className="text-[14px]">{getFileIcon(f.name)}</span>
+          <span className="text-[14px] flex items-center">{getFileIcon(f.name)}</span>
           <span className="flex-1 truncate">{f.name}</span>
           <span className="text-[var(--text-muted)] text-[11px]">{formatFileSize(f.size)}</span>
         </div>
@@ -142,7 +152,7 @@ export default function StorageTab() {
       {/* Header */}
       <div className="flex justify-between items-center pb-3 border-b border-[var(--border-color)] shrink-0">
         <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{t('storageTab.title')}</h3>
-        <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={fetchFiles}>↻ {t('common.refresh')}</button>
+        <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5")} onClick={fetchFiles}><RefreshCw size={12} /> {t('common.refresh')}</button>
       </div>
 
       {/* Content */}

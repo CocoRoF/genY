@@ -8,6 +8,7 @@ import { getRoads, getGroundTiles, BUILDINGS, NATURE } from '@/lib/cityLayout';
 import { Asset3DLoader } from '@/lib/assetLoader';
 import { AvatarSystem } from '@/lib/avatarSystem';
 import { useI18n } from '@/lib/i18n';
+import { Building2 } from 'lucide-react';
 
 /* ────────────────────────────────────────────────────────────
    Camera controller (reproduces the orbit / pan / zoom from
@@ -288,7 +289,7 @@ export default function PlaygroundTab() {
            }}>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-[0.9rem] font-semibold text-[var(--text-primary)]">
-            <span className="text-[1.1rem]">🏙️</span>
+            <Building2 size={18} />
             {t('playground.title')}
           </div>
           <span className="text-[0.75rem] text-[var(--text-muted)] px-2 py-0.5 rounded-full"

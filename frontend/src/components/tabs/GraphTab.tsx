@@ -8,6 +8,7 @@ import PropertyPanel from '@/components/workflow/PropertyPanel';
 import WorkflowCanvas from '@/components/workflow/WorkflowCanvas';
 import { agentApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { BarChart3, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { WorkflowDefinition } from '@/types/workflow';
 
 // ========== Main GraphTab Component ==========
@@ -69,7 +70,7 @@ export default function GraphTab() {
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         <div className="flex items-center justify-center flex-1">
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <div className="text-[32px] mb-3 opacity-60">📊</div>
+            <BarChart3 size={32} className="mb-3 opacity-60 text-[var(--text-muted)]" />
             <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">
               {t('graphTab.selectSession')}
             </h3>
@@ -104,13 +105,13 @@ export default function GraphTab() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="flex flex-col items-center gap-3 text-center max-w-[400px]">
-          <div className="text-[28px]">⚠️</div>
+          <AlertTriangle size={28} className="text-[var(--warning-color)]" />
           <p className="text-[0.875rem] text-[var(--danger-color)]">{error}</p>
           <button
-            className="px-4 py-2 text-[0.8125rem] rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+            className="px-4 py-2 text-[0.8125rem] rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1.5"
             onClick={fetchSessionWorkflow}
           >
-            ⟳ {t('graphTab.resetBtn')}
+            <RefreshCw size={12} /> {t('graphTab.resetBtn')}
           </button>
         </div>
       </div>

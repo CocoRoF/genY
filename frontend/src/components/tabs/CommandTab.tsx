@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { Play, Square, Loader2 } from 'lucide-react';
 
 export default function CommandTab() {
   const { selectedSessionId, sessions, isExecuting, setIsExecuting, getSessionData, updateSessionData } = useAppStore();
@@ -29,14 +30,14 @@ export default function CommandTab() {
         output: res.output || res.error || t('common.noOutput'),
         status: res.success ? 'success' : 'error',
         statusText: res.success
-          ? `✅ ${t('commandTab.statusSuccess')}${res.duration_ms ? ` (${(res.duration_ms / 1000).toFixed(1)}s)` : ''}`
-          : `❌ ${res.error || t('commandTab.statusFailed')}`,
+          ? `${t('commandTab.statusSuccess')}${res.duration_ms ? ` (${(res.duration_ms / 1000).toFixed(1)}s)` : ''}`
+          : `${res.error || t('commandTab.statusFailed')}`,
       });
     } catch (e: unknown) {
       updateSessionData(selectedSessionId, {
         output: e instanceof Error ? e.message : t('commandTab.requestFailed'),
         status: 'error',
-        statusText: `❌ ${t('commandTab.requestFailed')}`,
+        statusText: `${t('commandTab.requestFailed')}`,
       });
     } finally {
       setIsExecuting(false);
@@ -47,7 +48,7 @@ export default function CommandTab() {
     if (!selectedSessionId) return;
     try {
       await agentApi.stop(selectedSessionId);
-      updateSessionData(selectedSessionId, { statusText: `⏹ ${t('commandTab.statusStopped')}` });
+      updateSessionData(selectedSessionId, { statusText: `${t('commandTab.statusStopped')}` });
     } catch { /* ignore */ }
   }, [selectedSessionId, updateSessionData]);
 
@@ -112,18 +113,18 @@ export default function CommandTab() {
         </div>
         <div className="flex gap-2.5">
           <button
-            className="py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             disabled={isExecuting || !sessionData?.input?.trim()}
             onClick={() => handleExecute()}
           >
-            {isExecuting ? t('commandTab.executingBtn') : t('commandTab.executeBtn')}
+            {isExecuting ? <><Loader2 size={14} className="animate-spin" /> {t('commandTab.executingBtn')}</> : <><Play size={14} /> {t('commandTab.executeBtn')}</>}
           </button>
           {isExecuting && (
             <button
-              className="py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none"
+              className="py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none inline-flex items-center gap-1.5"
               onClick={handleStop}
             >
-              {t('commandTab.stopBtn')}
+              <Square size={14} /> {t('commandTab.stopBtn')}
             </button>
           )}
         </div>

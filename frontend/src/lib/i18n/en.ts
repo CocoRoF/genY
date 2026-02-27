@@ -86,7 +86,7 @@ const en = {
     heroTagline: 'An autonomous multi-agent system that manages multiple AI sessions, orchestrates complex tasks, and visualizes everything in an interactive 3D city playground.',
     sections: [
       {
-        title: '🚀 Getting Started',
+        title: 'Getting Started',
         body: [
           '1. Create a Session — Click the "+ New Session" button in the sidebar to create a new agent session. Choose a role (Developer, Researcher, Manager, or Worker) and give it a name.',
           '2. Send a Command — Switch to the Command tab and type your instruction. The agent will autonomously handle the task.',
@@ -94,14 +94,14 @@ const en = {
         ],
       },
       {
-        title: '📂 Understanding Sessions',
+        title: 'Understanding Sessions',
         body: [
           'Each session is an independent AI agent with its own memory and workspace. You can run multiple sessions at the same time — each one works on its own task without interfering with the others.',
           'Sessions can be paused, resumed, or deleted at any time from the sidebar. Deleted sessions go to the trash and can be restored if needed.',
         ],
       },
       {
-        title: '🧭 Navigating the Tabs',
+        title: 'Navigating the Tabs',
         body: [
           '• Main — You are here! This is the home page with a guide on how to use Geny.',
           '• Playground — A 3D city visualization where your active agents appear as animated characters. Pan, rotate, and zoom to explore.',
@@ -115,7 +115,7 @@ const en = {
         ],
       },
       {
-        title: '🎭 Roles',
+        title: 'Roles',
         body: [
           '• Developer — Optimized for coding tasks: writing, reviewing, and refactoring code.',
           '• Researcher — Focused on information gathering, analysis, and summarization.',
@@ -125,21 +125,21 @@ const en = {
         ],
       },
       {
-        title: '🏙️ The 3D Playground',
+        title: 'The 3D Playground',
         body: [
           'The Playground tab renders a miniature city built from voxel-style assets. Each active session shows up as an animated character that wanders around the city using A* pathfinding.',
           'Controls: Left-click drag to pan, right-click drag to rotate, scroll to zoom in/out.',
         ],
       },
       {
-        title: '🔌 MCP & Custom Tools',
+        title: 'MCP & Custom Tools',
         body: [
           'Geny supports MCP (Model Context Protocol) servers and custom tools. MCP server configurations placed in the backend are automatically loaded for all sessions.',
           'Custom Python tools placed in the tools directory are auto-registered and available to every agent.',
         ],
       },
     ],
-    tipTitle: '💡 Tips',
+    tipTitle: 'Tips',
     tips: [
       'You can run multiple sessions in parallel — each agent works independently.',
       'Use the Manager role to orchestrate and delegate tasks across other sessions.',
@@ -160,9 +160,9 @@ const en = {
     maxTurns: 'Max turns',
     placeholder: 'Enter command or prompt...',
     skipPermissions: 'Skip permissions',
-    executingBtn: '⏳ Executing...',
-    executeBtn: '▶ Execute',
-    stopBtn: '⏹ Stop',
+    executingBtn: 'Executing...',
+    executeBtn: 'Execute',
+    stopBtn: 'Stop',
     output: 'Output',
     statusExecuting: 'Executing...',
     statusComplete: 'Complete',
@@ -355,7 +355,7 @@ const en = {
     official: 'Official',
     nodes: '{count} nodes',
     edges: '{count} edges',
-    backToWorkflows: '← Back to Workflows',
+    backToWorkflows: 'Back to Workflows',
     workflowEditor: 'Workflow Editor',
     viewPrefix: 'View: ',
     readOnly: 'Read-only',

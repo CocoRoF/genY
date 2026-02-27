@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { Send, Play, CheckCircle2, XCircle, RefreshCw, ClipboardList, FileEdit, MessageCircle, Bot, Pin } from 'lucide-react';
 import type { ManagerDashboard, WorkerInfo, ManagerEvent } from '@/types';
 
-const EVENT_ICONS: Record<string, string> = {
-  task_delegated: '📤', worker_started: '▶️', worker_completed: '✅',
-  worker_error: '❌', worker_progress: '🔄', plan_created: '📋',
-  plan_updated: '📝', user_message: '💬', manager_response: '🤖',
+const EVENT_ICON_COMPONENTS: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+  task_delegated: Send, worker_started: Play, worker_completed: CheckCircle2,
+  worker_error: XCircle, worker_progress: RefreshCw, plan_created: ClipboardList,
+  plan_updated: FileEdit, user_message: MessageCircle, manager_response: Bot,
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -144,7 +145,12 @@ export default function DashboardTab() {
                 <div key={idx}
                      className="flex gap-3 py-3 px-3.5 bg-[var(--bg-tertiary)] rounded-lg"
                      style={{ borderLeft: `3px solid ${getEventBorderColor(ev.event_type)}` }}>
-                  <span className="text-[18px] shrink-0">{EVENT_ICONS[ev.event_type] || '📌'}</span>
+                  <span className="text-[18px] shrink-0 flex items-center justify-center">
+                    {(() => {
+                      const IconComp = EVENT_ICON_COMPONENTS[ev.event_type] || Pin;
+                      return <IconComp size={16} />;
+                    })()}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center mb-1">
                       <span className="text-[12px] font-semibold text-[var(--text-primary)]">

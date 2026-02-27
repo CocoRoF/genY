@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { workflowApi } from '@/lib/workflowApi';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
+import { X, ArrowLeft } from 'lucide-react';
 import type { WorkflowDefinition } from '@/types/workflow';
 import { useWorkflowStore } from '@/store/useWorkflowStore';
 import CompiledViewModal from '@/components/modals/CompiledViewModal';
@@ -114,7 +115,7 @@ function WorkflowCard({
             title={t('common.delete')}
             onClick={e => { e.stopPropagation(); onDelete(); }}
           >
-            ×
+            <X size={14} />
           </button>
         )}
       </div>
@@ -223,6 +224,7 @@ export default function GraphWorkflowsTab() {
             className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={() => { setMode('list'); fetchAll(); }}
           >
+            <ArrowLeft size={12} />
             {t('workflowsTab.backToWorkflows')}
           </button>
           <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.workflowEditor')}</span>
@@ -243,6 +245,7 @@ export default function GraphWorkflowsTab() {
             className="flex items-center gap-1.5 h-7 px-3 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
             onClick={() => { setMode('list'); }}
           >
+            <ArrowLeft size={12} />
             {t('workflowsTab.backToWorkflows')}
           </button>
           <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.viewPrefix')}{viewName}</span>
@@ -378,7 +381,7 @@ export default function GraphWorkflowsTab() {
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[400px] shadow-[var(--shadow-lg)]" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-3 px-5 border-b border-[var(--border-color)]">
               <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.newWorkflowTitle')}</h3>
-              <button className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer text-lg" onClick={() => setShowCreateDialog(false)}>×</button>
+              <button className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer" onClick={() => setShowCreateDialog(false)}><X size={14} /></button>
             </div>
             <div className="p-5 flex flex-col gap-3">
               <div className="flex flex-col gap-1">

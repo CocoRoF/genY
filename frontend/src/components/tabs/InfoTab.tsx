@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import type { SessionInfo } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -74,7 +75,7 @@ export default function InfoTab() {
   const fields = [
     { label: t('info.fields.sessionId'), value: data.session_id },
     { label: t('info.fields.name'), value: data.session_name || t('info.unnamed') },
-    { label: t('info.fields.status'), value: isDeleted ? `🗑️ ${t('info.deleted')}` : (data.status || t('info.unknown')) },
+    { label: t('info.fields.status'), value: isDeleted ? t('info.deleted') : (data.status || t('info.unknown')) },
     { label: t('info.fields.model'), value: data.model || t('info.default') },
     { label: t('info.fields.role'), value: data.role || t('info.worker') },
     { label: t('info.fields.graphName'), value: data.graph_name || '—' },
@@ -114,8 +115,8 @@ export default function InfoTab() {
       {/* Actions for deleted */}
       {isDeleted && (
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border-color)]">
-          <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => restoreSession(data.session_id)}>↻ {t('info.restoreSession')}</button>
-          <button className={cn("py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => permanentDeleteSession(data.session_id)}>🗑️ {t('info.permanentDelete')}</button>
+          <button className={cn("py-2 px-4 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5")} onClick={() => restoreSession(data.session_id)}><RotateCcw size={12} /> {t('info.restoreSession')}</button>
+          <button className={cn("py-2 px-4 bg-[var(--danger-color)] hover:brightness-110 text-white text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed", "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5")} onClick={() => permanentDeleteSession(data.session_id)}><Trash2 size={12} /> {t('info.permanentDelete')}</button>
         </div>
       )}
     </div>
