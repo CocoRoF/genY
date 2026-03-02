@@ -68,7 +68,7 @@ export const toolPresetApi = {
 
   /** GET /api/tools/session/:id — get tools for a specific session */
   getSessionTools: (sessionId: string) =>
-    apiCall<{ session_id: string; tool_preset_id: string | null; tool_preset_name: string | null; active_servers: string[] }>(
+    apiCall<{ session_id: string; tool_preset_id: string | null; tool_preset_name: string | null; active_servers: string[]; active_tools: string[] }>(
       `/api/tools/session/${sessionId}`,
     ),
 };

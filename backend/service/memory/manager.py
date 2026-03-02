@@ -38,6 +38,11 @@ KST = timezone(timedelta(hours=9))
 # Maximum characters injected from memory into context.
 DEFAULT_MAX_INJECT_CHARS = 8_000
 
+# Maximum chars for truncated fields in LTM entries.
+_LTM_INPUT_PREVIEW = 300
+_LTM_OUTPUT_PREVIEW = 800
+_LTM_TODO_RESULT_PREVIEW = 400
+
 
 class SessionMemoryManager:
     """Per-session memory facade.
@@ -143,6 +148,201 @@ class SessionMemoryManager:
     def remember_topic(self, topic: str, text: str) -> None:
         """Write knowledge to a topic-specific long-term memory file."""
         self._ltm.write_topic(topic, text)
+
+    def record_execution(
+        self,
+        *,
+        input_text: str,
+        result_state: Dict[str, Any],
+        duration_ms: int,
+        execution_number: int = 0,
+        success: bool = True,
+    ) -> None:
+        """Record a structured execution summary to long-term memory.
+
+        Called after each graph invoke/astream to persist a concise,
+        structured record of work done — modeled after WORK_LOG.md's
+        methodology but designed for long-term memory recall.
+
+        Writes to ``memory/YYYY-MM-DD.md`` with structured sections.
+
+        Args:
+            input_text: The user's input prompt.
+            result_state: The final AutonomousState dict from the graph.
+            duration_ms: Total execution wall-time in milliseconds.
+            execution_number: Sequential execution counter for this session.
+            success: Whether execution completed without errors.
+        """
+        try:
+            entry = self._build_execution_entry(
+                input_text=input_text,
+                result_state=result_state,
+                duration_ms=duration_ms,
+                execution_number=execution_number,
+                success=success,
+            )
+            self._ltm.write_dated(entry)
+            logger.info(
+                "record_execution: #%d (%d chars) → long-term memory",
+                execution_number, len(entry),
+            )
+        except Exception:
+            logger.warning(
+                "record_execution: failed to write (non-critical)",
+                exc_info=True,
+            )
+
+    # ------------------------------------------------------------------
+    # Execution entry builder
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_execution_entry(
+        *,
+        input_text: str,
+        result_state: Dict[str, Any],
+        duration_ms: int,
+        execution_number: int,
+        success: bool,
+    ) -> str:
+        """Build a structured markdown entry for one graph execution.
+
+        Format:
+            ### [✅/❌] Execution #N — <difficulty> path
+            > **Task:** <truncated user input>
+            > **Duration:** X.Xs | **Iterations:** N/max
+
+            **Result:**
+            <truncated final output>
+
+            **TODOs:** (hard path only)
+            - ✅ Task title
+            - ⬜ Task title
+
+            **Review:** approved/rejected (medium path only)
+
+        Returns:
+            Formatted markdown string.
+        """
+        status_icon = "✅" if success else "❌"
+
+        # --- Extract fields from state ---
+        difficulty = result_state.get("difficulty", "unknown")
+        iteration = result_state.get("iteration", 0)
+        max_iterations = result_state.get("max_iterations", 0)
+        error = result_state.get("error")
+        completion_signal = result_state.get("completion_signal", "")
+        completion_detail = result_state.get("completion_detail", "")
+
+        # Best output: final_answer > answer > last_output
+        final_output = (
+            result_state.get("final_answer", "")
+            or result_state.get("answer", "")
+            or result_state.get("last_output", "")
+            or ""
+        )
+
+        # Truncate for readability
+        input_preview = input_text[:_LTM_INPUT_PREVIEW]
+        if len(input_text) > _LTM_INPUT_PREVIEW:
+            input_preview += "..."
+
+        output_preview = final_output[:_LTM_OUTPUT_PREVIEW]
+        if len(final_output) > _LTM_OUTPUT_PREVIEW:
+            output_preview += "..."
+
+        # Duration formatting
+        if duration_ms >= 60_000:
+            duration_str = f"{duration_ms / 60_000:.1f}m"
+        elif duration_ms >= 1_000:
+            duration_str = f"{duration_ms / 1_000:.1f}s"
+        else:
+            duration_str = f"{duration_ms}ms"
+
+        # --- Build markdown ---
+        lines: list[str] = []
+
+        # Header
+        lines.append(
+            f"### [{status_icon}] Execution #{execution_number}"
+            f" — {difficulty} path"
+        )
+        lines.append("")
+
+        # Task & metrics
+        lines.append(f"> **Task:** {input_preview}")
+        lines.append(
+            f"> **Duration:** {duration_str}"
+            f" | **Iterations:** {iteration}/{max_iterations}"
+        )
+        lines.append("")
+
+        # TODO list (hard path)
+        todos = result_state.get("todos") or []
+        if todos and difficulty == "hard":
+            lines.append("**TODOs:**")
+            for todo in todos:
+                title = todo.get("title", "Untitled")
+                status = todo.get("status", "pending")
+                if status in ("completed",):
+                    icon = "✅"
+                elif status in ("in_progress",):
+                    icon = "🔄"
+                elif status in ("failed",):
+                    icon = "❌"
+                else:
+                    icon = "⬜"
+
+                result_text = todo.get("result", "")
+                if result_text:
+                    result_text = result_text[:_LTM_TODO_RESULT_PREVIEW]
+                    if len(todo.get("result", "")) > _LTM_TODO_RESULT_PREVIEW:
+                        result_text += "..."
+                    lines.append(f"- {icon} **{title}** → {result_text}")
+                else:
+                    lines.append(f"- {icon} **{title}**")
+            lines.append("")
+
+        # Review feedback (medium path)
+        review_result = result_state.get("review_result")
+        review_feedback = result_state.get("review_feedback")
+        if review_result and difficulty == "medium":
+            feedback_preview = ""
+            if review_feedback:
+                feedback_preview = f" — {review_feedback[:200]}"
+                if len(review_feedback) > 200:
+                    feedback_preview += "..."
+            lines.append(f"**Review:** {review_result}{feedback_preview}")
+            lines.append("")
+
+        # Completion signal
+        if completion_signal and completion_signal not in ("none", "continue"):
+            detail = f" ({completion_detail})" if completion_detail else ""
+            lines.append(f"**Signal:** {completion_signal}{detail}")
+            lines.append("")
+
+        # Error
+        if error:
+            lines.append(f"**Error:** {error[:300]}")
+            lines.append("")
+
+        # Result output
+        if output_preview:
+            lines.append("**Result:**")
+            lines.append(output_preview)
+            lines.append("")
+
+        # Fallback info
+        fallback = result_state.get("fallback")
+        if fallback and fallback.get("degraded"):
+            lines.append(
+                f"**Model Fallback:** {fallback.get('original_model', '?')}"
+                f" → {fallback.get('current_model', '?')}"
+                f" (attempts: {fallback.get('attempts', 0)})"
+            )
+            lines.append("")
+
+        return "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Search
@@ -285,40 +485,94 @@ class SessionMemoryManager:
         )
 
     def auto_flush(self, recent_n: int = 30) -> Optional[str]:
-        """Generate a summary of recent conversation for long-term storage.
+        """Generate a structured session-end summary for long-term storage.
 
-        This is a simplified version of OpenClaw's memory flush.
-        The caller should invoke this before compaction.
+        Called during session cleanup. Instead of dumping raw transcript,
+        produces a concise session summary with conversation statistics
+        that is useful for future memory recall.
 
         Args:
-            recent_n: Number of recent messages to summarize.
+            recent_n: Number of recent messages to include excerpts from.
 
         Returns:
             The flushed text, or None if nothing to flush.
         """
-        recent = self._stm.get_recent(n=recent_n)
-        if not recent:
+        now = datetime.now(KST)
+        all_entries = self._stm.load_all()
+        if not all_entries:
             return None
 
-        # Build a condensed transcript
-        lines: list[str] = []
-        for entry in recent:
-            lines.append(entry.content)
+        # --- Gather statistics ---
+        user_msgs = [e for e in all_entries if "[user]" in e.content.lower()]
+        assistant_msgs = [e for e in all_entries if "[assistant]" in e.content.lower()]
+        total_chars = sum(e.char_count for e in all_entries)
 
-        transcript = "\n".join(lines)
-        if len(transcript) < 100:
+        # First and last timestamps
+        timestamps = [e.timestamp for e in all_entries if e.timestamp]
+        first_ts = min(timestamps) if timestamps else None
+        last_ts = max(timestamps) if timestamps else None
+
+        duration_str = ""
+        if first_ts and last_ts:
+            delta = last_ts - first_ts
+            total_minutes = int(delta.total_seconds() / 60)
+            if total_minutes >= 60:
+                duration_str = f"{total_minutes // 60}h {total_minutes % 60}m"
+            else:
+                duration_str = f"{total_minutes}m"
+
+        # --- Build summary ---
+        lines: list[str] = []
+        lines.append("### 📋 Session End Summary")
+        lines.append("")
+
+        metrics = [f"**Messages:** {len(all_entries)} total"]
+        metrics.append(
+            f"({len(user_msgs)} user, {len(assistant_msgs)} assistant)"
+        )
+        if duration_str:
+            metrics.append(f"| **Duration:** {duration_str}")
+        metrics.append(f"| **Total chars:** {total_chars:,}")
+        lines.append(" ".join(metrics))
+        lines.append("")
+
+        # Conversation flow: list user requests as bullet points
+        if user_msgs:
+            lines.append("**Conversation Flow:**")
+            for i, entry in enumerate(user_msgs, 1):
+                # Extract just the content (strip [user] prefix)
+                content = entry.content
+                if content.lower().startswith("[user] "):
+                    content = content[7:]
+                preview = content[:150]
+                if len(content) > 150:
+                    preview += "..."
+                ts_str = ""
+                if entry.timestamp:
+                    ts_str = f"[{entry.timestamp.strftime('%H:%M')}] "
+                lines.append(f"{i}. {ts_str}{preview}")
+
+                # Limit to 20 entries for readability
+                if i >= 20:
+                    remaining = len(user_msgs) - 20
+                    if remaining > 0:
+                        lines.append(f"   ... +{remaining} more requests")
+                    break
+            lines.append("")
+
+        summary_text = "\n".join(lines)
+
+        if len(summary_text) < 50:
             return None  # Too short to bother
 
         # Save to dated file
-        self._ltm.write_dated(
-            f"## Auto-flushed Session Transcript\n\n{transcript}"
-        )
+        self._ltm.write_dated(summary_text)
 
         logger.info(
-            "auto_flush: saved %d messages (%d chars) to long-term",
-            len(recent), len(transcript),
+            "auto_flush: session summary (%d chars, %d messages) → long-term",
+            len(summary_text), len(all_entries),
         )
-        return transcript
+        return summary_text
 
     # ------------------------------------------------------------------
     # Statistics

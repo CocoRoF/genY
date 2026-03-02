@@ -344,7 +344,8 @@ class ExecutionContext:
         logger.warning(
             f"[{self.session_id}] {node_name}: "
             f"structured parse failed ({result.error}), "
-            f"sending correction prompt…"
+            f"sending correction prompt… "
+            f"raw_text[:{min(200, len(raw_text))}]={raw_text[:200]!r}"
         )
         from langchain_core.messages import HumanMessage
 
@@ -386,7 +387,11 @@ class ExecutionContext:
             f"Structured output parsing failed for {node_name} "
             f"after correction retry: {result2.error}"
         )
-        logger.error(f"[{self.session_id}] {error_msg}")
+        logger.error(
+            f"[{self.session_id}] {error_msg} "
+            f"attempt1_raw[:{min(200, len(raw_text))}]={raw_text[:200]!r} "
+            f"attempt2_raw[:{min(200, len(raw_text2))}]={raw_text2[:200]!r}"
+        )
         raise ValueError(error_msg)
 
 

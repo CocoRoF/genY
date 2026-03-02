@@ -30,6 +30,7 @@ const en = {
     settings: 'Settings',
     info: 'Info',
     graph: 'Graph',
+    sessionTools: 'Tools',
     command: 'Command',
     dashboard: 'Dashboard',
     storage: 'Storage',
@@ -67,6 +68,8 @@ const en = {
     no: 'No',
     enabled: 'Enabled',
     disabled: 'Disabled',
+    configured: 'Configured',
+    notConfigured: 'Not Configured',
     export: 'Export',
     import: 'Import',
     view: 'View',
@@ -342,6 +345,14 @@ const en = {
     metadata: 'Metadata',
     innerGraph: 'Inner Graph',
     path: '{name} Path',
+  },
+
+  // ─── Session Tools Tab ───
+  sessionTools: {
+    title: 'Session Tools',
+    selectSession: 'Select a Session',
+    selectSessionDesc: 'Choose a session to view its available tools and MCP servers.',
+    loading: 'Loading tools…',
   },
 
   // ─── Graph Workflows Tab ───

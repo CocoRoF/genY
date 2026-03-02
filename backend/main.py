@@ -196,19 +196,27 @@ async def lifespan(app: FastAPI):
     await proxy.close()
 
     # Stop all active sessions (processes only — storage preserved)
+    # Soft-delete all active sessions so they appear in "deleted sessions" on restart
     async def stop_all_sessions():
+        from service.claude_manager.session_store import get_session_store
+        store = get_session_store()
+
         sessions = agent_manager.list_sessions()
-        # Stop processes in parallel (no storage cleanup)
         stop_tasks = []
         for session in sessions:
-            agent = agent_manager.get_agent(session.session_id)
+            sid = session.session_id
+            agent = agent_manager.get_agent(sid)
             if agent:
                 stop_tasks.append(agent.cleanup())
+                # Mark as soft-deleted so the session shows up in "deleted sessions"
+                store.soft_delete(sid)
             else:
                 # Legacy process — just stop, don't delete storage
-                process = agent_manager._local_processes.get(session.session_id)
+                process = agent_manager._local_processes.get(sid)
                 if process:
                     stop_tasks.append(process.stop())
+                # Also soft-delete legacy sessions
+                store.soft_delete(sid)
         if stop_tasks:
             await asyncio.gather(*stop_tasks, return_exceptions=True)
 

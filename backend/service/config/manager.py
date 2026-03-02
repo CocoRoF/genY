@@ -106,7 +106,47 @@ class ConfigManager:
                 raise FileNotFoundError(f"Config file not found: {config_path}")
 
             self._configs[config_name] = config
+
+            # Sync loaded values to os.environ via apply_change callbacks.
+            # This ensures that values from JSON config files are available
+            # as environment variables even when .env file is missing.
+            self._sync_env_on_load(config)
+
             return config
+
+    def _sync_env_on_load(self, config: BaseConfig) -> None:
+        """Propagate config values to ``os.environ`` on initial load.
+
+        Config JSON files are the single source of truth.  This method
+        ensures that values stored in JSON (e.g. ANTHROPIC_API_KEY) are
+        available as environment variables at runtime, even when a
+        ``.env`` file does not exist.
+
+        Only fields that have an ``apply_change`` callback are synced,
+        and only when the config value is non-empty.
+        """
+        try:
+            meta_lookup = {f.name: f for f in config.get_fields_metadata()}
+            current = config.to_dict()
+
+            for name, value in current.items():
+                if not value:               # skip empty / falsy
+                    continue
+                meta = meta_lookup.get(name)
+                if meta is None or meta.apply_change is None:
+                    continue
+                try:
+                    meta.apply_change(None, value)
+                except Exception as exc:
+                    logger.debug(
+                        f"_sync_env_on_load: callback failed for "
+                        f"{config.get_config_name()}.{name}: {exc}"
+                    )
+        except Exception:
+            logger.debug(
+                f"_sync_env_on_load: skipped for {config.get_config_name()}",
+                exc_info=True,
+            )
 
     def save_config(self, config: BaseConfig) -> bool:
         """

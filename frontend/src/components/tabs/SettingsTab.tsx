@@ -192,7 +192,7 @@ export default function SettingsTab() {
               {filtered.map(config => {
                 const schema = config.schema || {} as ConfigSchema;
                 const values = config.values || {};
-                const isEnabled = values.enabled === true;
+                const hasEnabledField = schema.fields?.some((f: ConfigField) => f.name === 'enabled');
                 const configured = schema.fields?.filter((f: ConfigField) => {
                   const v = values[f.name];
                   return v !== undefined && v !== '' && v !== f.default;
@@ -200,19 +200,26 @@ export default function SettingsTab() {
                 const total = schema.fields?.length || 0;
                 const ls = getLocalizedSchema(schema, locale);
 
+                // Configs with explicit enabled toggle vs configs that are "configured" by having fields set
+                const isActive = hasEnabledField ? values.enabled === true : configured > 0;
+                const badgeLabel = hasEnabledField
+                  ? (values.enabled === true ? t('common.enabled') : t('common.disabled'))
+                  : (configured > 0 ? t('common.configured') : t('common.notConfigured'));
+                const activeColor = hasEnabledField ? 'var(--success-color)' : 'var(--info-color, #3b82f6)';
+
                 return (
                   <div key={schema.name}
                        className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius-lg)] py-4 px-5 cursor-pointer transition-all hover:bg-[var(--bg-hover)]"
-                       style={{ borderLeft: `3px solid ${isEnabled ? 'var(--success-color)' : 'var(--text-muted)'}`, opacity: isEnabled ? 1 : 0.8 }}
+                       style={{ borderLeft: `3px solid ${isActive ? activeColor : 'var(--text-muted)'}`, opacity: isActive ? 1 : 0.8 }}
                        onClick={() => openEdit(schema.name)}>
                     <div className="flex items-start gap-3.5">
                       <div className="flex-1 min-w-0">
                         <h4 className="text-[0.9375rem] font-semibold text-[var(--text-primary)] mb-1">{ls.display_name}</h4>
                         <p className="text-[0.8125rem] text-[var(--text-secondary)] leading-[1.4] line-clamp-2">{ls.description}</p>
                       </div>
-                      <span className={`shrink-0 inline-block py-1 px-2.5 rounded-[12px] text-[0.75rem] font-medium ${isEnabled ? 'text-[var(--success-color)]' : 'text-[var(--text-muted)] bg-[var(--bg-tertiary)]'}`}
-                            style={isEnabled ? { background: 'rgba(16, 185, 129, 0.15)' } : {}}>
-                        {isEnabled ? t('common.enabled') : t('common.disabled')}
+                      <span className={`shrink-0 inline-block py-1 px-2.5 rounded-[12px] text-[0.75rem] font-medium ${isActive ? '' : 'text-[var(--text-muted)] bg-[var(--bg-tertiary)]'}`}
+                            style={isActive ? { color: activeColor, background: hasEnabledField ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)' } : {}}>
+                        {badgeLabel}
                       </span>
                     </div>
                     <div className="flex justify-between items-center mt-3 pt-3 border-t border-[var(--border-color)]">

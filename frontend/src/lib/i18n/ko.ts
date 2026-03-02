@@ -30,6 +30,7 @@ const ko: Translations = {
     settings: '설정',
     info: '정보',
     graph: '그래프',
+    sessionTools: '도구',
     command: '명령',
     dashboard: '대시보드',
     storage: '스토리지',
@@ -67,6 +68,8 @@ const ko: Translations = {
     no: '아니오',
     enabled: '활성화',
     disabled: '비활성화',
+    configured: '설정됨',
+    notConfigured: '미설정',
     export: '내보내기',
     import: '가져오기',
     view: '보기',
@@ -342,6 +345,14 @@ const ko: Translations = {
     metadata: '메타데이터',
     innerGraph: '내부 그래프',
     path: '{name} 경로',
+  },
+
+  // ─── Session Tools Tab ───
+  sessionTools: {
+    title: '세션 도구',
+    selectSession: '세션을 선택하세요',
+    selectSessionDesc: '세션을 선택하면 사용 가능한 도구와 MCP 서버를 확인할 수 있습니다.',
+    loading: '도구 로딩 중…',
   },
 
   // ─── Graph Workflows Tab ───

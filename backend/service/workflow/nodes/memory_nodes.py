@@ -113,14 +113,9 @@ class MemoryInjectNode(BaseNode):
             input_text = state.get(search_field, "") or ""
             max_results = int(config.get("max_results", 5))
             search_chars = int(config.get("search_chars", 500))
-            record_input = config.get("record_input", True)
 
-            # Record user input to transcript
-            if record_input:
-                try:
-                    context.memory_manager.record_message("user", input_text[:5000])
-                except Exception:
-                    logger.debug(f"[{context.session_id}] memory_inject: transcript record failed")
+            # Note: user input is recorded once by AgentSession.invoke()/astream()
+            # before the graph starts — no duplicate recording here.
 
             # Search for relevant memories
             results = context.memory_manager.search(

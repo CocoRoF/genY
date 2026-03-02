@@ -269,15 +269,6 @@ def make_transcript_record_node(storage_path: str):
 
         stm.add_message("assistant", last_output)
 
-        # Also record user input if this is the first turn
-        iteration = state.get("iteration", 0)
-        if iteration <= 1:
-            messages = state.get("messages", [])
-            for msg in messages:
-                if hasattr(msg, "type") and msg.type == "human":
-                    stm.add_message("user", msg.content)
-                    break
-
         return {}  # No state mutation
 
     return _node

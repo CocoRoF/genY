@@ -167,19 +167,18 @@ def env_sync(env_key: str) -> Callable[[Any, Any], None]:
     """
     Factory that returns an ``apply_change`` callback.
 
-    The callback writes the **new** value to the .env file and
-    updates ``os.environ[env_key]`` so the change takes effect
-    without a server restart.
+    The callback updates ``os.environ[env_key]`` so the change takes
+    effect without a server restart.
+
+    **Note:** The ``.env`` file is never written to.  Config JSON files
+    are the single source of truth; ``.env`` is only read as a fallback
+    for default values (see ``read_env_defaults``).
     """
 
     def _apply(_old_value: Any, new_value: Any) -> None:
         str_val = _to_env_str(new_value)
-        # Update .env file
-        content = _read_env()
-        content = _set_value(content, env_key, str_val)
-        _write_env(content)
-        # Update live environment
+        # Update live environment only — .env is read-only fallback
         os.environ[env_key] = str_val
-        logger.info(f"env_sync: {env_key} updated")
+        logger.info(f"env_sync: {env_key} set in os.environ")
 
     return _apply

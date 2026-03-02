@@ -250,7 +250,10 @@ async def get_session_tools(
     """Get the tools and MCP servers active for a specific session.
 
     Returns which tool preset was used, which servers are active,
-    and which tools are available.
+    and which tools are available.  The ``allowed_servers`` /
+    ``allowed_tools`` lists from the preset are resolved against the
+    globally-available pool so the frontend gets concrete names (not
+    just ``["*"]``).
     """
     from service.langgraph import get_agent_session_manager
 
@@ -259,26 +262,53 @@ async def get_session_tools(
     if not agent:
         raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
 
-    # Get MCP config from the agent's process
-    active_servers: List[str] = []
-    if agent.process and hasattr(agent.process, '_mcp_config'):
-        mcp = agent.process._mcp_config
-        if mcp and hasattr(mcp, 'servers') and mcp.servers:
-            active_servers = list(mcp.servers.keys())
-
-    # Get tool_preset_id from session metadata
+    # ── Resolve tool preset ──
     tool_preset_id = getattr(agent, '_tool_preset_id', None)
-    tool_preset_name = None
+    tool_preset_name = getattr(agent, '_tool_preset_name', None)
+    allowed_servers: List[str] = []
+    allowed_tools: List[str] = []
 
     if tool_preset_id:
         store = get_tool_preset_store()
         preset = store.load(tool_preset_id)
         if preset:
             tool_preset_name = preset.name
+            allowed_servers = preset.allowed_servers
+            allowed_tools = preset.allowed_tools
+
+    # ── Build the full available pool ──
+    all_server_names: List[str] = []
+    mcp_config = get_global_mcp_config()
+    if mcp_config and mcp_config.servers:
+        all_server_names = list(mcp_config.servers.keys())
+
+    all_tool_names: List[str] = []
+    try:
+        from service.mcp_loader import MCPLoader
+        loader = MCPLoader()
+        loader._load_tools()
+        for tool_obj in loader.tools:
+            name = getattr(tool_obj, 'name', None) or getattr(tool_obj, '__name__', None)
+            if name:
+                all_tool_names.append(name)
+    except Exception:
+        pass
+
+    # ── Resolve wildcards ──
+    is_wildcard_servers = "*" in allowed_servers
+    is_wildcard_tools = "*" in allowed_tools
+
+    active_servers = all_server_names if is_wildcard_servers else [
+        s for s in allowed_servers if s in set(all_server_names)
+    ]
+    active_tools = all_tool_names if is_wildcard_tools else [
+        t for t in allowed_tools if t in set(all_tool_names)
+    ]
 
     return {
         "session_id": session_id,
         "tool_preset_id": tool_preset_id,
         "tool_preset_name": tool_preset_name,
         "active_servers": active_servers,
+        "active_tools": active_tools,
     }

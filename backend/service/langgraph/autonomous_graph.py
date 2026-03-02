@@ -284,16 +284,8 @@ class AutonomousGraph:
         try:
             input_text = state.get("input", "")
 
-            # Record user input to transcript
-            try:
-                self._memory_manager.record_message(
-                    "user", input_text[:5000]
-                )
-            except Exception:
-                logger.debug(
-                    f"[{self._session_id}] memory_inject: "
-                    f"user transcript record failed (non-critical)"
-                )
+            # Note: user input is recorded once by AgentSession.invoke()/astream()
+            # before the graph starts — no duplicate recording here.
 
             # Search for relevant memories
             results = self._memory_manager.search(

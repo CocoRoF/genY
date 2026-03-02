@@ -451,8 +451,28 @@ class ClassifyNode(BaseNode):
             return result
 
         except Exception as e:
-            logger.exception(f"[{context.session_id}] classify error: {e}")
-            return {"error": str(e), "is_complete": True}
+            # Classify failure should NOT terminate the graph.
+            # Fall back to default category and continue execution.
+            logger.warning(
+                f"[{context.session_id}] classify: structured parse failed, "
+                f"falling back to default='{default_cat}'. Error: {e}"
+            )
+
+            # Store default as Difficulty enum if output_field == "difficulty"
+            if output_field == "difficulty":
+                try:
+                    store_value = Difficulty(default_cat)
+                except ValueError:
+                    store_value = default_cat
+            else:
+                store_value = default_cat
+
+            return {
+                output_field: store_value,
+                "current_step": "classified",
+                "messages": [HumanMessage(content=input_text)],
+                "last_output": default_cat,
+            }
 
     def get_routing_function(
         self, config: Dict[str, Any],

@@ -16,6 +16,7 @@ const GraphWorkflowsTab = dynamic(() => import('@/components/tabs/GraphWorkflows
 const InfoTab = dynamic(() => import('@/components/tabs/InfoTab'));
 const SettingsTab = dynamic(() => import('@/components/tabs/SettingsTab'));
 const ToolPresetsTab = dynamic(() => import('@/components/tabs/ToolPresetsTab'));
+const SessionToolsTab = dynamic(() => import('@/components/tabs/SessionToolsTab'));
 
 const TAB_MAP: Record<string, React.ComponentType> = {
   main: MainTab,
@@ -27,6 +28,7 @@ const TAB_MAP: Record<string, React.ComponentType> = {
   graph: GraphTab,
   workflows: GraphWorkflowsTab,
   tools: ToolPresetsTab,
+  sessionTools: SessionToolsTab,
   info: InfoTab,
   settings: SettingsTab,
 };

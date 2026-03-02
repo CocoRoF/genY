@@ -170,6 +170,7 @@ class AgentSession:
         self._error_message: Optional[str] = None
         self._current_thread_id: str = "default"
         self._current_iteration: int = 0
+        self._execution_count: int = 0
         self._execution_start_time: Optional[datetime] = None
 
         # Session freshness evaluator
@@ -730,6 +731,23 @@ class AgentSession:
                     stop_reason="completed" if not has_error else result.get("error"),
                 )
 
+            # Record structured execution entry to long-term memory
+            self._execution_count += 1
+            if self._memory_manager:
+                try:
+                    self._memory_manager.record_execution(
+                        input_text=input_text,
+                        result_state=result,
+                        duration_ms=duration_ms,
+                        execution_number=self._execution_count,
+                        success=not has_error,
+                    )
+                except Exception:
+                    logger.debug(
+                        f"[{self._session_id}] LTM execution record failed (non-critical)",
+                        exc_info=True,
+                    )
+
             if has_error:
                 self._error_message = result["error"]
                 return f"Error: {result['error']}"
@@ -818,10 +836,21 @@ class AgentSession:
                 except Exception:
                     logger.debug("Failed to record user message — non-critical", exc_info=True)
 
+            # Accumulate state updates for LTM recording
+            accumulated_state: Dict[str, Any] = {}
+
             # Stream the compiled graph
             async for event in self._graph.astream(initial_state, config):
                 event_count += 1
                 last_event = event
+
+                # Accumulate state from node outputs for LTM recording
+                if isinstance(event, dict):
+                    for key, value in event.items():
+                        if key == "__end__":
+                            continue
+                        if isinstance(value, dict):
+                            accumulated_state.update(value)
 
                 # Parse per-node event info from the streamed dict.
                 # LangGraph astream yields dicts like {node_id: state_update}.
@@ -883,6 +912,25 @@ class AgentSession:
                     total_duration_ms=duration_ms,
                     stop_reason="stream_complete",
                 )
+
+            # Record structured execution entry to long-term memory
+            self._execution_count += 1
+            if self._memory_manager:
+                try:
+                    # Ensure input is in accumulated state
+                    accumulated_state.setdefault("input", input_text)
+                    self._memory_manager.record_execution(
+                        input_text=input_text,
+                        result_state=accumulated_state,
+                        duration_ms=duration_ms,
+                        execution_number=self._execution_count,
+                        success=True,
+                    )
+                except Exception:
+                    logger.debug(
+                        f"[{self._session_id}] LTM execution record failed (non-critical)",
+                        exc_info=True,
+                    )
 
         except Exception as e:
             self._status = SessionStatus.RUNNING
