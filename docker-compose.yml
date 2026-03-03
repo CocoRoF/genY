@@ -27,7 +27,8 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     env_file:
-      - ./backend/.env
+      - path: ./backend/.env
+        required: false
     environment:
       # Override port/host inside container (always 8000 internally)
       - APP_HOST=0.0.0.0
