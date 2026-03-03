@@ -347,8 +347,3 @@ backend/service/claude_manager/sessions.json
 
 # Docker data directory (bind-mounted volumes)
 data/geny_agent_sessions/
-data/logs/
-data/session_store/sessions.json
-!data/session_store/
-!data/sessions.json
-!data/README.md
