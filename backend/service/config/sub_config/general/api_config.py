@@ -14,7 +14,11 @@ from service.config.base import BaseConfig, ConfigField, FieldType, register_con
 from service.config.sub_config.general.env_utils import env_sync, read_env_defaults
 
 MODEL_OPTIONS = [
+    {"value": "claude-opus-4-6", "label": "Claude Opus 4.6"},
+    {"value": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6"},
+    {"value": "claude-opus-4-5-20251101", "label": "Claude Opus 4.5"},
     {"value": "claude-sonnet-4-5-20250929", "label": "Claude Sonnet 4.5"},
+    {"value": "claude-haiku-4-5-20251001", "label": "Claude Haiku 4.5"},
     {"value": "claude-opus-4-20250514", "label": "Claude Opus 4"},
     {"value": "claude-sonnet-4-20250514", "label": "Claude Sonnet 4"},
     {"value": "claude-haiku-4-20250414", "label": "Claude Haiku 4"},
@@ -27,7 +31,7 @@ class APIConfig(BaseConfig):
     """Anthropic API and model settings."""
 
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-5-20250929"
+    anthropic_model: str = "claude-sonnet-4-6"
     max_thinking_tokens: int = 31999
     skip_permissions: bool = True
 
@@ -113,7 +117,7 @@ class APIConfig(BaseConfig):
                 field_type=FieldType.SELECT,
                 label="Default Model",
                 description="Default Claude model for new sessions",
-                default="claude-sonnet-4-5-20250929",
+                default="claude-sonnet-4-6",
                 options=MODEL_OPTIONS,
                 group="api",
                 apply_change=env_sync("ANTHROPIC_MODEL"),

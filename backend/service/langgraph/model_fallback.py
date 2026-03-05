@@ -153,8 +153,9 @@ def is_recoverable(reason: FailureReason) -> bool:
 
 # 기본 모델 후보군 (우선순위 순)
 DEFAULT_MODEL_CANDIDATES = [
-    "claude-sonnet-4-20250514",
-    "claude-haiku-4-20250414",
+    "claude-sonnet-4-6",
+    "claude-sonnet-4-5-20250929",
+    "claude-haiku-4-5-20251001",
 ]
 
 # 모델별 재시도 대기 시간 (초)

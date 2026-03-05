@@ -43,12 +43,17 @@ logger = getLogger(__name__)
 
 # Claude 모델별 컨텍스트 윈도우 크기 (토큰)
 MODEL_CONTEXT_LIMITS: Dict[str, int] = {
-    # Opus
+    # Claude 4.6
+    "claude-opus-4-6": 200_000,
+    "claude-sonnet-4-6": 200_000,
+    # Claude 4.5
+    "claude-opus-4-5-20251101": 200_000,
+    "claude-sonnet-4-5-20250929": 200_000,
+    "claude-haiku-4-5-20251001": 200_000,
+    # Claude 4
     "claude-opus-4-20250514": 200_000,
-    # Sonnet
     "claude-sonnet-4-20250514": 200_000,
     "claude-sonnet-4-20250715": 200_000,
-    # Haiku
     "claude-haiku-4-20250414": 200_000,
     # Legacy
     "claude-3-5-sonnet-20241022": 200_000,
