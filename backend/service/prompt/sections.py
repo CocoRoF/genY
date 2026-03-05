@@ -35,12 +35,16 @@ class SectionLibrary:
 
     @staticmethod
     def identity(
-        agent_name: str = "Geny Agent",
+        agent_name: str = "Great Agent",
         role: str = "worker",
         agent_id: Optional[str] = None,
+        session_name: Optional[str] = None,
     ) -> PromptSection:
         """에이전트 정체성 섹션 (간결)."""
-        parts = [f"You are {agent_name} (role: {role})."]
+        display_name = session_name if session_name else agent_name
+        parts = [f"You are {display_name} (role: {role})."]
+        if session_name:
+            parts.append(f"Your name is \"{session_name}\" — remember this as your identity.")
         if agent_id:
             parts.append(f"Agent ID: {agent_id}")
 
@@ -501,12 +505,13 @@ class AutonomousPrompts:
 
 
 def build_agent_prompt(
-    agent_name: str = "Geny Agent",
+    agent_name: str = "Great Agent",
     role: str = "worker",
     agent_id: Optional[str] = None,
     working_dir: Optional[str] = None,
     model: Optional[str] = None,
     session_id: Optional[str] = None,
+    session_name: Optional[str] = None,
     tools: Optional[List[str]] = None,
     mcp_servers: Optional[List[str]] = None,
     mode: PromptMode = PromptMode.FULL,
@@ -538,6 +543,7 @@ def build_agent_prompt(
         working_dir: Working directory path.
         model: Model name.
         session_id: Session identifier.
+        session_name: Session display name — when set, the agent recognizes it as its own name.
         tools: List of available tool names.
         mcp_servers: List of MCP server names.
         mode: Prompt detail level.
@@ -552,7 +558,7 @@ def build_agent_prompt(
     builder = PromptBuilder(mode=mode)
 
     # §1 Identity (1 line)
-    builder.add_section(SectionLibrary.identity(agent_name, role, agent_id))
+    builder.add_section(SectionLibrary.identity(agent_name, role, agent_id, session_name))
 
     # §2 Role behavior (from prompts/*.md, or lean fallback)
     builder.add_section(SectionLibrary.role_protocol(role))

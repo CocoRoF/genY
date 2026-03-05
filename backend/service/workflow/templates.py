@@ -62,10 +62,10 @@ def create_autonomous_template() -> WorkflowDefinition:
         ))
 
     # ── START & Common Entry ──
-    _add("start",           "start",           "Start",             288, 160)
-    _add("memory_inject",   "mem_inject",      "Memory Inject",     288, 256)
-    _add("relevance_gate",  "relevance_gate",  "Relevance Gate",    288, 312)
-    _add("context_guard",   "guard_cls",       "Guard (Classify)",  288, 368,
+    _add("start",           "start",           "Start",              32, 112)
+    _add("memory_inject",   "mem_inject",      "Memory Inject",     128, 224)
+    _add("relevance_gate",  "relevance_gate",  "Relevance Gate",   -144, 224)
+    _add("context_guard",   "guard_cls",       "Guard (Classify)",  128, 384,
          {"position_label": "classify"})
     _add("classify",        "classify",        "Classify",          288, 480)
 

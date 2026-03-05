@@ -221,12 +221,13 @@ class AgentSessionManager(SessionManager):
 
         # Build prompt
         prompt = build_agent_prompt(
-            agent_name="Geny Agent",
+            agent_name="Great Agent",
             role=role,
             agent_id=None,
             working_dir=request.working_dir,
             model=request.model,
             session_id=None,
+            session_name=request.session_name,
             tools=tools,
             mcp_servers=mcp_servers,
             mode=mode,
