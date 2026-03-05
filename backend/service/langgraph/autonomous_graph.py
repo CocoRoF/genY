@@ -517,8 +517,10 @@ class AutonomousGraph:
 
         Only activates when ``is_chat_message`` is True. If not a chat
         message, passes through immediately. When active, performs a
-        lightweight LLM call to decide relevance based on the agent's
-        role and persona.
+        structured-output LLM call to decide relevance based on the
+        agent's role and persona.
+
+        Uses Pydantic-validated structured output for reliable parsing.
 
         Returns:
             State update with ``relevance_skipped`` set if irrelevant.
@@ -545,31 +547,60 @@ class AutonomousGraph:
                 )
             return {}
 
-        # Chat mode — check relevance
+        # Chat mode — check relevance via structured output
         input_text = state.get("input", "")
         metadata = state.get("metadata", {})
         agent_name = metadata.get("agent_name", "Agent")
         agent_role = metadata.get("agent_role", "worker")
 
         try:
+            from service.workflow.nodes.structured_output import (
+                RelevanceOutput,
+                build_schema_instruction,
+                parse_structured_output,
+            )
+
             prompt = AutonomousPrompts.check_relevance().format(
                 agent_name=agent_name,
                 role=agent_role,
                 message=input_text,
             )
-            messages = [HumanMessage(content=prompt)]
+            schema_instruction = build_schema_instruction(
+                RelevanceOutput,
+                extra_instruction=(
+                    "The 'relevant' field MUST be a boolean (true or false). "
+                    "Respond true ONLY if this message clearly pertains to "
+                    "your name, role, or expertise."
+                ),
+            )
+            messages = [HumanMessage(content=f"{prompt}\n\n{schema_instruction}")]
 
             response, _ = await self._resilient_invoke(
                 messages, "relevance_gate", state
             )
-            response_text = response.content.strip().lower()
+            raw_text = response.content if hasattr(response, "content") else str(response)
 
-            is_relevant = "yes" in response_text
+            result = parse_structured_output(raw_text, RelevanceOutput)
+            if result.success and result.data is not None:
+                is_relevant = result.data.relevant
+                reasoning = result.data.reasoning or ""
+            else:
+                # Structured parse failed — fall back to string matching
+                response_text = raw_text.strip().lower()
+                is_relevant = (
+                    "yes" in response_text
+                    or "예" in response_text
+                    or "네" in response_text
+                    or '"relevant": true' in response_text
+                    or '"relevant":true' in response_text
+                ) and "no" not in response_text[:5]
+                reasoning = f"fallback parse (raw: {response_text[:50]})"
 
             logger.info(
                 f"[{self._session_id}] relevance_gate: "
                 f"message {'relevant' if is_relevant else 'NOT relevant'} "
-                f"(response: {response_text[:50]})"
+                f"(agent={agent_name}, role={agent_role}"
+                f"{', reason=' + reasoning[:80] if reasoning else ''})"
             )
 
             if session_logger:
@@ -594,14 +625,80 @@ class AutonomousGraph:
         except Exception as e:
             logger.warning(
                 f"[{self._session_id}] relevance_gate: "
-                f"error during relevance check: {e}, defaulting to relevant"
+                f"structured parse failed: {e}, "
+                f"falling back to string matching"
+            )
+            # Fallback: simple string matching
+            return await self._relevance_gate_fallback(
+                state, session_logger, agent_name, agent_role, input_text,
+            )
+
+    async def _relevance_gate_fallback(
+        self,
+        state: AutonomousState,
+        session_logger: Any,
+        agent_name: str,
+        agent_role: str,
+        input_text: str,
+    ) -> Dict[str, Any]:
+        """Fallback relevance check using simple YES/NO string matching.
+
+        Only called when structured output parsing fails.
+        """
+        try:
+            fallback_prompt = (
+                f"You are {agent_name} (role: {agent_role}).\n"
+                f"Message: \"{input_text}\"\n\n"
+                f"Is this message relevant to you? Reply ONLY: YES or NO"
+            )
+            messages = [HumanMessage(content=fallback_prompt)]
+            response, _ = await self._resilient_invoke(
+                messages, "relevance_gate_fallback", state
+            )
+            response_text = response.content.strip().lower()
+
+            is_relevant = (
+                "yes" in response_text
+                or "예" in response_text
+                or "네" in response_text
+            ) and "no" not in response_text[:5]
+
+            logger.info(
+                f"[{self._session_id}] relevance_gate (fallback): "
+                f"message {'relevant' if is_relevant else 'NOT relevant'} "
+                f"(raw: {response_text[:50]})"
+            )
+
+            if session_logger:
+                session_logger.log_graph_node_exit(
+                    node_name="relevance_gate",
+                    iteration=state.get("iteration", 0),
+                    output_preview=f"Relevant (fallback): {is_relevant}",
+                    duration_ms=0,
+                    state_changes={"relevance_skipped": not is_relevant},
+                )
+
+            if not is_relevant:
+                return {
+                    "relevance_skipped": True,
+                    "is_complete": True,
+                    "final_answer": "",
+                    "current_step": "relevance_skipped",
+                }
+
+            return {"relevance_skipped": False}
+
+        except Exception as e2:
+            logger.warning(
+                f"[{self._session_id}] relevance_gate: "
+                f"fallback also failed: {e2}, defaulting to relevant"
             )
             if session_logger:
                 session_logger.log_graph_error(
-                    error_message=str(e),
+                    error_message=str(e2),
                     node_name="relevance_gate",
                     iteration=state.get("iteration", 0),
-                    error_type=type(e).__name__,
+                    error_type=type(e2).__name__,
                 )
             # On error, assume relevant (don't block legitimate work)
             return {"relevance_skipped": False}
@@ -609,8 +706,17 @@ class AutonomousGraph:
     def _route_after_relevance(
         self, state: AutonomousState
     ) -> Literal["continue", "skip"]:
-        """Route after relevance gate — continue processing or skip to END."""
-        if state.get("relevance_skipped") or state.get("is_complete"):
+        """Route after relevance gate — continue processing or skip to END.
+
+        Uses ``relevance_skipped`` as the primary signal, and only
+        considers ``is_complete`` when it was set in the relevance
+        gate step itself (current_step == 'relevance_skipped').
+        This prevents false skips from unrelated ``is_complete``
+        flags set by other graph nodes.
+        """
+        if state.get("relevance_skipped"):
+            return "skip"
+        if state.get("is_complete") and state.get("current_step") == "relevance_skipped":
             return "skip"
         return "continue"
 

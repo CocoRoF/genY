@@ -494,16 +494,21 @@ class AutonomousPrompts:
         The gate determines whether a broadcast message is relevant
         to this agent's role and persona. Must be token-efficient.
         Returns format string with placeholders: agent_name, role, message.
+
+        Uses structured JSON output for reliable parsing.
         """
         return (
-            "You are {agent_name} (role: {role}).\n"
-            "A group chat message was sent to all agents.\n\n"
-            "Message: {message}\n\n"
-            "Should you respond to this message? Consider:\n"
-            "- Is it directed at you by name or role?\n"
-            "- Is it relevant to your expertise/responsibilities?\n"
-            "- Is it a general question that you should answer?\n\n"
-            "Reply ONLY with: YES or NO"
+            "You are **{agent_name}** (role: {role}).\n"
+            "A message was broadcast to all agents in a group chat.\n\n"
+            "Message: \"{message}\"\n\n"
+            "Determine whether YOU should respond. Answer relevant=true when:\n"
+            "- The message mentions your name (or a similar/abbreviated form)\n"
+            "- The message targets your role or expertise area\n"
+            "- It is a general request that clearly falls under your responsibilities\n\n"
+            "Answer relevant=false when:\n"
+            "- The message is directed at a DIFFERENT agent by name\n"
+            "- The task is outside your role/expertise\n"
+            "- Another agent is clearly better suited\n"
         )
 
 

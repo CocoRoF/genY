@@ -444,7 +444,7 @@ class ClassifyNode(BaseNode):
             result: Dict[str, Any] = {
                 output_field: store_value,
                 "current_step": "classified",
-                "messages": [HumanMessage(content=input_text)],
+                "messages": [],
                 "last_output": matched,
             }
             result.update(fallback)
@@ -470,7 +470,7 @@ class ClassifyNode(BaseNode):
             return {
                 output_field: store_value,
                 "current_step": "classified",
-                "messages": [HumanMessage(content=input_text)],
+                "messages": [],
                 "last_output": default_cat,
             }
 

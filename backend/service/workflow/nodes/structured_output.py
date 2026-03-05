@@ -105,6 +105,20 @@ class CreateTodosOutput(BaseModel):
     """The list of TODO items."""
 
 
+class RelevanceOutput(BaseModel):
+    """Structured output for the RelevanceGateNode.
+
+    The LLM decides whether a broadcast message is relevant
+    to this agent's role and persona.
+    """
+
+    relevant: bool
+    """True if the message is relevant to this agent."""
+
+    reasoning: Optional[str] = None
+    """Brief reasoning for the relevance decision."""
+
+
 class FinalReviewOutput(BaseModel):
     """Structured output for the FinalReviewNode.
 
