@@ -56,30 +56,67 @@ export interface ExecuteResponse {
   duration_ms?: number;
 }
 
-// ==================== Chat Types ====================
+// ==================== Chat Room Types ====================
 
-export interface ChatBroadcastRequest {
+export interface ChatRoom {
+  id: string;
+  name: string;
+  session_ids: string[];
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface CreateChatRoomRequest {
+  name: string;
+  session_ids: string[];
+}
+
+export interface UpdateChatRoomRequest {
+  name?: string;
+  session_ids?: string[];
+}
+
+export interface ChatRoomListResponse {
+  rooms: ChatRoom[];
+  total: number;
+}
+
+export interface ChatRoomMessage {
+  id: string;
+  type: 'user' | 'agent' | 'system';
+  content: string;
+  timestamp: string;
+  session_id?: string | null;
+  session_name?: string | null;
+  role?: string | null;
+  duration_ms?: number | null;
+}
+
+export interface ChatRoomMessageListResponse {
+  room_id: string;
+  messages: ChatRoomMessage[];
+  total: number;
+}
+
+export interface ChatRoomBroadcastRequest {
   message: string;
   timeout?: number;
 }
 
-export interface ChatSessionResponse {
-  session_id: string;
-  session_name: string | null;
-  role: string | null;
-  responded: boolean;
-  output: string | null;
-  error: string | null;
-  duration_ms: number | null;
-}
+// SSE event types from broadcast stream
+export type ChatSSEEventType =
+  | 'user_saved'
+  | 'agent_response'
+  | 'agent_skip'
+  | 'agent_error'
+  | 'summary'
+  | 'done'
+  | 'error';
 
-export interface ChatBroadcastResponse {
-  success: boolean;
-  message: string;
-  total_sessions: number;
-  responded_count: number;
-  responses: ChatSessionResponse[];
-  total_duration_ms: number;
+export interface ChatSSEEvent {
+  event: ChatSSEEventType;
+  data: ChatRoomMessage | { error?: string; session_id?: string; session_name?: string; role?: string; duration_ms?: number };
 }
 
 

@@ -650,18 +650,26 @@ const ko: Translations = {
   // ─── Chat Tab ───
   chatTab: {
     title: '그룹 채팅',
-    subtitle: '모든 세션에 메시지 전송',
+    subtitle: '선택한 세션과 채팅방',
     activeSessions: '{count}개 활성',
     emptyTitle: '대화를 시작하세요',
-    emptyDesc: '메시지를 보내면 모든 활성 세션이 자신의 역할과 전문성에 따라 응답 여부를 결정합니다.',
-    inputPlaceholder: '브로드캐스트할 메시지를 입력하세요...',
+    emptyDesc: '메시지를 보내면 이 방의 세션들이 자신의 역할과 전문성에 따라 응답합니다.',
+    inputPlaceholder: '메시지를 입력하세요...',
     sendHint: '전송',
     newlineHint: '줄바꿈',
     noActiveSessions: '활성 세션 없음',
-    broadcasting: '{count}개 세션에 전송 중...',
-    noResponses: '이 메시지에 관련성을 느낀 세션이 없습니다.',
-    broadcastSummary: '{responded}/{total}개 세션 응답 ({duration}초)',
     broadcastError: '메시지 전송 실패',
+    // Room list
+    createRoom: '새 채팅방',
+    noRooms: '채팅방이 없습니다',
+    noRoomsDesc: '채팅방을 만들고 세션을 선택하여 그룹 대화를 시작하세요.',
+    members: '명',
+    deleteRoom: '채팅방 삭제',
+    deleteRoomConfirm: '이 채팅방과 모든 메시지를 삭제하시겠습니까?',
+    // Create room
+    roomName: '채팅방 이름',
+    enterRoomName: '채팅방 이름을 입력하세요...',
+    selectSessions: '세션 선택',
   },
 };
 

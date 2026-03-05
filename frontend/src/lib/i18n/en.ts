@@ -650,18 +650,26 @@ const en = {
   // ─── Chat Tab ───
   chatTab: {
     title: 'Group Chat',
-    subtitle: 'Broadcast to all sessions',
+    subtitle: 'Chat rooms with selected sessions',
     activeSessions: '{count} active',
     emptyTitle: 'Start a conversation',
-    emptyDesc: 'Send a message and all active sessions will decide whether to respond based on their role and expertise.',
-    inputPlaceholder: 'Type a message to broadcast...',
+    emptyDesc: 'Send a message and the sessions in this room will respond based on their role and expertise.',
+    inputPlaceholder: 'Type a message...',
     sendHint: 'to send',
     newlineHint: 'for new line',
     noActiveSessions: 'No active sessions',
-    broadcasting: 'Broadcasting to {count} sessions...',
-    noResponses: 'No sessions found this message relevant.',
-    broadcastSummary: '{responded}/{total} sessions responded ({duration}s)',
-    broadcastError: 'Failed to broadcast message',
+    broadcastError: 'Failed to send message',
+    // Room list
+    createRoom: 'New Room',
+    noRooms: 'No chat rooms yet',
+    noRoomsDesc: 'Create a room and select sessions to start a group conversation.',
+    members: 'members',
+    deleteRoom: 'Delete room',
+    deleteRoomConfirm: 'Delete this room and all its messages?',
+    // Create room
+    roomName: 'Room Name',
+    enterRoomName: 'Enter room name...',
+    selectSessions: 'Select Sessions',
   },
 };
 

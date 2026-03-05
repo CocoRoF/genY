@@ -36,8 +36,13 @@ import type {
   ManagerDashboard,
   StorageListResponse,
   StorageFileContent,
-  ChatBroadcastRequest,
-  ChatBroadcastResponse,
+  CreateChatRoomRequest,
+  UpdateChatRoomRequest,
+  ChatRoom,
+  ChatRoomListResponse,
+  ChatRoomMessageListResponse,
+  ChatRoomBroadcastRequest,
+  ChatRoomMessage,
 } from '@/types';
 
 export const agentApi = {
@@ -301,10 +306,100 @@ export const configApi = {
 // ==================== Chat API ====================
 
 export const chatApi = {
-  /** POST /api/chat/broadcast — broadcast message to all sessions */
-  broadcast: (data: ChatBroadcastRequest) =>
-    apiCall<ChatBroadcastResponse>('/api/chat/broadcast', {
+  /** GET /api/chat/rooms — list all chat rooms */
+  listRooms: () =>
+    apiCall<ChatRoomListResponse>('/api/chat/rooms'),
+
+  /** POST /api/chat/rooms — create a new chat room */
+  createRoom: (data: CreateChatRoomRequest) =>
+    apiCall<ChatRoom>('/api/chat/rooms', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  /** GET /api/chat/rooms/:id — get a single room */
+  getRoom: (roomId: string) =>
+    apiCall<ChatRoom>(`/api/chat/rooms/${roomId}`),
+
+  /** PATCH /api/chat/rooms/:id — update room name/sessions */
+  updateRoom: (roomId: string, data: UpdateChatRoomRequest) =>
+    apiCall<ChatRoom>(`/api/chat/rooms/${roomId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
+  /** DELETE /api/chat/rooms/:id — delete room & history */
+  deleteRoom: (roomId: string) =>
+    apiCall<{ success: boolean; room_id: string }>(`/api/chat/rooms/${roomId}`, {
+      method: 'DELETE',
+    }),
+
+  /** GET /api/chat/rooms/:id/messages — get room message history */
+  getRoomMessages: (roomId: string) =>
+    apiCall<ChatRoomMessageListResponse>(`/api/chat/rooms/${roomId}/messages`),
+
+  /**
+   * POST /api/chat/rooms/:id/broadcast — SSE streaming broadcast.
+   * Calls onEvent for each SSE event as it arrives.
+   * Returns when the stream is complete.
+   */
+  broadcastToRoom: async (
+    roomId: string,
+    data: ChatRoomBroadcastRequest,
+    onEvent: (eventType: string, eventData: ChatRoomMessage | Record<string, unknown>) => void,
+  ): Promise<void> => {
+    const res = await fetch(`/api/chat/rooms/${roomId}/broadcast`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      let message: string;
+      try {
+        const json = JSON.parse(body);
+        const raw = json.detail || json.message || json.error;
+        message = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : `HTTP ${res.status}`;
+      } catch {
+        message = body || `HTTP ${res.status}`;
+      }
+      throw new Error(message);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        if (!part.trim()) continue;
+        let eventType = '';
+        let eventDataStr = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event: ')) eventType = line.slice(7);
+          else if (line.startsWith('data: ')) eventDataStr = line.slice(6);
+        }
+        if (eventType && eventDataStr) {
+          try {
+            const parsed = JSON.parse(eventDataStr);
+            onEvent(eventType, parsed);
+          } catch {
+            // skip malformed events
+          }
+        }
+      }
+    }
+  },
 };

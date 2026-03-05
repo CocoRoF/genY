@@ -79,3 +79,17 @@ body {
 	outline: 2px solid var(--primary-color);
 	outline-offset: 2px;
 }
+
+/* ========================================
+   Typing Indicator Animation
+   ======================================== */
+@keyframes typingBounce {
+	0%, 60%, 100% {
+		transform: translateY(0);
+		opacity: 0.4;
+	}
+	30% {
+		transform: translateY(-4px);
+		opacity: 1;
+	}
+}
