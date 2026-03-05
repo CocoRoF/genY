@@ -219,6 +219,11 @@ class AgentSessionManager(SessionManager):
         # Allowed tools list (filtered by policy)
         tools = policy.filter_tool_names(request.allowed_tools)
 
+        # Resolve shared folder path for prompt inclusion
+        shared_folder_path: str | None = None
+        if self._shared_folder_enabled and self._shared_folder_manager:
+            shared_folder_path = self._shared_folder_link_name or "_shared"
+
         # Build prompt
         prompt = build_agent_prompt(
             agent_name="Great Agent",
@@ -233,17 +238,12 @@ class AgentSessionManager(SessionManager):
             mode=mode,
             context_files=context_files if context_files else None,
             extra_system_prompt=request.system_prompt,
+            shared_folder_path=shared_folder_path,
         )
 
         # Append memory context if available
         if memory_context:
             prompt = prompt + "\n\n" + memory_context
-
-        # Append shared folder context if enabled
-        if self._shared_folder_enabled and self._shared_folder_manager:
-            shared_ctx = self._build_shared_folder_context()
-            if shared_ctx:
-                prompt = prompt + "\n\n" + shared_ctx
 
         logger.debug(f"  PromptBuilder: mode={mode.value}, role={role}, length={len(prompt)} chars")
 

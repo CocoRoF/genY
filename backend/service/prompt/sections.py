@@ -1,11 +1,11 @@
 """
-프롬프트 섹션 라이브러리
+Prompt Section Library
 
-OpenClaw의 25+ 섹션 설계를 참고하여
-Geny Agent에 적합한 15개 핵심 섹션을 정의합니다.
+Defines core prompt sections for Geny Agent, inspired by
+OpenClaw's 25+ section design.
 
-각 섹션은 PromptSection 객체로 생성되며,
-PromptBuilder에 등록하여 조건부로 조립됩니다.
+Each section is created as a PromptSection object and
+registered with PromptBuilder for conditional assembly.
 """
 
 from __future__ import annotations
@@ -23,14 +23,14 @@ KST = timezone(timedelta(hours=9))
 
 
 class SectionLibrary:
-    """프롬프트 섹션 생성 팩토리.
+    """Prompt section factory.
 
-    각 메서드는 PromptSection 객체를 생성하여 반환합니다.
-    PromptBuilder에 add_section()으로 등록하세요.
+    Each static method creates and returns a PromptSection object.
+    Register via PromptBuilder.add_section().
     """
 
     # ========================================================================
-    # §1 Identity — 에이전트 정체성
+    # §1 Identity — Agent identity
     # ========================================================================
 
     @staticmethod
@@ -40,7 +40,7 @@ class SectionLibrary:
         agent_id: Optional[str] = None,
         session_name: Optional[str] = None,
     ) -> PromptSection:
-        """에이전트 정체성 섹션 (간결)."""
+        """Agent identity section (concise one-liner)."""
         display_name = session_name if session_name else agent_name
         parts = [f"You are {display_name} (role: {role})."]
         if session_name:
@@ -56,12 +56,12 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §2 Role Protocol — 역할별 행동 지침
+    # §2 Role Protocol — Per-role behavior instructions
     # ========================================================================
 
     @staticmethod
     def role_protocol(role: str = "worker") -> PromptSection:
-        """역할별 상세 행동 지침 섹션."""
+        """Per-role behavior protocol section."""
 
         # Lean fallback protocols — only used when no prompts/*.md file exists
         protocols = {
@@ -82,7 +82,7 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §3 Capabilities — 사용 가능 도구 목록
+    # §3 Capabilities — Available tools
     # ========================================================================
 
     @staticmethod
@@ -90,10 +90,10 @@ class SectionLibrary:
         tools: Optional[List[str]] = None,
         mcp_servers: Optional[List[str]] = None,
     ) -> PromptSection:
-        """사용 가능한 도구/MCP 서버 목록 섹션.
+        """Available tools/MCP server list section.
 
-        Claude CLI 기본 도구는 이미 내장되어 있으므로,
-        추가 MCP 서버나 커스텀 도구만 명시합니다.
+        Claude CLI built-in tools are already known, so only
+        additional MCP servers or custom tools are listed.
         """
         parts: List[str] = []
 
@@ -120,12 +120,12 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §4 Tool Style — 도구 사용 스타일 가이드
+    # §4 Tool Style — Tool usage guidelines
     # ========================================================================
 
     @staticmethod
     def tool_style() -> PromptSection:
-        """도구 호출 형식 및 결과 처리 가이드."""
+        """Tool invocation format and result handling guide."""
         content = """## Tool Usage Guidelines
 
 ### Efficiency Principles
@@ -153,12 +153,12 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §5 Safety — 안전 가이드라인
+    # §5 Safety — Safety guidelines
     # ========================================================================
 
     @staticmethod
     def safety() -> PromptSection:
-        """안전 가이드라인 섹션."""
+        """Safety guidelines section."""
         content = """## Safety Guidelines
 
 ### Data Protection
@@ -185,7 +185,7 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §6 Workspace — 작업 환경 정보
+    # §6 Workspace — Working environment
     # ========================================================================
 
     @staticmethod
@@ -194,7 +194,7 @@ class SectionLibrary:
         project_name: Optional[str] = None,
         file_tree: Optional[str] = None,
     ) -> PromptSection:
-        """작업 디렉토리 정보 섹션 (간결)."""
+        """Working directory info section (concise)."""
         content = f"Working directory: {working_dir}"
         if project_name:
             content += f" (project: {project_name})"
@@ -210,12 +210,12 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §7 DateTime — 현재 시각 정보
+    # §7 DateTime — Current time
     # ========================================================================
 
     @staticmethod
     def datetime_info() -> PromptSection:
-        """현재 시각 정보 (1-line). 빌드 시점의 시각을 캡처."""
+        """Current time (1-line). Captures the time at prompt build."""
         now_kst = datetime.now(timezone.utc).astimezone(KST)
 
         return PromptSection(
@@ -226,12 +226,12 @@ class SectionLibrary:
         )
 
     # ========================================================================
-    # §8 Context Efficiency — 토큰 효율 가이드
+    # §8 Context Efficiency — Token-efficient response guidelines
     # ========================================================================
 
     @staticmethod
     def context_efficiency() -> PromptSection:
-        """토큰 효율적 응답 가이드."""
+        """Token-efficient response guide."""
         content = """## Context Efficiency
 
 Be mindful of context window limits. Follow these guidelines:
@@ -249,12 +249,12 @@ Be mindful of context window limits. Follow these guidelines:
         )
 
     # ========================================================================
-    # §9 Delegation — Manager 전용 위임 프로토콜
+    # §9 Delegation — Manager-only delegation protocol
     # ========================================================================
 
     @staticmethod
     def delegation(worker_tools: Optional[List[str]] = None) -> PromptSection:
-        """Manager 전용 위임 프로토콜 섹션."""
+        """Manager-only delegation protocol section."""
         tools_list = worker_tools or ["list_workers", "delegate_task", "get_worker_status", "broadcast_task"]
 
         content = f"""## Delegation Protocol
@@ -277,12 +277,12 @@ Be mindful of context window limits. Follow these guidelines:
         )
 
     # ========================================================================
-    # §10 Status Reporting — Worker 진행 상태 보고
+    # §10 Status Reporting — Worker progress reporting
     # ========================================================================
 
     @staticmethod
     def status_reporting() -> PromptSection:
-        """Worker 진행 상태 보고 형식."""
+        """Worker progress reporting format."""
         content = """## Status Reporting
 
 When reporting progress to the Manager or system, use this format:
@@ -307,7 +307,7 @@ Always provide actionable information. If blocked, explain what's needed to unbl
         )
 
     # ========================================================================
-    # §11 Bootstrap Context — 프로젝트 컨텍스트 파일
+    # §11 Bootstrap Context — Project context files
     # ========================================================================
 
     @staticmethod
@@ -316,9 +316,9 @@ Always provide actionable information. If blocked, explain what's needed to unbl
         file_content: str,
         tag: Optional[str] = None,
     ) -> PromptSection:
-        """부트스트랩 파일 내용을 프롬프트에 주입.
+        """Inject bootstrap file content into the prompt.
 
-        OpenClaw의 <project-context> / <persona> 패턴 참고.
+        Inspired by OpenClaw's <project-context> / <persona> pattern.
         """
         tag = tag or "project-context"
 
@@ -331,7 +331,7 @@ Always provide actionable information. If blocked, explain what's needed to unbl
         )
 
     # ========================================================================
-    # §12 Runtime Line — 런타임 메타 정보
+    # §12 Runtime Line — Runtime metadata
     # ========================================================================
 
     @staticmethod
@@ -341,7 +341,7 @@ Always provide actionable information. If blocked, explain what's needed to unbl
         role: Optional[str] = None,
         version: str = "1.0.0",
     ) -> PromptSection:
-        """런타임 메타 정보 (1-line)."""
+        """Runtime metadata (1-line)."""
         parts = [f"Geny v{version}"]
         if model:
             parts.append(model)
@@ -517,24 +517,28 @@ def build_agent_prompt(
     mode: PromptMode = PromptMode.FULL,
     context_files: Optional[Dict[str, str]] = None,
     extra_system_prompt: Optional[str] = None,
+    shared_folder_path: Optional[str] = None,
 ) -> str:
     """Build the agent system prompt via the modular prompt builder.
+
+    Final prompt layout::
+
+        [Base prompt]          identity + role_protocol + capabilities
+                               + workspace + datetime + context_files
+        ---
+        [Role prompt]          user-provided extra_system_prompt (if any)
+        ---
+        [Shared folder info]   shared folder instructions (if enabled)
 
     Design philosophy:
     - Claude CLI already provides tool knowledge, safety, and error handling.
     - LangGraph graph controls execution loop, retry, and completion.
     - The system prompt only needs: Identity + Role Behavior + Context.
 
-    Sections removed (handled by infrastructure):
-    - tool_style: Claude CLI knows its own tools
-    - safety: Claude CLI has built-in safety
-    - context_efficiency: ContextWindowGuard handles budget
-    - execution_protocol: LangGraph graph controls the loop
-    - error_recovery: _resilient_invoke + Claude's natural debugging
-    - completion_signals: Only self-manager needs signals (in .md file)
-    - delegation: Merged into manager.md template
-    - status_reporting: Graph nodes track status
-    - safety_wrap: Claude CLI has its own guardrails
+    Sections handled by infrastructure (not included here):
+    - tool_style, safety, context_efficiency, execution_protocol,
+      error_recovery, completion_signals, delegation, status_reporting,
+      safety_wrap — all handled by Claude CLI, LangGraph, or role .md files.
 
     Args:
         agent_name: Display name for the agent.
@@ -543,12 +547,13 @@ def build_agent_prompt(
         working_dir: Working directory path.
         model: Model name.
         session_id: Session identifier.
-        session_name: Session display name — when set, the agent recognizes it as its own name.
+        session_name: Session display name — the agent recognizes it as its own name.
         tools: List of available tool names.
         mcp_servers: List of MCP server names.
         mode: Prompt detail level.
         context_files: Bootstrap file dict ``{filename: content}``.
-        extra_system_prompt: Additional system prompt appended at end.
+        extra_system_prompt: Role-specific prompt assigned by the user.
+        shared_folder_path: Relative path to the shared folder (e.g. ``_shared``).
 
     Returns:
         Assembled system prompt string.
@@ -586,13 +591,25 @@ def build_agent_prompt(
                 SectionLibrary.bootstrap_context(filename, content)
             )
 
-    # §7 Runtime metadata
-    builder.add_section(
-        SectionLibrary.runtime_line(model, session_id, role)
-    )
+    # -- Assemble base prompt --
+    base_prompt = builder.build()
 
-    # §8 Extra system prompt (user-provided)
-    if extra_system_prompt:
-        builder.add_extra_context(extra_system_prompt)
+    # -- Build final prompt with clear separators --
+    parts = [base_prompt]
 
-    return builder.build()
+    # Role prompt section (user-specified system prompt for this session)
+    if extra_system_prompt and extra_system_prompt.strip():
+        parts.append("---")
+        parts.append(extra_system_prompt.strip())
+
+    # Shared folder section
+    if shared_folder_path:
+        shared_section = (
+            "---\n"
+            f"Shared Folder: ./{shared_folder_path}/\n"
+            f"A shared directory accessible by ALL sessions. "
+            f"Use it to exchange files, data, and artifacts between sessions."
+        )
+        parts.append(shared_section)
+
+    return "\n\n".join(parts)
