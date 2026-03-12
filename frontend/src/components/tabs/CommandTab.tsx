@@ -60,8 +60,6 @@ export default function CommandTab() {
     );
   }
 
-  const isManager = session.role === 'manager';
-
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Session Header Bar */}
@@ -84,9 +82,7 @@ export default function CommandTab() {
                 <span
                   className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[10px] font-bold text-white uppercase tracking-wider"
                   style={{
-                    background: isManager
-                      ? 'linear-gradient(135deg, #8b5cf6, #6366f1)'
-                      : 'linear-gradient(135deg, #10b981, #059669)',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
                   }}
                 >
                   {session.role}

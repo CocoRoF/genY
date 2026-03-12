@@ -66,12 +66,18 @@ services:
     volumes:
       # ── Bind mount: 로컬 소스 ↔ 컨테이너 동기화 ──────────────────
       - ./backend:/app
-      # ── 컨테이너 전용 경로는 anonymous volume으로 보호 ────────────
+      # ── 호스트↔컨테이너 bytecode 충돌 방지 (anonymous volume) ────
       - /app/__pycache__
       - /app/.pytest_cache
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - geny-net-dev
 
@@ -96,7 +102,8 @@ services:
       - /app/node_modules
       - /app/.next
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - geny-net-dev
 
