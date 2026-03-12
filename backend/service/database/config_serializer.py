@@ -1,9 +1,9 @@
 """
-Config Serializer — 설정 값의 안전한 직렬화/역직렬화 유틸리티
+Config Serializer — Safe serialization/deserialization utility for config values
 
-JSON 이중 직렬화 문제 방지:
-- 이미 JSON 문자열인 값을 다시 직렬화하지 않음
-- 역직렬화 시 다중 이스케이프된 값을 안전하게 처리
+Prevents JSON double-serialization issues:
+- Does not re-serialize values that are already JSON strings
+- Safely handles multi-escaped values during deserialization
 """
 import json
 import logging
@@ -14,11 +14,11 @@ logger = logging.getLogger("config-serializer")
 
 def safe_serialize(value: Any, data_type: str = None) -> str:
     """
-    설정 값을 DB 저장용 문자열로 안전하게 직렬화
+    Safely serialize a config value to a string for DB storage.
 
-    JSON 이중 직렬화 방지:
-    - list/dict 타입만 JSON 직렬화
-    - 이미 JSON 문자열인 경우 재직렬화하지 않음
+    Prevents JSON double-serialization:
+    - Only JSON-serializes list/dict types
+    - Does not re-serialize values that are already JSON strings
     """
     if value is None:
         return ""
@@ -46,9 +46,9 @@ def safe_serialize(value: Any, data_type: str = None) -> str:
 
 def safe_deserialize(value: str, data_type: str = "string") -> Any:
     """
-    DB에서 읽은 문자열 값을 실제 타입으로 안전하게 역직렬화
+    Safely deserialize a string value from DB to the actual type.
 
-    다중 이스케이프된 JSON 문자열 처리 (최대 10번 반복)
+    Handles multi-escaped JSON strings (up to 10 iterations).
     """
     if value is None or value == "":
         return None
@@ -88,7 +88,7 @@ def safe_deserialize(value: str, data_type: str = "string") -> Any:
 
 
 def _is_json_string(value: str) -> bool:
-    """문자열이 유효한 JSON (list 또는 dict)인지 확인"""
+    """Check if a string is valid JSON (list or dict)."""
     if not isinstance(value, str):
         return False
     value = value.strip()
@@ -103,7 +103,7 @@ def _is_json_string(value: str) -> bool:
 
 
 def _safe_parse_json_list(value: str, max_depth: int = 10) -> list:
-    """다중 이스케이프된 JSON 리스트를 안전하게 파싱"""
+    """Safely parse a multi-escaped JSON list."""
     if not isinstance(value, str) or not value.strip():
         return []
 
@@ -140,7 +140,7 @@ def _safe_parse_json_list(value: str, max_depth: int = 10) -> list:
 
 
 def _safe_parse_json_dict(value: str, max_depth: int = 10) -> dict:
-    """다중 이스케이프된 JSON 딕셔너리를 안전하게 파싱"""
+    """Safely parse a multi-escaped JSON dictionary."""
     if not isinstance(value, str) or not value.strip():
         return {}
 
@@ -170,7 +170,7 @@ def _safe_parse_json_dict(value: str, max_depth: int = 10) -> dict:
 
 
 def normalize_config_value(value: Any, data_type: str = None) -> Any:
-    """설정 값을 정규화 (이미 잘못 저장된 값 복구)"""
+    """Normalize a config value (recover improperly stored values)."""
     if value is None:
         return None
 

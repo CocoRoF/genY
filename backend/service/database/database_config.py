@@ -1,7 +1,7 @@
 """
 Database Configuration Module
 
-환경변수 기반의 PostgreSQL 데이터베이스 설정을 관리합니다.
+Manages PostgreSQL database configuration based on environment variables.
 
 Usage:
     from service.database.database_config import database_config
@@ -15,7 +15,7 @@ from typing import Any
 
 
 class ConfigValue:
-    """설정 값을 .value 속성으로 접근할 수 있게 하는 래퍼 클래스"""
+    """Wrapper class that allows accessing configuration values via the .value property."""
 
     def __init__(self, value: Any):
         self._value = value
@@ -33,22 +33,22 @@ class ConfigValue:
 
 class DatabaseConfig:
     """
-    PostgreSQL 데이터베이스 설정 클래스
+    PostgreSQL Database Configuration Class
 
     Environment Variables:
-        - POSTGRES_HOST: PostgreSQL 호스트 (기본값: localhost)
-        - POSTGRES_PORT: PostgreSQL 포트 (기본값: 5432)
-        - POSTGRES_DB: 데이터베이스 이름 (기본값: geny)
-        - POSTGRES_USER: 데이터베이스 사용자 (기본값: geny)
-        - POSTGRES_PASSWORD: 데이터베이스 비밀번호 (기본값: geny123)
-        - AUTO_MIGRATION: 자동 마이그레이션 여부 (기본값: true)
+        - POSTGRES_HOST: PostgreSQL host (default: localhost)
+        - POSTGRES_PORT: PostgreSQL port (default: 5432)
+        - POSTGRES_DB: Database name (default: geny)
+        - POSTGRES_USER: Database user (default: geny)
+        - POSTGRES_PASSWORD: Database password (default: geny123)
+        - AUTO_MIGRATION: Enable auto migration (default: true)
     """
 
     def __init__(self):
         self._load_config()
 
     def _load_config(self) -> None:
-        """환경변수에서 설정을 로드합니다."""
+        """Load configuration from environment variables."""
         self.POSTGRES_HOST = ConfigValue(os.getenv("POSTGRES_HOST", "localhost"))
         self.POSTGRES_PORT = ConfigValue(os.getenv("POSTGRES_PORT", "5432"))
         self.POSTGRES_DB = ConfigValue(os.getenv("POSTGRES_DB", "geny"))
@@ -60,18 +60,18 @@ class DatabaseConfig:
         )
 
     def reload(self) -> None:
-        """환경변수에서 설정을 다시 로드합니다."""
+        """Reload configuration from environment variables."""
         self._load_config()
 
     def get_connection_string(self) -> str:
-        """PostgreSQL 연결 문자열을 반환합니다."""
+        """Return the PostgreSQL connection string."""
         return (
             f"postgresql://{self.POSTGRES_USER.value}:{self.POSTGRES_PASSWORD.value}"
             f"@{self.POSTGRES_HOST.value}:{self.POSTGRES_PORT.value}/{self.POSTGRES_DB.value}"
         )
 
     def get_connection_dict(self) -> dict:
-        """PostgreSQL 연결 정보를 딕셔너리로 반환합니다."""
+        """Return PostgreSQL connection info as a dictionary."""
         return {
             "host": self.POSTGRES_HOST.value,
             "port": self.POSTGRES_PORT.value,
@@ -91,16 +91,16 @@ class DatabaseConfig:
         )
 
 
-# 싱글톤 인스턴스
+# Singleton instance
 database_config = DatabaseConfig()
 
 
 def get_database_config() -> DatabaseConfig:
-    """데이터베이스 설정 인스턴스를 반환합니다."""
+    """Return the database configuration instance."""
     return database_config
 
 
 def reload_database_config() -> DatabaseConfig:
-    """환경변수에서 설정을 다시 로드하고 인스턴스를 반환합니다."""
+    """Reload configuration from environment variables and return the instance."""
     database_config.reload()
     return database_config

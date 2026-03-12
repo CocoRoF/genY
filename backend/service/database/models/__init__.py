@@ -1,11 +1,11 @@
 """
-모델 모듈 초기화
+Models Module Initialization
 
-모든 모델 클래스를 등록하고 APPLICATION_MODELS 리스트를 제공합니다.
-새 모델을 추가할 때는:
-1. models/ 에 새 파일을 생성
-2. 여기에 import + APPLICATION_MODELS에 추가
-→ 자동으로 테이블 생성 및 마이그레이션 대상이 됩니다.
+Registers all model classes and provides the APPLICATION_MODELS list.
+To add a new model:
+1. Create a new file in models/
+2. Import it here and add to APPLICATION_MODELS
+-> It will automatically become a target for table creation and migration.
 """
 from service.database.models.base_model import BaseModel
 from service.database.models.persistent_config import PersistentConfigModel
@@ -15,9 +15,9 @@ __all__ = [
     'PersistentConfigModel',
 ]
 
-# 애플리케이션에서 사용할 모델 목록
-# 여기에 등록된 모든 모델은 앱 시작 시 자동으로 테이블이 생성되고
-# 스키마 변경이 감지되면 ALTER TABLE로 마이그레이션됩니다.
+# List of models used by the application
+# All models registered here will automatically have their tables created at app startup
+# and will be migrated with ALTER TABLE when schema changes are detected.
 APPLICATION_MODELS = [
     PersistentConfigModel,
 ]

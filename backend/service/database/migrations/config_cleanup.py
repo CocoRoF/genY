@@ -1,8 +1,8 @@
 """
 Config Cleanup Migration
 
-DB에 잘못 저장된 다중 이스케이프된 설정 값들을 정리합니다.
-앱 시작 시 자동으로 실행됩니다.
+Cleans up multi-escaped config values that were incorrectly stored in DB.
+Automatically runs at app startup.
 """
 import json
 import logging
@@ -13,7 +13,7 @@ logger = logging.getLogger("config-cleanup")
 
 def cleanup_escaped_configs(db_manager) -> dict:
     """
-    DB에 저장된 다중 이스케이프된 설정 값들을 정리
+    Clean up multi-escaped config values stored in DB.
     """
     from service.database.config_serializer import safe_deserialize, safe_serialize
 
@@ -94,7 +94,7 @@ def cleanup_escaped_configs(db_manager) -> dict:
 
 
 def _needs_cleanup(value: str, data_type: str) -> bool:
-    """다중 이스케이프된 값인지 확인"""
+    """Check if a value is multi-escaped and needs cleanup."""
     if not isinstance(value, str):
         return False
 
@@ -130,7 +130,7 @@ def _needs_cleanup(value: str, data_type: str) -> bool:
 
 
 def run_cleanup_migration(db_manager) -> bool:
-    """앱 시작 시 자동으로 실행할 수 있는 마이그레이션 함수"""
+    """Migration function that can be automatically run at app startup."""
     try:
         logger.info("Running config cleanup migration...")
         result = cleanup_escaped_configs(db_manager)

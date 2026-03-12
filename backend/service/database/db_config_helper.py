@@ -1,8 +1,8 @@
 """
 DB Config Helper
 
-DB에서 설정을 읽고 쓰는 간단한 헬퍼 함수들.
-AppDatabaseManager 및 DatabaseManager 모두 지원합니다.
+Simple helper functions for reading and writing configuration from/to DB.
+Supports both AppDatabaseManager and DatabaseManager.
 """
 import logging
 from typing import Any, Optional, Dict, TYPE_CHECKING
@@ -17,7 +17,7 @@ logger = logging.getLogger("db-config-helper")
 
 
 def _get_db_manager(db_manager):
-    """db_manager에서 실제 DatabaseManager 인스턴스 추출"""
+    """Extract the actual DatabaseManager instance from db_manager."""
     if db_manager is None:
         return None
     if hasattr(db_manager, 'db_manager'):
@@ -26,7 +26,7 @@ def _get_db_manager(db_manager):
 
 
 def _is_db_available(db_manager) -> bool:
-    """DB 연결이 사용 가능한지 확인"""
+    """Check if the DB connection is available."""
     actual_manager = _get_db_manager(db_manager)
     if actual_manager is None:
         return False
@@ -36,7 +36,7 @@ def _is_db_available(db_manager) -> bool:
 
 
 def get_db_config(db_manager, config_name: str, config_key: str) -> Optional[Any]:
-    """DB에서 설정 값 조회"""
+    """Get a config value from DB."""
     actual_manager = _get_db_manager(db_manager)
     if not _is_db_available(db_manager):
         return None
@@ -62,7 +62,7 @@ def get_db_config(db_manager, config_name: str, config_key: str) -> Optional[Any
 def set_db_config(db_manager, config_name: str, config_key: str,
                   config_value: Any, config_type: str = "string",
                   category: Optional[str] = None) -> bool:
-    """DB에 설정 값 저장 (UPSERT)"""
+    """Save a config value to DB (UPSERT)."""
     actual_manager = _get_db_manager(db_manager)
     if not _is_db_available(db_manager):
         return False
@@ -71,7 +71,9 @@ def set_db_config(db_manager, config_name: str, config_key: str,
         value_str = safe_serialize(config_value, config_type)
         category = category or ""
 
-        query = """
+        # UPSERT via ON CONFLICT — persistent_configs table
+        # requires UNIQUE (config_name, config_key) constraint
+        upsert_query = """
             INSERT INTO persistent_configs (config_name, config_key, config_value, data_type, category)
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (config_name, config_key)
@@ -80,34 +82,11 @@ def set_db_config(db_manager, config_name: str, config_key: str,
                 data_type = EXCLUDED.data_type,
                 category = EXCLUDED.category,
                 updated_at = CURRENT_TIMESTAMP
+            RETURNING id
         """
-        # Note: requires a UNIQUE constraint on (config_name, config_key)
-        # We handle this via a two-step check instead for safety
-        check_query = """
-            SELECT id FROM persistent_configs
-            WHERE config_name = %s AND config_key = %s
-            LIMIT 1
-        """
-        existing = actual_manager.execute_query_one(check_query, (config_name, config_key))
-
-        if existing:
-            update_query = """
-                UPDATE persistent_configs
-                SET config_value = %s, data_type = %s, category = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE config_name = %s AND config_key = %s
-            """
-            actual_manager.execute_update_delete(
-                update_query, (value_str, config_type, category, config_name, config_key)
-            )
-        else:
-            insert_query = """
-                INSERT INTO persistent_configs (config_name, config_key, config_value, data_type, category)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id
-            """
-            actual_manager.execute_insert(
-                insert_query, (config_name, config_key, value_str, config_type, category)
-            )
+        actual_manager.execute_insert(
+            upsert_query, (config_name, config_key, value_str, config_type, category)
+        )
 
         logger.debug(f"Saved config to DB: {config_name}.{config_key}")
         return True
@@ -118,7 +97,7 @@ def set_db_config(db_manager, config_name: str, config_key: str,
 
 def get_all_db_configs(db_manager) -> Dict[str, Dict[str, Any]]:
     """
-    DB에서 모든 설정 조회
+    Get all configs from DB.
 
     Returns:
         {config_name: {config_key: config_value, ...}, ...}
@@ -152,7 +131,7 @@ def get_all_db_configs(db_manager) -> Dict[str, Dict[str, Any]]:
 
 def get_config_group(db_manager, config_name: str) -> Dict[str, Any]:
     """
-    특정 config_name의 모든 키-값 조회
+    Get all key-value pairs for a specific config_name.
 
     Returns:
         {config_key: config_value, ...}
@@ -185,7 +164,7 @@ def get_config_group(db_manager, config_name: str) -> Dict[str, Any]:
 
 
 def delete_config_group(db_manager, config_name: str) -> bool:
-    """특정 config_name의 모든 레코드 삭제"""
+    """Delete all records for a specific config_name."""
     actual_manager = _get_db_manager(db_manager)
     if not _is_db_available(db_manager):
         return False
@@ -201,7 +180,7 @@ def delete_config_group(db_manager, config_name: str) -> bool:
 
 def save_config_group(db_manager, config_name: str, data: Dict[str, Any],
                       category: str = "general") -> bool:
-    """config_name에 해당하는 모든 키-값을 일괄 저장"""
+    """Batch save all key-value pairs for a config_name."""
     try:
         for key, value in data.items():
             data_type = _infer_data_type(value)
@@ -214,7 +193,7 @@ def save_config_group(db_manager, config_name: str, data: Dict[str, Any],
 
 
 def _infer_data_type(value: Any) -> str:
-    """값에서 데이터 타입 추론"""
+    """Infer data type from value."""
     if isinstance(value, bool):
         return "bool"
     elif isinstance(value, int):

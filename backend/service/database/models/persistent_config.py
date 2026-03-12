@@ -1,15 +1,15 @@
 """
-Persistent Config 모델 — 설정 저장을 위한 데이터베이스 모델
+Persistent Config Model — Database model for storing configuration
 
-모든 GenY 설정(api, github, language, limits, ...)이
-이 테이블의 레코드로 관리됩니다.
+All GenY settings (api, github, language, limits, ...)
+are managed as records in this table.
 """
 from typing import Dict, Any
 from service.database.models.base_model import BaseModel
 
 
 class PersistentConfigModel(BaseModel):
-    """설정 데이터를 저장하기 위한 모델"""
+    """Model for storing configuration data."""
 
     def __init__(self, config_name: str = "", config_key: str = "",
                  config_value: str = "", data_type: str = "string",
@@ -32,6 +32,19 @@ class PersistentConfigModel(BaseModel):
             'data_type': "VARCHAR(50) DEFAULT 'string'",
             'category': 'VARCHAR(100)',
         }
+
+    @classmethod
+    def get_create_table_query(cls, db_type: str = "postgresql") -> str:
+        """Generate CREATE TABLE query — includes UNIQUE constraint."""
+        base_query = super().get_create_table_query(db_type)
+        # Add UNIQUE constraint (required for ON CONFLICT UPSERT)
+        # Insert UNIQUE constraint before the closing parenthesis
+        constraint = ",\n            UNIQUE (config_name, config_key)"
+        # Insert before last ')'
+        idx = base_query.rfind(')')
+        if idx != -1:
+            return base_query[:idx] + constraint + base_query[idx:]
+        return base_query
 
     def get_indexes(self) -> list:
         return [

@@ -1,10 +1,10 @@
 """
-기본 데이터 모델 클래스
+Base Data Model Class
 
-모든 데이터베이스 모델의 부모 클래스.
-get_table_name()과 get_schema()를 정의하면
-자동으로 CREATE TABLE / INSERT / UPDATE 쿼리가 생성되며,
-스키마 변경 시 자동 마이그레이션(ALTER TABLE ADD COLUMN)이 수행됩니다.
+Parent class for all database models.
+Define get_table_name() and get_schema() to
+automatically generate CREATE TABLE / INSERT / UPDATE queries,
+and auto migration (ALTER TABLE ADD COLUMN) on schema changes.
 """
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -16,34 +16,34 @@ from zoneinfo import ZoneInfo
 
 logger = logging.getLogger("database-base-model")
 
-# 환경변수에서 타임존 가져오기
+# Get timezone from environment variable
 TIMEZONE = ZoneInfo(os.getenv('TIMEZONE', 'Asia/Seoul'))
 
 
 class BaseModel(ABC):
-    """모든 데이터 모델의 기본 클래스"""
+    """Base class for all data models."""
 
     def __init__(self, **kwargs):
         self.id: Optional[int] = kwargs.get('id')
         self.created_at: Optional[datetime] = kwargs.get('created_at')
         self.updated_at: Optional[datetime] = kwargs.get('updated_at')
 
-        # 추가 필드들을 동적으로 설정
+        # Set additional fields dynamically
         for key, value in kwargs.items():
             if not hasattr(self, key):
                 setattr(self, key, value)
 
     @abstractmethod
     def get_table_name(self) -> str:
-        """테이블 이름 반환"""
+        """Return the table name."""
         pass
 
     @abstractmethod
     def get_schema(self) -> Dict[str, str]:
         """
-        테이블 스키마 반환 (컬럼명: 타입)
+        Return the table schema (column_name: type).
 
-        예시:
+        Example:
             {
                 'name': 'VARCHAR(255) NOT NULL',
                 'config_value': 'TEXT',
@@ -54,20 +54,20 @@ class BaseModel(ABC):
 
     def get_indexes(self) -> List[tuple]:
         """
-        테이블 인덱스 정의. 서브클래스에서 오버라이드하여 사용.
+        Define table indexes. Override in subclass.
 
         Returns:
-            [("인덱스명", "컬럼1, 컬럼2 DESC"), ...]
+            [("index_name", "column1, column2 DESC"), ...]
         """
         return []
 
     @classmethod
     def now(cls) -> datetime:
-        """현재 시간을 설정된 타임존으로 반환"""
+        """Return current time in the configured timezone."""
         return datetime.now(TIMEZONE)
 
     def to_dict(self) -> Dict[str, Any]:
-        """객체를 딕셔너리로 변환"""
+        """Convert object to dictionary."""
         result = {}
         for key, value in self.__dict__.items():
             if isinstance(value, datetime):
@@ -80,7 +80,7 @@ class BaseModel(ABC):
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
-        """딕셔너리에서 객체 생성"""
+        """Create object from dictionary."""
         tz = TIMEZONE
 
         for field in ("created_at", "updated_at"):
@@ -95,9 +95,9 @@ class BaseModel(ABC):
         return cls(**data)
 
     def get_insert_query(self, db_type: str = "postgresql") -> tuple:
-        """INSERT 쿼리 생성"""
+        """Generate INSERT query."""
         data = self.to_dict()
-        # id와 타임스탬프 제외 (자동 생성)
+        # Exclude id and timestamps (auto-generated)
         data.pop('id', None)
         data.pop('created_at', None)
         data.pop('updated_at', None)
@@ -116,7 +116,7 @@ class BaseModel(ABC):
         return query.strip(), values
 
     def get_update_query(self, db_type: str = "postgresql") -> tuple:
-        """UPDATE 쿼리 생성"""
+        """Generate UPDATE query."""
         if not self.id:
             raise ValueError("Cannot update record without ID")
 
@@ -144,7 +144,7 @@ class BaseModel(ABC):
 
     @classmethod
     def get_create_table_query(cls, db_type: str = "postgresql") -> str:
-        """CREATE TABLE 쿼리 생성"""
+        """Generate CREATE TABLE query."""
         instance = cls()
         schema = instance.get_schema()
 

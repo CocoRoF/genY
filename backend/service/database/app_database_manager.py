@@ -1,16 +1,16 @@
 """
-psycopg3 기반 AppDatabaseManager
+psycopg3-based AppDatabaseManager
 
-고수준 ORM-like 인터페이스를 제공하며,
-내부적으로 DatabaseManager의 커넥션 풀을 사용합니다.
+Provides a high-level ORM-like interface,
+internally using DatabaseManager's connection pool.
 
-주요 기능:
-1. 모델 기반 CRUD: insert(model), update(model), delete(model_class, id), find_by_id, find_all, find_by_condition
-2. 테이블 이름 기반 CRUD: insert_record, update_record, delete_record, find_records, find_records_by_condition
-3. 자동 테이블 생성: register_models → create_tables
-4. 자동 마이그레이션: run_migrations → 스키마 diff + ALTER TABLE ADD COLUMN
-5. 쿼리 연산자: __like__, __not__, __gte__, __lte__, __gt__, __lt__, __in__, __notin__
-6. 자동 복구: 모든 CRUD 작업에 retry + auto-recovery 포함
+Key features:
+1. Model-based CRUD: insert(model), update(model), delete(model_class, id), find_by_id, find_all, find_by_condition
+2. Table-name-based CRUD: insert_record, update_record, delete_record, find_records, find_records_by_condition
+3. Auto table creation: register_models -> create_tables
+4. Auto migration: run_migrations -> schema diff + ALTER TABLE ADD COLUMN
+5. Query operators: __like__, __not__, __gte__, __lte__, __gt__, __lt__, __in__, __notin__
+6. Auto recovery: all CRUD operations include retry + auto-recovery
 """
 import logging
 import json
@@ -30,16 +30,18 @@ class AppDatabaseManager:
     """
     Application Database Manager
 
-    모델 기반 + 테이블 이름 기반 듀얼 인터페이스를 제공하며,
-    연결 실패 시 자동 복구 + 재시도를 수행합니다.
+    Provides model-based + table-name-based dual interfaces,
+    with automatic recovery + retry on connection failures.
     """
 
     def __init__(self, database_config=None):
+        # If database_config is None, DatabaseManager internally uses the singleton
         self.db_manager = DatabaseManager(database_config)
+        self.db_config = self.db_manager.config
         self.logger = logger
         self._models_registry: List[Type[BaseModel]] = []
 
-        # 복구 및 재시도 설정
+        # Recovery and retry settings
         self._max_retries = 3
         self._retry_delay = 1.0
         self._retry_backoff = 2.0
@@ -52,7 +54,7 @@ class AppDatabaseManager:
     # ============================================================
 
     def _serialize_value(self, value: Any) -> Any:
-        """dict/list 타입을 JSON 문자열로 변환"""
+        """Convert dict/list types to JSON strings."""
         if isinstance(value, dict):
             return json.dumps(value, ensure_ascii=False, default=str)
         elif isinstance(value, list):
@@ -62,7 +64,7 @@ class AppDatabaseManager:
         return value
 
     def _serialize_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """데이터 딕셔너리의 모든 값을 직렬화"""
+        """Serialize all values in a data dictionary."""
         return {k: self._serialize_value(v) for k, v in data.items()}
 
     # ============================================================
@@ -70,7 +72,7 @@ class AppDatabaseManager:
     # ============================================================
 
     def _ensure_connection(self) -> bool:
-        """연결 상태 확인 및 필요시 복구"""
+        """Check connection status and recover if necessary."""
         current_time = time.time()
         if current_time - self._last_health_check < self._health_check_interval:
             return True
@@ -85,7 +87,7 @@ class AppDatabaseManager:
             return self.reconnect()
 
     def _with_auto_recovery(self, operation: Callable[[], T], operation_name: str = "operation") -> T:
-        """자동 복구가 포함된 작업 실행 래퍼"""
+        """Execution wrapper with automatic recovery."""
         last_exception = None
         current_delay = self._retry_delay
 
@@ -115,7 +117,7 @@ class AppDatabaseManager:
         raise last_exception
 
     def check_health(self) -> bool:
-        """데이터베이스 연결 상태 확인"""
+        """Check database connection status."""
         try:
             return self.db_manager.health_check(auto_recover=self._auto_recover)
         except Exception as e:
@@ -123,7 +125,7 @@ class AppDatabaseManager:
             return False
 
     def reconnect(self) -> bool:
-        """데이터베이스 재연결"""
+        """Reconnect to database."""
         try:
             self.logger.info("Attempting database reconnection...")
             if self.db_manager.reconnect():
@@ -138,11 +140,11 @@ class AppDatabaseManager:
             return False
 
     def get_pool_stats(self) -> Dict[str, Any]:
-        """커넥션 풀 상태 통계 반환"""
+        """Return connection pool status statistics."""
         return self.db_manager.get_pool_stats()
 
     def check_and_refresh_pool(self) -> bool:
-        """풀 상태 확인 및 필요시 리프레시"""
+        """Check pool status and refresh if necessary."""
         return self.db_manager.check_and_refresh_pool()
 
     # ============================================================
@@ -150,18 +152,18 @@ class AppDatabaseManager:
     # ============================================================
 
     def register_model(self, model_class: Type[BaseModel]):
-        """모델 클래스를 등록"""
+        """Register a model class."""
         if model_class not in self._models_registry:
             self._models_registry.append(model_class)
             self.logger.info("Registered model: %s", model_class.__name__)
 
     def register_models(self, model_classes: List[Type[BaseModel]]):
-        """여러 모델 클래스를 한 번에 등록"""
+        """Register multiple model classes at once."""
         for model_class in model_classes:
             self.register_model(model_class)
 
     def initialize_database(self, create_tables: bool = True) -> bool:
-        """데이터베이스 연결 및 테이블 생성"""
+        """Connect to database and create tables + auto migration."""
         last_error = None
 
         for attempt in range(self._max_retries + 1):
@@ -173,7 +175,17 @@ class AppDatabaseManager:
                 self._last_health_check = time.time()
 
                 if create_tables:
-                    return self.create_tables()
+                    if not self.create_tables():
+                        raise RuntimeError("Failed to create tables")
+
+                # Run auto migration (schema diff -> ALTER TABLE ADD COLUMN)
+                if self.db_config and hasattr(self.db_config, 'AUTO_MIGRATION'):
+                    auto_migrate = self.db_config.AUTO_MIGRATION
+                    if hasattr(auto_migrate, 'value'):
+                        auto_migrate = auto_migrate.value
+                    if auto_migrate:
+                        self.run_migrations()
+
                 return True
             except Exception as e:
                 last_error = e
@@ -192,11 +204,11 @@ class AppDatabaseManager:
         return False
 
     def initialize_connection(self) -> bool:
-        """데이터베이스 연결만 수행 (테이블 생성 없이)"""
+        """Connect to database only (without table creation)."""
         return self.initialize_database(create_tables=False)
 
     def create_tables(self) -> bool:
-        """등록된 모든 모델의 테이블 생성"""
+        """Create tables for all registered models."""
         try:
             db_type = self.db_manager.db_type
 
@@ -208,7 +220,7 @@ class AppDatabaseManager:
                 self.logger.info("Creating table: %s", table_name)
                 self.db_manager.execute_query(create_query)
 
-                # 모델에 정의된 인덱스 자동 생성
+                # Auto-create indexes defined in the model
                 for idx_name, columns in instance.get_indexes():
                     try:
                         idx_query = f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}({columns})"
@@ -217,18 +229,47 @@ class AppDatabaseManager:
                     except Exception as e:
                         self.logger.warning("Failed to create index %s for %s: %s", idx_name, table_name, e)
 
+            # Add UNIQUE constraint to persistent_configs table if not present
+            self._ensure_unique_constraint("persistent_configs", "config_name", "config_key")
+
             self.logger.info("All application tables created successfully")
             return True
         except Exception as e:
             self.logger.error("Failed to create application tables: %s", e)
             return False
 
+    def _ensure_unique_constraint(self, table_name: str, *columns: str) -> None:
+        """Add UNIQUE constraint to table if not present (backward compatible with existing tables)."""
+        try:
+            col_csv = ", ".join(columns)
+            constraint_name = f"uq_{table_name}_{'_'.join(columns)}"
+
+            # Check if constraint exists
+            check_query = """
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE table_name = %s AND constraint_type = 'UNIQUE'
+                LIMIT 1
+            """
+            existing = self.db_manager.execute_query_one(check_query, (table_name,))
+            if existing:
+                return
+
+            alter_query = f"""
+                ALTER TABLE {table_name}
+                ADD CONSTRAINT {constraint_name} UNIQUE ({col_csv})
+            """
+            self.db_manager.execute_query(alter_query)
+            self.logger.info("Added UNIQUE constraint %s on %s(%s)", constraint_name, table_name, col_csv)
+        except Exception as e:
+            # Ignore if already exists or has duplicate data
+            self.logger.debug("UNIQUE constraint check for %s: %s", table_name, e)
+
     # ============================================================
     #  Model-based CRUD
     # ============================================================
 
     def insert(self, model: BaseModel) -> Optional[Dict]:
-        """모델 인스턴스를 데이터베이스에 삽입"""
+        """Insert a model instance into the database."""
         def _do_insert():
             db_type = self.db_manager.db_type
             query, values = model.get_insert_query(db_type)
@@ -248,7 +289,7 @@ class AppDatabaseManager:
             return None
 
     def update(self, model: BaseModel) -> bool:
-        """모델 인스턴스를 데이터베이스에서 업데이트"""
+        """Update a model instance in the database."""
         def _do_update():
             db_type = self.db_manager.db_type
             query, values = model.get_update_query(db_type)
@@ -263,43 +304,32 @@ class AppDatabaseManager:
 
     def update_config(self, config_name: str, config_key: str, config_value: Any,
                       data_type: str = "string", category: str = None) -> bool:
-        """설정 값 업데이트 (UPSERT)"""
+        """Update config value (UPSERT via ON CONFLICT)."""
         try:
             table_name = "persistent_configs"
-            check_query = f"SELECT id FROM {table_name} WHERE config_name = %s AND config_key = %s"
-            existing = self.db_manager.execute_query_one(check_query, (config_name, config_key))
-
             value_str = safe_serialize(config_value, data_type)
 
-            if existing:
-                update_query = f"""
-                    UPDATE {table_name}
-                    SET config_value = %s,
-                        data_type = %s,
-                        category = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE config_name = %s AND config_key = %s
-                """
-                affected_rows = self.db_manager.execute_update_delete(
-                    update_query, (value_str, data_type, category, config_name, config_key)
-                )
-                return affected_rows is not None and affected_rows > 0
-            else:
-                insert_query = f"""
-                    INSERT INTO {table_name} (config_name, config_key, config_value, data_type, category)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id
-                """
-                insert_id = self.db_manager.execute_insert(
-                    insert_query, (config_name, config_key, value_str, data_type, category)
-                )
-                return insert_id is not None
+            upsert_query = f"""
+                INSERT INTO {table_name} (config_name, config_key, config_value, data_type, category)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (config_name, config_key)
+                DO UPDATE SET
+                    config_value = EXCLUDED.config_value,
+                    data_type = EXCLUDED.data_type,
+                    category = EXCLUDED.category,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id
+            """
+            result = self.db_manager.execute_insert(
+                upsert_query, (config_name, config_key, value_str, data_type, category or "")
+            )
+            return result is not None
         except Exception as e:
             self.logger.error("Failed to update config in DB: %s.%s - %s", config_name, config_key, e)
             return False
 
     def delete(self, model_class: Type[BaseModel], record_id: int) -> bool:
-        """ID로 레코드 삭제"""
+        """Delete a record by ID."""
         try:
             table_name = model_class().get_table_name()
             query = f"DELETE FROM {table_name} WHERE id = %s"
@@ -310,7 +340,7 @@ class AppDatabaseManager:
             return False
 
     def delete_by_condition(self, model_class: Type[BaseModel], conditions: Dict[str, Any]) -> bool:
-        """조건으로 레코드 삭제"""
+        """Delete records by condition."""
         try:
             table_name = model_class().get_table_name()
             where_clauses = []
@@ -334,7 +364,7 @@ class AppDatabaseManager:
     def find_by_id(self, model_class: Type[BaseModel], record_id: int,
                    select_columns: List[str] = None,
                    ignore_columns: List[str] = None) -> Optional[BaseModel]:
-        """ID로 레코드 조회"""
+        """Find a record by ID."""
         try:
             table_name = model_class().get_table_name()
 
@@ -360,7 +390,7 @@ class AppDatabaseManager:
     def find_all(self, model_class: Type[BaseModel], limit: int = 500, offset: int = 0,
                  select_columns: List[str] = None,
                  ignore_columns: List[str] = None) -> List[BaseModel]:
-        """모든 레코드 조회 (페이징 지원)"""
+        """Find all records (with pagination)."""
         try:
             table_name = model_class().get_table_name()
 
@@ -389,7 +419,7 @@ class AppDatabaseManager:
                           return_list: bool = False,
                           select_columns: List[str] = None,
                           ignore_columns: List[str] = None) -> list:
-        """조건으로 레코드 조회"""
+        """Find records by condition."""
         def _do_find():
             table_name = model_class().get_table_name()
 
@@ -430,7 +460,7 @@ class AppDatabaseManager:
 
     def _build_where_clause(self, key: str, value: Any, where_clauses: List[str],
                             values: List[Any]):
-        """WHERE 절 조건 빌드 헬퍼"""
+        """WHERE clause condition builder helper."""
         placeholder = "%s"
 
         if key.endswith("__like__"):
@@ -480,7 +510,7 @@ class AppDatabaseManager:
     def update_list_columns(self, model_class: Type[BaseModel],
                             updates: Dict[str, Any],
                             conditions: Dict[str, Any]) -> bool:
-        """리스트 컬럼을 포함한 모델 업데이트"""
+        """Update model with list columns."""
         try:
             table_name = model_class().get_table_name()
 
@@ -516,12 +546,12 @@ class AppDatabaseManager:
     # ============================================================
 
     def close(self):
-        """데이터베이스 연결 종료"""
+        """Close database connection."""
         self.db_manager.disconnect()
         self.logger.info("Application database connection closed")
 
     def run_migrations(self) -> bool:
-        """데이터베이스 스키마 마이그레이션 실행"""
+        """Run database schema migrations."""
         try:
             return self.db_manager.run_migrations(self._models_registry)
         except Exception as e:
@@ -533,7 +563,7 @@ class AppDatabaseManager:
     # ============================================================
 
     def get_table_list(self) -> List[Dict[str, Any]]:
-        """데이터베이스의 모든 테이블 목록 조회"""
+        """Get list of all tables in the database."""
         try:
             query = """
                 SELECT table_name, table_type
@@ -548,7 +578,7 @@ class AppDatabaseManager:
             return []
 
     def get_table_schema(self, table_name: str) -> List[Dict[str, Any]]:
-        """테이블 스키마 조회"""
+        """Get table schema."""
         try:
             query = """
                 SELECT column_name, data_type, is_nullable, column_default
@@ -563,7 +593,7 @@ class AppDatabaseManager:
             return []
 
     def execute_raw_query(self, query: str, params: tuple = None) -> Dict[str, Any]:
-        """임의의 SQL 쿼리 실행"""
+        """Execute an arbitrary SQL query."""
         def _do_execute():
             query_stripped = query.strip().rstrip(';')
             results = self.db_manager.execute_query(query_stripped, params)
@@ -592,7 +622,7 @@ class AppDatabaseManager:
     # ============================================================
 
     def insert_record(self, table_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """테이블 이름 기반 레코드 삽입"""
+        """Insert record by table name."""
         def _do_insert():
             serialized_data = self._serialize_data(data)
             columns = list(serialized_data.keys())
@@ -609,7 +639,7 @@ class AppDatabaseManager:
             return {"success": False, "id": None, "error": str(e)}
 
     def update_record(self, table_name: str, data: Dict[str, Any], record_id: int) -> Dict[str, Any]:
-        """테이블 이름 기반 레코드 업데이트 (ID 기반)"""
+        """Update record by table name (ID-based)."""
         def _do_update():
             serialized_data = self._serialize_data(data)
             set_clause = ", ".join([f"{k} = %s" for k in serialized_data.keys()])
@@ -626,7 +656,7 @@ class AppDatabaseManager:
 
     def update_records_by_condition(self, table_name: str, updates: Dict[str, Any],
                                     conditions: Dict[str, Any]) -> Dict[str, Any]:
-        """테이블 이름 기반 조건부 레코드 업데이트"""
+        """Update records by table name with conditions."""
         def _do_update():
             serialized_updates = self._serialize_data(updates)
             set_clause = ", ".join([f"{k} = %s" for k in serialized_updates.keys()])
@@ -649,7 +679,7 @@ class AppDatabaseManager:
             return {"success": False, "affected_rows": 0, "error": str(e)}
 
     def delete_record(self, table_name: str, record_id: int) -> Dict[str, Any]:
-        """테이블 이름 기반 레코드 삭제 (ID 기반)"""
+        """Delete record by table name (ID-based)."""
         def _do_delete():
             query = f"DELETE FROM {table_name} WHERE id = %s"
             affected_rows = self.db_manager.execute_update_delete(query, (record_id,))
@@ -662,7 +692,7 @@ class AppDatabaseManager:
             return {"success": False, "affected_rows": 0, "error": str(e)}
 
     def delete_records_by_condition(self, table_name: str, conditions: Dict[str, Any]) -> Dict[str, Any]:
-        """테이블 이름 기반 조건부 레코드 삭제"""
+        """Delete records by table name with conditions."""
         def _do_delete():
             where_clauses = []
             values = []
@@ -682,7 +712,7 @@ class AppDatabaseManager:
 
     def find_record_by_id(self, table_name: str, record_id: int,
                           select_columns: List[str] = None) -> Dict[str, Any]:
-        """테이블 이름 기반 ID로 레코드 조회"""
+        """Find record by table name and ID."""
         def _do_find():
             columns_str = ", ".join(select_columns) if select_columns else "*"
             query = f"SELECT {columns_str} FROM {table_name} WHERE id = %s"
@@ -699,7 +729,7 @@ class AppDatabaseManager:
                      select_columns: List[str] = None,
                      orderby: str = "id",
                      orderby_asc: bool = False) -> Dict[str, Any]:
-        """테이블 이름 기반 전체 레코드 조회"""
+        """Find all records by table name."""
         def _do_find():
             columns_str = ", ".join(select_columns) if select_columns else "*"
             orderby_type = "ASC" if orderby_asc else "DESC"
@@ -720,7 +750,7 @@ class AppDatabaseManager:
                                   orderby: str = "id",
                                   orderby_asc: bool = False,
                                   select_columns: List[str] = None) -> Dict[str, Any]:
-        """테이블 이름 기반 조건부 레코드 조회"""
+        """Find records by table name with conditions."""
         def _do_find():
             columns_str = ", ".join(select_columns) if select_columns else "*"
             orderby_type = "ASC" if orderby_asc else "DESC"

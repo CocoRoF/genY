@@ -1,14 +1,14 @@
 """
-psycopg3 기반 데이터베이스 연결 및 커넥션 풀 관리
+psycopg3-based database connection and connection pool management
 
-주요 기능:
-- ConnectionPool을 사용한 커넥션 풀 관리
-- 자동 idle 커넥션 정리 (max_idle)
-- 커넥션 수명 관리 (max_lifetime)
-- 죽은 커넥션 자동 감지 및 폐기 (check callback)
-- 자동 재연결 (reconnect_timeout)
-- 재시도 데코레이터 (exponential backoff)
-- 스키마 마이그레이션 (ALTER TABLE ADD COLUMN)
+Key features:
+- Connection pool management using ConnectionPool
+- Automatic idle connection cleanup (max_idle)
+- Connection lifetime management (max_lifetime)
+- Dead connection detection and disposal (check callback)
+- Automatic reconnection (reconnect_timeout)
+- Retry decorator (exponential backoff)
+- Schema migration (ALTER TABLE ADD COLUMN)
 """
 import os
 import logging
@@ -36,7 +36,7 @@ def with_retry(max_retries: int = DEFAULT_MAX_RETRIES,
                backoff: float = DEFAULT_RETRY_BACKOFF,
                exceptions: tuple = None):
     """
-    재시도 데코레이터 — 연결 관련 예외 발생 시 exponential backoff로 재시도
+    Retry decorator — retries with exponential backoff on connection-related exceptions
     """
     if exceptions is None:
         # lazy import to handle when psycopg is not yet installed
@@ -79,14 +79,14 @@ def with_retry(max_retries: int = DEFAULT_MAX_RETRIES,
 
 class DatabaseManager:
     """
-    psycopg3 기반 데이터베이스 연결 및 커넥션 풀 관리
+    psycopg3-based database connection and connection pool management
 
-    커넥션 풀 핵심 파라미터:
-    - min_size / max_size: 풀 크기 범위
-    - max_idle: 미사용 커넥션 유지 시간 (초)
-    - max_lifetime: 커넥션 최대 수명 (초)
-    - reconnect_timeout: 재연결 시도 최대 시간 (초)
-    - timeout: 커넥션 획득 대기 시간 (초)
+    Connection pool key parameters:
+    - min_size / max_size: Pool size range
+    - max_idle: Idle connection retention time (seconds)
+    - max_lifetime: Maximum connection lifetime (seconds)
+    - reconnect_timeout: Maximum reconnection attempt time (seconds)
+    - timeout: Connection acquisition wait time (seconds)
     """
 
     DEFAULT_MIN_SIZE = int(os.getenv('DB_POOL_MIN_SIZE', '2'))
@@ -106,6 +106,10 @@ class DatabaseManager:
         reconnect_timeout: float = None,
         timeout: float = None
     ):
+        # If database_config is None, automatically use the singleton instance
+        if database_config is None:
+            from service.database.database_config import database_config as _default_config
+            database_config = _default_config
         self.config = database_config
         self.db_type = "postgresql"
         self.logger = logger
@@ -139,7 +143,7 @@ class DatabaseManager:
         self._health_check_interval = float(os.getenv('DB_HEALTH_CHECK_INTERVAL', '30'))
 
     def _build_conninfo(self) -> str:
-        """PostgreSQL 연결 문자열 생성"""
+        """Build PostgreSQL connection string."""
         host = self.config.POSTGRES_HOST.value
         port = self.config.POSTGRES_PORT.value
         database = self.config.POSTGRES_DB.value
@@ -148,7 +152,7 @@ class DatabaseManager:
         return f"host={host} port={port} dbname={database} user={user} password={password}"
 
     def _configure_connection(self, conn) -> None:
-        """커넥션 초기 설정 콜백"""
+        """Connection initialization callback."""
         import psycopg
         try:
             timezone_str = str(TIMEZONE)
@@ -167,7 +171,7 @@ class DatabaseManager:
             raise
 
     def _check_connection(self, conn) -> None:
-        """커넥션 유효성 체크 콜백"""
+        """Connection validity check callback."""
         import psycopg
         try:
             with conn.cursor() as cur:
@@ -182,7 +186,7 @@ class DatabaseManager:
             raise
 
     def _reset_connection(self, conn) -> None:
-        """커넥션 리셋 콜백"""
+        """Connection reset callback."""
         import psycopg
         try:
             if conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
@@ -192,7 +196,7 @@ class DatabaseManager:
             raise
 
     def _on_reconnect_failed(self, pool) -> None:
-        """재연결 실패 콜백"""
+        """Reconnection failure callback."""
         self._stats['reconnect_attempts'] += 1
         self.logger.error(
             f"Pool failed to reconnect after {self.reconnect_timeout} seconds. "
@@ -200,7 +204,7 @@ class DatabaseManager:
         )
 
     def connect(self) -> bool:
-        """데이터베이스 연결 (커넥션 풀 초기화)"""
+        """Connect to database (initialize connection pool)."""
         try:
             return self._connect_postgresql_pool()
         except Exception as e:
@@ -209,7 +213,7 @@ class DatabaseManager:
             return False
 
     def _connect_postgresql_pool(self) -> bool:
-        """PostgreSQL ConnectionPool 생성 및 초기화"""
+        """Create and initialize PostgreSQL ConnectionPool."""
         from psycopg.rows import dict_row
         from psycopg_pool import ConnectionPool
 
@@ -257,7 +261,7 @@ class DatabaseManager:
             return False
 
     def reconnect(self) -> bool:
-        """데이터베이스 재연결"""
+        """Reconnect to database."""
         try:
             self.logger.info("Attempting database reconnection...")
             self._stats['reconnect_attempts'] += 1
@@ -274,7 +278,7 @@ class DatabaseManager:
             return False
 
     def health_check(self, auto_recover: bool = True) -> bool:
-        """데이터베이스 연결 상태 확인"""
+        """Check database connection status."""
         try:
             if not self._is_pool_healthy():
                 if auto_recover:
@@ -304,7 +308,7 @@ class DatabaseManager:
             return False
 
     def _is_pool_healthy(self) -> bool:
-        """풀이 정상 상태인지 확인"""
+        """Check if the pool is in a healthy state."""
         if not self._pool:
             return False
         try:
@@ -318,14 +322,14 @@ class DatabaseManager:
             return False
 
     def _ensure_pool_healthy(self) -> bool:
-        """풀이 정상 상태인지 확인하고 필요시 복구"""
+        """Check if the pool is healthy and recover if necessary."""
         if self._is_pool_healthy():
             return True
         self.logger.warning("Pool is not healthy, attempting recovery...")
         return self._try_recover_connection()
 
     def _try_recover_connection(self) -> bool:
-        """연결 복구 시도"""
+        """Attempt connection recovery."""
         with self._recovery_lock:
             if self._recovering:
                 time.sleep(0.5)
@@ -359,7 +363,7 @@ class DatabaseManager:
 
     @contextmanager
     def get_connection(self, timeout: float = None, auto_recover: bool = True):
-        """커넥션 획득 컨텍스트 매니저"""
+        """Context manager for acquiring a connection."""
         from psycopg import OperationalError, InterfaceError
 
         if not self._is_pool_healthy():
@@ -386,7 +390,7 @@ class DatabaseManager:
                 raise
 
     def disconnect(self):
-        """데이터베이스 연결 해제"""
+        """Disconnect from database."""
         with self._pool_lock:
             if self._pool:
                 try:
@@ -399,7 +403,7 @@ class DatabaseManager:
                     self._pool = None
 
     def get_pool_stats(self) -> Dict[str, Any]:
-        """풀 상태 통계 반환"""
+        """Return pool status statistics."""
         stats = self._stats.copy()
         if self._pool:
             try:
@@ -416,7 +420,7 @@ class DatabaseManager:
         return stats
 
     def check_and_refresh_pool(self) -> bool:
-        """풀 상태 확인 및 필요시 리프레시"""
+        """Check pool status and refresh if necessary."""
         if not self._pool:
             return True
         try:
@@ -431,7 +435,7 @@ class DatabaseManager:
     # ============================================================
 
     def _execute_with_retry(self, operation: Callable[[], T], operation_name: str = "operation") -> T:
-        """재시도 로직이 포함된 실행 래퍼"""
+        """Execution wrapper with retry logic."""
         from psycopg import OperationalError, InterfaceError
 
         last_exception = None
@@ -458,7 +462,7 @@ class DatabaseManager:
         raise last_exception
 
     def execute_query(self, query: str, params: tuple = None) -> Optional[list]:
-        """쿼리 실행 — 자동 재시도 포함"""
+        """Execute query — with automatic retry."""
         def _do_execute():
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
@@ -482,14 +486,14 @@ class DatabaseManager:
             return None
 
     def execute_query_one(self, query: str, params: tuple = None) -> Optional[Dict]:
-        """쿼리 실행하여 단일 결과 반환"""
+        """Execute query and return a single result."""
         result = self.execute_query(query, params)
         if result and len(result) > 0:
             return result[0]
         return None
 
     def execute_insert(self, query: str, params: tuple = None) -> Optional[int]:
-        """INSERT 쿼리 실행하여 생성된 ID 반환"""
+        """Execute INSERT query and return the generated ID."""
         def _do_insert():
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
@@ -514,7 +518,7 @@ class DatabaseManager:
             return None
 
     def execute_update_delete(self, query: str, params: tuple = None) -> Optional[int]:
-        """UPDATE/DELETE 쿼리 실행하여 영향받은 행 수 반환"""
+        """Execute UPDATE/DELETE query and return the number of affected rows."""
         def _do_update_delete():
             with self.get_connection() as conn:
                 with conn.cursor() as cur:
@@ -534,7 +538,7 @@ class DatabaseManager:
             return None
 
     def table_exists(self, table_name: str) -> bool:
-        """테이블 존재 여부 확인"""
+        """Check if a table exists."""
         query = """
             SELECT EXISTS (
                 SELECT FROM information_schema.tables
@@ -549,7 +553,7 @@ class DatabaseManager:
     # ============================================================
 
     def run_migrations(self, models_registry=None) -> bool:
-        """데이터베이스 마이그레이션 실행"""
+        """Run database migrations."""
         try:
             self.logger.info("Running migrations...")
 
@@ -565,7 +569,7 @@ class DatabaseManager:
             return False
 
     def _run_schema_migrations(self, models_registry) -> bool:
-        """스키마 변경 감지 및 마이그레이션 실행"""
+        """Detect schema changes and run migrations."""
         try:
             self.logger.info("Running schema migrations...")
 
@@ -597,7 +601,7 @@ class DatabaseManager:
             return False
 
     def _get_table_columns(self, table_name: str) -> dict:
-        """테이블의 현재 컬럼 구조 조회"""
+        """Query the current column structure of a table."""
         try:
             query = """
                 SELECT column_name, data_type, is_nullable, column_default
@@ -614,7 +618,7 @@ class DatabaseManager:
             return {}
 
     def _add_column_to_table(self, table_name: str, column_name: str, column_def: str) -> bool:
-        """테이블에 컬럼 추가"""
+        """Add a column to a table."""
         try:
             self.logger.info(f"Adding missing column {column_name} to table {table_name}")
             alter_query = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_def}"
@@ -634,7 +638,7 @@ _db_manager_lock = threading.Lock()
 
 
 def get_database_manager(database_config=None) -> DatabaseManager:
-    """데이터베이스 매니저 싱글톤 인스턴스 반환"""
+    """Return the database manager singleton instance."""
     global _db_manager
     with _db_manager_lock:
         if _db_manager is None or database_config is not None:
@@ -643,7 +647,7 @@ def get_database_manager(database_config=None) -> DatabaseManager:
 
 
 def reset_database_manager():
-    """데이터베이스 매니저 싱글톤 리셋"""
+    """Reset the database manager singleton."""
     global _db_manager
     with _db_manager_lock:
         if _db_manager:
