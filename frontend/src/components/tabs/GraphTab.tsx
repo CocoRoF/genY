@@ -122,14 +122,14 @@ export default function GraphTab() {
     <ReactFlowProvider>
       <div className="flex flex-col h-full min-h-0 overflow-hidden">
         {/* Toolbar */}
-        <div className="flex items-center justify-between h-10 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-between h-10 px-2 md:px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0 overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <span className="text-[12px] md:text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2 shrink-0">
               {t('graphTab.title')}
             </span>
 
             {/* Graph name */}
-            <span className="text-[12px] font-medium text-[var(--text-secondary)] truncate max-w-[200px]">
+            <span className="text-[11px] md:text-[12px] font-medium text-[var(--text-secondary)] truncate max-w-[120px] md:max-w-[200px]">
               {graphName}
             </span>
 
@@ -143,8 +143,8 @@ export default function GraphTab() {
             {/* Session name */}
             {session?.session_name && (
               <>
-                <span className="w-px h-4 bg-[var(--border-color)] shrink-0" />
-                <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[150px]">
+                <span className="w-px h-4 bg-[var(--border-color)] shrink-0 hidden md:block" />
+                <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[100px] md:max-w-[150px] hidden md:block">
                   {session.session_name}
                 </span>
               </>
@@ -167,20 +167,22 @@ export default function GraphTab() {
           </div>
         </div>
 
-        {/* Canvas + Property Panel — identical layout to WorkflowTab */}
-        <div className="flex flex-1 min-h-0">
-          {/* ReactFlow Canvas — same renderer as Workflow Editor */}
+        {/* Canvas + Property Panel */}
+        <div className="flex flex-1 min-h-0 relative">
+          {/* ReactFlow Canvas */}
           <div className="flex-1 min-w-0">
             <WorkflowCanvas readOnly />
           </div>
 
-          {/* Property Panel — always mounted (avoids mount/unmount lag on selection) */}
+          {/* Property Panel — overlay on mobile, side panel on desktop */}
           <div
             className={`shrink-0 border-l border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto transition-[width] duration-150 ${
-              selectedNodeId ? 'w-[300px]' : 'w-0 overflow-hidden border-l-0'
+              selectedNodeId
+                ? 'fixed inset-y-0 right-0 z-30 w-[280px] md:static md:w-[300px] shadow-lg md:shadow-none'
+                : 'w-0 overflow-hidden border-l-0'
             }`}
           >
-            <div className="w-[300px]">
+            <div className="w-[280px] md:w-[300px]">
               <PropertyPanel readOnly />
             </div>
           </div>

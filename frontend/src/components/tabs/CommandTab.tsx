@@ -63,12 +63,13 @@ export default function CommandTab() {
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Session Header Bar */}
-      <div className="shrink-0 px-6 py-4 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className="shrink-0 px-3 md:px-6 py-3 md:py-4 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
             {/* Icon spanning both rows */}
-            <div className="w-10 h-10 rounded-lg bg-[var(--primary-color)] flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.25)] shrink-0">
-              <Terminal size={18} className="text-white" />
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-[var(--primary-color)] flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.25)] shrink-0">
+              <Terminal size={16} className="text-white md:hidden" />
+              <Terminal size={18} className="text-white hidden md:block" />
             </div>
             {/* Right side: 2 rows */}
             <div className="flex flex-col gap-1">
@@ -102,7 +103,7 @@ export default function CommandTab() {
           </div>
           {/* Status badge */}
           {sessionData?.statusText && (
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[0.75rem] font-medium ${
+            <div className={`hidden sm:inline-flex items-center gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full text-[0.6875rem] md:text-[0.75rem] font-medium shrink-0 ${
               sessionData.status === 'success' ? 'bg-[rgba(16,185,129,0.1)] text-[var(--success-color)] border border-[rgba(16,185,129,0.2)]'
                 : sessionData.status === 'error' ? 'bg-[rgba(239,68,68,0.1)] text-[var(--danger-color)] border border-[rgba(239,68,68,0.2)]'
                 : 'bg-[rgba(245,158,11,0.1)] text-[var(--warning-color)] border border-[rgba(245,158,11,0.2)]'
@@ -119,12 +120,12 @@ export default function CommandTab() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 p-6 gap-5 min-h-0">
+      <div className="flex flex-col flex-1 p-3 md:p-6 gap-3 md:gap-5 min-h-0">
         {/* Command Input Area */}
         <div className="flex flex-col gap-3 shrink-0">
           <div className="relative">
             <textarea
-              className="w-full p-4 pr-[140px] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[0.875rem] font-[inherit] resize-y min-h-[120px] transition-all placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+              className="w-full p-3 md:p-4 pr-[100px] md:pr-[140px] bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[0.8125rem] md:text-[0.875rem] font-[inherit] resize-y min-h-[80px] md:min-h-[120px] transition-all placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
               placeholder={t('commandTab.placeholder')}
               value={sessionData?.input || ''}
               onChange={e => updateSessionData(selectedSessionId, { input: e.target.value })}

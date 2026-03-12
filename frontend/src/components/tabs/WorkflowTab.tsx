@@ -209,7 +209,7 @@ function WorkflowToolbar() {
   );
 
   return (
-    <div className="flex items-center gap-2 h-10 px-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
+    <div className="flex items-center gap-1.5 md:gap-2 h-10 px-2 md:px-3 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0 overflow-x-auto scrollbar-hide">
       {/* Workflow selector */}
       <select
         value={currentWorkflow?.id || ''}
@@ -407,10 +407,10 @@ export default function WorkflowTab({ readOnly = false }: { readOnly?: boolean }
     <ReactFlowProvider>
       <div className="flex flex-col h-full">
         {!readOnly && <WorkflowToolbar />}
-        <div className="flex flex-1 min-h-0">
-          {/* Left: Node Palette (hidden in readOnly) */}
+        <div className="flex flex-1 min-h-0 relative">
+          {/* Left: Node Palette (hidden on mobile in non-readOnly) */}
           {!readOnly && (
-            <div className="w-[240px] shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto">
+            <div className="hidden md:block w-[240px] shrink-0 border-r border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto">
               <NodePalette />
             </div>
           )}
@@ -420,9 +420,9 @@ export default function WorkflowTab({ readOnly = false }: { readOnly?: boolean }
             <WorkflowCanvas readOnly={readOnly} />
           </div>
 
-          {/* Right: Property Panel */}
+          {/* Right: Property Panel — overlay on mobile */}
           {selectedNodeId && (
-            <div className="w-[300px] shrink-0 border-l border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto">
+            <div className="fixed inset-y-0 right-0 z-30 w-[280px] md:static md:w-[300px] shrink-0 border-l border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto shadow-lg md:shadow-none">
               <PropertyPanel readOnly={readOnly} />
             </div>
           )}

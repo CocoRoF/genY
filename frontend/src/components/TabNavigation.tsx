@@ -72,9 +72,9 @@ export default function TabNavigation() {
     || '';
 
   return (
-    <div className="flex items-center gap-0.5 h-11 px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
+    <div className="flex items-center gap-0.5 h-11 px-2 md:px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0 overflow-x-auto scrollbar-hide">
       {/* ── Global Tabs ── */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 shrink-0">
         {GLOBAL_TAB_IDS.map(id => (
           <TabButton
             key={id}

@@ -32,6 +32,7 @@ interface AppState {
   // UI state
   activeTab: string;
   sidebarCollapsed: boolean;
+  mobileSidebarOpen: boolean;
   isExecuting: boolean;
   deletedSectionOpen: boolean;
 
@@ -45,6 +46,7 @@ interface AppState {
   restoreSession: (id: string) => Promise<void>;
   setActiveTab: (tab: string) => void;
   toggleSidebar: () => void;
+  setMobileSidebarOpen: (open: boolean) => void;
   toggleDeletedSection: () => void;
   checkHealth: () => Promise<void>;
   loadPrompts: () => Promise<void>;
@@ -72,6 +74,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   promptContents: {},
   activeTab: 'main',
   sidebarCollapsed: false,
+  mobileSidebarOpen: false,
   isExecuting: false,
   deletedSectionOpen: false,
 
@@ -138,6 +141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (tab) => set({ activeTab: tab }),
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
   toggleDeletedSection: () => set((s) => ({ deletedSectionOpen: !s.deletedSectionOpen })),
 
   checkHealth: async () => {

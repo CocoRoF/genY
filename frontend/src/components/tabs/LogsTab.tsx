@@ -130,11 +130,11 @@ export default function LogsTab() {
   }
 
   return (
-    <div className="flex flex-col flex-1 p-6 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 p-3 md:p-6 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-5 flex-wrap gap-3 shrink-0">
-        <h3 className="text-[1rem] font-semibold">{t('logsTab.title')}</h3>
-        <div className="flex gap-3 items-center">
+      <div className="flex justify-between items-center mb-3 md:mb-5 flex-wrap gap-2 md:gap-3 shrink-0">
+        <h3 className="text-[0.9375rem] md:text-[1rem] font-semibold">{t('logsTab.title')}</h3>
+        <div className="flex gap-2 md:gap-3 items-center flex-wrap">
           {/* ── Filter selector: groups + separator + individual levels ── */}
           <select
             className="py-1.5 pl-2.5 pr-7 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-[6px] text-[var(--text-primary)] text-[0.75rem] font-medium cursor-pointer appearance-none transition-all hover:border-[var(--text-muted)] hover:bg-[var(--bg-secondary)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.15)]"
@@ -192,10 +192,11 @@ export default function LogsTab() {
                 className={`rounded-[var(--border-radius)] font-mono text-[0.8125rem] mb-[2px] transition-colors ${isExpanded ? 'bg-[var(--bg-tertiary)] p-4' : 'py-2.5 px-4 hover:bg-[var(--bg-tertiary)]'} ${isExpandable ? 'cursor-pointer' : ''}`}
                 onClick={() => isExpandable && setExpandedIdx(isExpanded ? null : idx)}
               >
-                <div className="flex items-center gap-3 mb-1">
-                  <span className="text-[var(--text-muted)] whitespace-nowrap">{entry.timestamp}</span>
-                  <span
-                    className="inline-block py-[2px] px-2 rounded-[4px] text-[0.6875rem] font-semibold min-w-[64px] text-center uppercase tracking-[0.025em]"
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-1">
+                  <span className="text-[var(--text-muted)] whitespace-nowrap text-[0.6875rem] md:text-[0.8125rem]">{entry.timestamp}</span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block py-[2px] px-2 rounded-[4px] text-[0.625rem] md:text-[0.6875rem] font-semibold min-w-[52px] md:min-w-[64px] text-center uppercase tracking-[0.025em]"
                     style={LEVEL_STYLE_MAP[entry.level] || {}}
                   >
                     {entry.level}
@@ -205,6 +206,7 @@ export default function LogsTab() {
                       {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </span>
                   )}
+                  </div>
                 </div>
                 {isExpandable && !isExpanded ? (
                   <span className="ml-6 text-[var(--text-secondary)] whitespace-nowrap overflow-hidden text-ellipsis block max-w-full">

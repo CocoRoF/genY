@@ -92,9 +92,9 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between py-3 px-5 border-b border-[var(--border-color)] shrink-0">
-          <div className="flex items-center gap-3">
-            <Search size={18} className="text-[var(--text-muted)]" />
+        <div className="flex items-center justify-between py-3 px-3 md:px-5 border-b border-[var(--border-color)] shrink-0">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            <Search size={18} className="text-[var(--text-muted)] hidden sm:block" />
             <div>
               <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">
                 {t('compiledView.title')}
@@ -128,8 +128,8 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
         </div>
 
         {/* Tabs + Search */}
-        <div className="flex items-center gap-2 px-5 pt-3 pb-2 border-b border-[var(--border-color)] shrink-0">
-          <div className="flex gap-1">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 md:px-5 pt-3 pb-2 border-b border-[var(--border-color)] shrink-0">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide w-full sm:w-auto">
             {(['state', 'nodes', 'edges', 'code'] as TabId[]).map(tab => (
               <button
                 key={tab}
@@ -147,14 +147,14 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
               </button>
             ))}
           </div>
-          <div className="flex-1" />
+          <div className="flex-1 hidden sm:block" />
           {activeTab !== 'code' && (
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('compiledView.search')}
-              className="h-7 w-[200px] px-2.5 text-[11px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)]"
+              className="h-7 w-full sm:w-[200px] px-2.5 text-[11px] bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)]"
             />
           )}
           {activeTab === 'code' && (
@@ -202,7 +202,7 @@ export default function CompiledViewModal({ workflowId, workflowName, onClose }:
 
         {/* Footer — Summary */}
         {data?.summary && (
-          <div className="flex items-center gap-4 px-5 py-2.5 border-t border-[var(--border-color)] shrink-0 text-[10px] text-[var(--text-muted)]">
+          <div className="flex items-center gap-2 md:gap-4 px-3 md:px-5 py-2.5 border-t border-[var(--border-color)] shrink-0 text-[10px] text-[var(--text-muted)] overflow-x-auto scrollbar-hide flex-nowrap">
             <span>{t('compiledView.summaryNodes', { count: data.summary.total_nodes })}</span>
             <span>{t('compiledView.summaryEdges', { count: data.summary.total_edges })}</span>
             <span>{t('compiledView.summaryConditional', { count: data.summary.conditional_edges })}</span>
@@ -230,7 +230,7 @@ function CodeView({ code }: { code: string }) {
 
   return (
     <div className="h-full overflow-auto">
-      <pre className="px-5 py-4 text-[12px] leading-[1.7] font-mono text-[var(--text-primary)] whitespace-pre overflow-x-auto">
+      <pre className="px-3 md:px-5 py-4 text-[12px] leading-[1.7] font-mono text-[var(--text-primary)] whitespace-pre overflow-x-auto">
         {lines.map((line, i) => (
           <CodeLine key={i} lineNo={i + 1} text={line} />
         ))}
@@ -365,7 +365,7 @@ function NodesView({
 }) {
   const { t } = useI18n();
   return (
-    <div className="px-5 py-4 space-y-2">
+    <div className="px-3 md:px-5 py-4 space-y-2">
       {nodes.map(node => {
         const isExpanded = expandedNodes.has(node.id);
         const roleColor = node.role === 'conditional'
@@ -382,7 +382,7 @@ function NodesView({
             {/* Node header */}
             <button
               onClick={() => toggleNode(node.id)}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer bg-transparent border-none"
+              className="w-full flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 text-left hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer bg-transparent border-none flex-wrap"
             >
               <NodeIcon name={isExpanded ? 'chevron-down' : 'chevron-right'} size={10} className="opacity-40 w-3" />
               <span className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">
@@ -505,7 +505,7 @@ function NodesView({
 function EdgesView({ edges }: { edges: CompileViewEdgeDetail[] }) {
   const { t } = useI18n();
   return (
-    <div className="px-5 py-4 space-y-2">
+    <div className="px-3 md:px-5 py-4 space-y-2">
       {edges.map((edge, i) => {
         const isConditional = edge.wiring === 'conditional';
         const wiringColor = isConditional
@@ -629,7 +629,7 @@ function StateView({
   }, [visibleFields]);
 
   return (
-    <div className="px-5 py-4 space-y-4">
+    <div className="px-3 md:px-5 py-4 space-y-4">
       {/* Summary bar */}
       {summary && (
         <div className="flex items-center gap-3 flex-wrap">
@@ -746,7 +746,7 @@ function StateView({
                   {node.node_type}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Reads */}
                 <div>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] block mb-1">

@@ -249,8 +249,8 @@ function PresetCard({
         </span>
       </div>
 
-      {/* Action Buttons (visible on hover) */}
-      <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Action Buttons (visible on hover, always visible on touch) */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         {onView && (
           <button
             className="h-7 px-2 flex items-center gap-1 justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -320,8 +320,8 @@ function ViewPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between py-3 px-5 border-b border-[var(--border-color)] shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between py-3 px-3 md:px-5 border-b border-[var(--border-color)] shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <button
             className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer transition-colors"
             onClick={onBack}
@@ -357,7 +357,7 @@ function ViewPanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 md:px-5 py-4 space-y-4">
         {/* Description */}
         {preset.description && (
           <p className="text-[0.8125rem] text-[var(--text-muted)] leading-[1.6]">{preset.description}</p>
@@ -460,7 +460,7 @@ function EditPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between py-3 px-5 border-b border-[var(--border-color)] shrink-0">
+      <div className="flex items-center justify-between py-3 px-3 md:px-5 border-b border-[var(--border-color)] shrink-0">
         <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)]">
           {isNew ? t('toolPresets.newPreset') : t('toolPresets.editPreset')}
         </h3>
@@ -483,7 +483,7 @@ function EditPanel({
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-3 md:px-5 py-4 space-y-4">
         {/* Name */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)]">{t('toolPresets.nameLabel')}</label>
@@ -695,9 +695,9 @@ export default function ToolPresetsTab() {
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)]">
       {/* Header */}
-      <div className="flex items-center justify-between py-4 px-5 border-b border-[var(--border-color)] shrink-0">
-        <div>
-          <h2 className="text-[1rem] font-semibold text-[var(--text-primary)] m-0">{t('toolPresets.title')}</h2>
+      <div className="flex items-center justify-between py-3 md:py-4 px-3 md:px-5 border-b border-[var(--border-color)] shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-[1rem] font-semibold text-[var(--text-primary)] m-0 truncate">{t('toolPresets.title')}</h2>
           <p className="text-[0.75rem] text-[var(--text-muted)] mt-1">{t('toolPresets.subtitle')}</p>
         </div>
         <button
@@ -709,7 +709,7 @@ export default function ToolPresetsTab() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      <div className="flex-1 overflow-y-auto px-3 md:px-5 py-4">
         {error && (
           <div className="text-[0.8125rem] text-[var(--danger-color)] bg-[rgba(239,68,68,0.1)] p-2.5 rounded-[6px] mb-4">{error}</div>
         )}

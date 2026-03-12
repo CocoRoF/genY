@@ -147,36 +147,36 @@ export default function SettingsTab() {
       )}
 
       {/* Header */}
-      <div className="flex justify-between items-center py-4 px-5 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
-        <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.title')}</h3>
-        <div className="flex gap-2">
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={exportConfigs}>{t('common.export')}</button>
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={() => setImportOpen(true)}>{t('common.import')}</button>
-          <button className={cn("py-2 px-4 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem]")} onClick={loadConfigs}>{t('common.refresh')}</button>
+      <div className="flex justify-between items-center py-3 md:py-4 px-4 md:px-5 border-b border-[var(--border-color)] bg-[var(--bg-secondary)] shrink-0">
+        <h3 className="text-[0.9375rem] md:text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.title')}</h3>
+        <div className="flex gap-1.5 md:gap-2">
+          <button className={cn("py-1.5 px-2 md:px-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.6875rem] md:text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]")} onClick={exportConfigs}>{t('common.export')}</button>
+          <button className={cn("py-1.5 px-2 md:px-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.6875rem] md:text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]")} onClick={() => setImportOpen(true)}>{t('common.import')}</button>
+          <button className={cn("py-1.5 px-2 md:px-3 bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.6875rem] md:text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]")} onClick={loadConfigs}>{t('common.refresh')}</button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Category Sidebar */}
-        <div className="w-[200px] border-r border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto">
-          <div className="p-3">
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        {/* Category Sidebar — horizontal scroll on mobile, vertical on desktop */}
+        <div className="md:w-[200px] border-b md:border-b-0 md:border-r border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-x-auto md:overflow-x-visible md:overflow-y-auto shrink-0">
+          <div className="flex md:flex-col p-2 md:p-3 gap-1 md:gap-0">
             <button
-              className={`w-full flex items-center gap-2.5 py-2.5 px-3 rounded-[var(--border-radius)] text-[0.875rem] font-medium text-left mb-1 transition-colors ${selectedCategory === 'all' ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              className={`whitespace-nowrap md:w-full flex items-center gap-2 md:gap-2.5 py-2 md:py-2.5 px-3 rounded-[var(--border-radius)] text-[0.8125rem] md:text-[0.875rem] font-medium text-left md:mb-1 transition-colors shrink-0 ${selectedCategory === 'all' ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
               onClick={() => setSelectedCategory('all')}
             >
               <span className="flex-1">{t('settings.all')}</span>
-              <span className="text-[0.75rem] text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">{configs.length}</span>
+              <span className="text-[0.6875rem] md:text-[0.75rem] text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">{configs.length}</span>
             </button>
             {categories.map(cat => {
               const count = configs.filter(c => c.schema?.category === cat.name).length;
               return (
                 <button key={cat.name}
-                  className={`w-full flex items-center gap-2.5 py-2.5 px-3 rounded-[var(--border-radius)] text-[0.875rem] font-medium text-left mb-1 transition-colors ${selectedCategory === cat.name ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+                  className={`whitespace-nowrap md:w-full flex items-center gap-2 md:gap-2.5 py-2 md:py-2.5 px-3 rounded-[var(--border-radius)] text-[0.8125rem] md:text-[0.875rem] font-medium text-left md:mb-1 transition-colors shrink-0 ${selectedCategory === cat.name ? 'bg-[rgba(59,130,246,0.1)] text-[var(--primary-color)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
                   onClick={() => setSelectedCategory(cat.name)}
                 >
                   <span className="flex-1">{cat.label}</span>
-                  <span className="text-[0.75rem] text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">{count}</span>
+                  <span className="text-[0.6875rem] md:text-[0.75rem] text-[var(--text-muted)] bg-[var(--bg-tertiary)] py-[2px] px-2 rounded-[10px]">{count}</span>
                 </button>
               );
             })}
@@ -184,7 +184,7 @@ export default function SettingsTab() {
         </div>
 
         {/* Config List */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-3 md:p-5">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4"><p className="text-[0.8125rem] text-[var(--text-muted)]">{t('settings.noConfigs')}</p></div>
           ) : (
@@ -237,7 +237,7 @@ export default function SettingsTab() {
       {/* Edit Modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setEditing(null)}>
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-[600px] max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg w-full max-w-[600px] mx-4 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center py-4 px-6 border-b border-[var(--border-color)]">
               <h3 className="text-[1rem] font-semibold text-[var(--text-primary)]">{t('settings.editPrefix')}{getLocalizedSchema(editing.schema, locale).display_name}</h3>
               <button className="flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] cursor-pointer" onClick={() => setEditing(null)}><X size={16} /></button>

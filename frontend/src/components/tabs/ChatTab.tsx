@@ -277,9 +277,9 @@ export default function ChatTab() {
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
+        <div className="shrink-0 px-3 md:px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 md:gap-3">
               <div className="w-9 h-9 rounded-lg bg-[var(--primary-color)] flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.25)]">
                 <MessageCircle size={16} className="text-white" />
               </div>
@@ -303,7 +303,7 @@ export default function ChatTab() {
         </div>
 
         {/* Room list */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 space-y-2">
           {loadingRooms && rooms.length === 0 && (
             <div className="flex justify-center py-10">
               <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
@@ -353,7 +353,7 @@ export default function ChatTab() {
                 </div>
               </div>
               <button
-                className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-[rgba(239,68,68,0.1)] text-[var(--text-muted)] hover:text-red-500 transition-all border-none bg-transparent cursor-pointer"
+                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-md hover:bg-[rgba(239,68,68,0.1)] text-[var(--text-muted)] hover:text-red-500 transition-all border-none bg-transparent cursor-pointer"
                 onClick={e => { e.stopPropagation(); handleDeleteRoom(room.id); }}
                 title={t('chatTab.deleteRoom')}
               >
@@ -371,8 +371,8 @@ export default function ChatTab() {
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
-          <div className="flex items-center gap-3">
+        <div className="shrink-0 px-3 md:px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
+          <div className="flex items-center gap-2 md:gap-3">
             <button
               className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] cursor-pointer transition-all"
               onClick={() => setView('room-list')}
@@ -386,7 +386,7 @@ export default function ChatTab() {
         </div>
 
         {/* Form */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-5 space-y-5">
           {/* Room name */}
           <div>
             <label className="block text-[0.75rem] font-medium text-[var(--text-secondary)] mb-1.5">
@@ -463,7 +463,7 @@ export default function ChatTab() {
         </div>
 
         {/* Footer — create button */}
-        <div className="shrink-0 px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
+        <div className="shrink-0 px-3 md:px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
           <button
             className="w-full py-2.5 rounded-lg bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.8125rem] font-medium cursor-pointer border-none transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             disabled={!newRoomName.trim() || selectedSessionIds.length === 0 || creating}
@@ -484,9 +484,9 @@ export default function ChatTab() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
+      <div className="shrink-0 px-3 md:px-6 py-3 bg-gradient-to-r from-[rgba(59,130,246,0.06)] to-transparent border-b border-[var(--border-color)]">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
             <button
               className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--bg-tertiary)] border border-[var(--border-color)] hover:border-[var(--primary-color)] cursor-pointer transition-all"
               onClick={() => { setView('room-list'); setActiveRoomId(null); setMessages([]); setActiveRoom(null); }}
@@ -505,9 +505,9 @@ export default function ChatTab() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
             <Users size={12} className="text-[var(--text-muted)]" />
-            <span className="text-[0.75rem] text-[var(--text-secondary)]">
+            <span className="text-[0.6875rem] md:text-[0.75rem] text-[var(--text-secondary)]">
               {activeRoom?.session_ids.filter(id => aliveSessions.some(s => s.session_id === id)).length || 0} {t('chatTab.activeSessions', { count: '' }).replace(/ $/, '')}
             </span>
           </div>
@@ -515,7 +515,7 @@ export default function ChatTab() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 md:px-6 py-4 space-y-3">
         {loadingMessages && (
           <div className="flex justify-center py-10">
             <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
@@ -538,7 +538,7 @@ export default function ChatTab() {
           if (msg.type === 'user') {
             return (
               <div key={msg.id} className="flex justify-end gap-2">
-                <div className="max-w-[70%] flex flex-col items-end">
+                <div className="max-w-[85%] md:max-w-[70%] flex flex-col items-end">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[0.6875rem] text-[var(--text-muted)]">
                       {formatTime(msg.timestamp)}
@@ -566,7 +566,7 @@ export default function ChatTab() {
                 >
                   <Bot size={14} className="text-white" />
                 </div>
-                <div className="max-w-[70%] flex flex-col">
+                <div className="max-w-[85%] md:max-w-[70%] flex flex-col">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[0.75rem] font-semibold text-[var(--text-primary)]">
                       {msg.session_name || msg.session_id?.substring(0, 8)}
@@ -639,8 +639,8 @@ export default function ChatTab() {
       </div>
 
       {/* Input Area */}
-      <div className="shrink-0 px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
-        <div className="relative flex items-end gap-3">
+      <div className="shrink-0 px-3 md:px-6 py-3 border-t border-[var(--border-color)] bg-[var(--bg-primary)]">
+        <div className="relative flex items-end gap-2 md:gap-3">
           <textarea
             ref={inputRef}
             className="flex-1 p-3 pr-12 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-[var(--text-primary)] text-[0.8125rem] font-[inherit] resize-none min-h-[44px] max-h-[120px] transition-all placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"

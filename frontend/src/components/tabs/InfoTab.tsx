@@ -96,7 +96,7 @@ export default function InfoTab() {
   ];
 
   return (
-    <div className="p-5 overflow-y-auto h-full bg-[var(--bg-primary)]">
+    <div className="p-3 md:p-5 overflow-y-auto h-full bg-[var(--bg-primary)]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-[16px] font-semibold text-[var(--text-primary)] m-0">{data.session_name || t('info.sessionDetails')}</h4>
@@ -107,7 +107,7 @@ export default function InfoTab() {
       </div>
 
       {/* Fields Grid */}
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {fields.map(f => (
           <div key={f.label} className="flex flex-col gap-0.5 py-2 px-3 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-color)]">
             <span className="text-[10px] font-semibold uppercase tracking-[0.5px] text-[var(--text-muted)]">{f.label}</span>

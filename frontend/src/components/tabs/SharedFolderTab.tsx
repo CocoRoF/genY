@@ -299,21 +299,21 @@ export default function SharedFolderTab() {
   const tree = buildFileTree(files);
 
   return (
-    <div className="flex flex-col flex-1 p-6 gap-5 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 p-3 md:p-6 gap-3 md:gap-5 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center pb-3 border-b border-[var(--border-color)] shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[var(--border-color)] shrink-0">
         <div className="flex items-center gap-3">
           <FolderSync size={20} className="text-[var(--primary-color)]" />
           <div>
-            <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">
+            <h3 className="text-[15px] md:text-[16px] font-semibold text-[var(--text-primary)]">
               {t('sharedFolderTab.title')}
             </h3>
-            <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+            <p className="text-[11px] md:text-[12px] text-[var(--text-muted)] mt-0.5">
               {t('sharedFolderTab.description')}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap">
           <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
           <button
             className={cn(
@@ -358,9 +358,9 @@ export default function SharedFolderTab() {
 
       {/* Info banner */}
       {info && (
-        <div className="flex items-center gap-6 py-2 px-4 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[12px] text-[var(--text-muted)] shrink-0">
-          <span className="flex items-center gap-1.5">
-            <Info size={12} /> {t('sharedFolderTab.path')}: <code className="text-[var(--text-secondary)]">{info.path}</code>
+        <div className="flex flex-wrap items-center gap-3 md:gap-6 py-2 px-3 md:px-4 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[11px] md:text-[12px] text-[var(--text-muted)] shrink-0">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <Info size={12} /> {t('sharedFolderTab.path')}: <code className="text-[var(--text-secondary)] truncate max-w-[150px] md:max-w-none">{info.path}</code>
           </span>
           <span>
             {t('sharedFolderTab.totalFiles')}: <strong className="text-[var(--text-secondary)]">{info.total_files}</strong>
@@ -372,9 +372,9 @@ export default function SharedFolderTab() {
       )}
 
       {/* Content */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 flex-1 min-h-0">
         {/* File Tree */}
-        <div className="w-[280px] shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] p-3 overflow-y-auto">
+        <div className="md:w-[280px] shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] p-3 overflow-y-auto max-h-[200px] md:max-h-none">
           {files.length === 0 ? (
             <p className="text-[var(--text-muted)] text-[13px] text-center py-6 px-3">
               {t('sharedFolderTab.empty')}

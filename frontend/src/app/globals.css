@@ -40,10 +40,13 @@ body {
 	color: var(--text-primary);
 	line-height: 1.5;
 	height: 100vh;
+	height: 100dvh;
 	overflow: hidden;
 	font-size: 14px;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
+	-webkit-text-size-adjust: 100%;
+	-webkit-tap-highlight-color: transparent;
 }
 
 /* ========================================
@@ -91,5 +94,65 @@ body {
 	30% {
 		transform: translateY(-4px);
 		opacity: 1;
+	}
+}
+
+/* ========================================
+   Mobile Touch & Scroll Optimization
+   ======================================== */
+* {
+	-webkit-overflow-scrolling: touch;
+}
+
+input, textarea, select, button {
+	font-size: 16px; /* prevent iOS zoom on focus */
+}
+
+@media (min-width: 768px) {
+	input, textarea, select, button {
+		font-size: inherit;
+	}
+}
+
+/* ========================================
+   Hover-only styles for non-touch devices
+   ======================================== */
+@media (hover: none) {
+	.group:hover .group-hover\:opacity-100,
+	.group:hover .group-hover\:visible {
+		opacity: 1 !important;
+		visibility: visible !important;
+	}
+}
+
+/* ========================================
+   Mobile scrollbar: hide in horizontal
+   scroll containers
+   ======================================== */
+.scrollbar-hide {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+	display: none;
+}
+
+/* ========================================
+   Sidebar mobile overlay backdrop
+   ======================================== */
+.sidebar-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 30;
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(2px);
+}
+
+/* ========================================
+   Safe area padding for notched devices
+   ======================================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+	.safe-bottom {
+		padding-bottom: env(safe-area-inset-bottom);
 	}
 }

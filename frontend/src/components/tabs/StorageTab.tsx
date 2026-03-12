@@ -162,10 +162,10 @@ export default function StorageTab() {
   const tree = buildFileTree(files);
 
   return (
-    <div className="flex flex-col flex-1 p-6 gap-5 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 p-3 md:p-6 gap-3 md:gap-5 min-h-0 overflow-hidden">
       {/* Header */}
       <div className="flex justify-between items-center pb-3 border-b border-[var(--border-color)] shrink-0">
-        <h3 className="text-[16px] font-semibold text-[var(--text-primary)]">{t('storageTab.title')}</h3>
+        <h3 className="text-[15px] md:text-[16px] font-semibold text-[var(--text-primary)]">{t('storageTab.title')}</h3>
         <div className="flex items-center gap-2">
           <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5")} onClick={handleDownloadFolder} disabled={downloading}><Download size={12} /> {downloading ? t('common.loading') : t('storageTab.downloadFolder')}</button>
           <button className={cn("py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]", "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5")} onClick={fetchFiles}><RefreshCw size={12} /> {t('common.refresh')}</button>
@@ -173,9 +173,9 @@ export default function StorageTab() {
       </div>
 
       {/* Content */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 flex-1 min-h-0">
         {/* File Tree */}
-        <div className="w-[280px] shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] p-3 overflow-y-auto">
+        <div className="md:w-[280px] shrink-0 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] p-3 overflow-y-auto max-h-[200px] md:max-h-none">
           {files.length === 0 ? (
             <p className="text-[var(--text-muted)] text-[13px] text-center py-6 px-3">{t('storageTab.empty')}</p>
           ) : (

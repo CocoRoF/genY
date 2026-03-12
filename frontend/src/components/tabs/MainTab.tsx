@@ -20,7 +20,7 @@ export default function MainTab() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-[1000px] mx-auto px-6 py-8">
+      <div className="max-w-[1000px] mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* ── Language Toggle ── */}
         <div className="flex justify-end mb-6">
           <div className="inline-flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)]">
@@ -48,21 +48,21 @@ export default function MainTab() {
         </div>
 
         {/* ── Logo ── */}
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6 md:mb-8">
           <Image
             src="/geny_full_logo_middle.png"
             alt="Geny Logo"
             width={420}
             height={160}
             priority
-            className="object-contain"
+            className="object-contain max-w-full h-auto"
           />
         </div>
 
         {/* ── Hero ── */}
-        <div className="text-center mb-10">
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">{t('main.heroTitle')}</h1>
-          <p className="text-base italic text-[var(--primary-color)] mb-3">{t('main.heroSubtitle')}</p>
+        <div className="text-center mb-8 md:mb-10">
+          <h1 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] mb-2">{t('main.heroTitle')}</h1>
+          <p className="text-sm md:text-base italic text-[var(--primary-color)] mb-3">{t('main.heroSubtitle')}</p>
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-[640px] mx-auto">
             {t('main.heroTagline')}
           </p>

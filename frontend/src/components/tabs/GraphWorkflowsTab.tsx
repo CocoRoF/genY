@@ -80,8 +80,8 @@ function WorkflowCard({
         )}
       </div>
 
-      {/* Action Buttons (visible on hover) */}
-      <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Action Buttons (visible on hover desktop, always on mobile) */}
+      <div className="absolute bottom-2 right-2 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         {onView && (
           <button
             className="h-7 px-2 flex items-center justify-center rounded-md bg-[var(--bg-primary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
@@ -278,9 +278,9 @@ export default function GraphWorkflowsTab() {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between py-4 px-6 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4 px-4 md:px-6 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0">
         <div>
-          <h2 className="text-[1.125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.title')}</h2>
+          <h2 className="text-[1rem] md:text-[1.125rem] font-semibold text-[var(--text-primary)]">{t('workflowsTab.title')}</h2>
           <p className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">
             {t('workflowsTab.subtitle')}
           </p>
@@ -310,7 +310,7 @@ export default function GraphWorkflowsTab() {
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-[var(--text-muted)] text-[0.875rem]">{t('workflowsTab.loadingWorkflows')}</div>
         ) : (
