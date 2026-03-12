@@ -381,20 +381,21 @@ async def get_session_logs(
         elif parsed:
             level_filter = parsed                 # set[LogLevel]
 
-    # First check if log file exists
-    log_file_path = get_log_file_path(session_id)
-
-    if not log_file_path:
-        raise HTTPException(status_code=404, detail=f"No logs found for session: {session_id}")
-
-    # Try to get from active session logger first (faster, uses cache)
+    # Try to get from active session logger first (fastest — uses in-memory cache)
     session_logger = get_session_logger(session_id, create_if_missing=False)
+    entries = []
 
     if session_logger:
         entries = session_logger.get_logs(limit=limit, level=level_filter)
     else:
-        # Read directly from file (for historical/deleted sessions)
+        # Read from DB first, then fall back to file (for historical/deleted sessions)
         entries = read_logs_from_file(session_id, limit=limit, level=level_filter)
+
+    # Resolve file path (informational — may be None if logs are DB-only)
+    log_file_path = get_log_file_path(session_id)
+
+    if not entries and not log_file_path:
+        raise HTTPException(status_code=404, detail=f"No logs found for session: {session_id}")
 
     return SessionLogsResponse(
         session_id=session_id,

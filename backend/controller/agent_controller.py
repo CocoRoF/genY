@@ -8,9 +8,13 @@ AgentSession(CompiledStateGraph) 기반 세션을 관리합니다.
 AgentSession API:   /api/agents (primary)
 Legacy Session API: /api/sessions (deprecated, backward compatibility)
 """
+import asyncio
+import json
+import time
 from logging import getLogger
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Path, Query
+from starlette.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from service.claude_manager.models import (
@@ -450,7 +454,6 @@ async def execute_agent_prompt(
 
     The session's graph type determines the execution flow automatically.
     """
-    import time
     start_time = time.time()
 
     agent = agent_manager.get_agent(session_id)
@@ -514,6 +517,147 @@ async def execute_agent_prompt(
             )
 
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── SSE helper ────────────────────────────────────────────────────────────────
+
+def _sse(event_type: str, data: dict) -> str:
+    """Format a single SSE event string."""
+    payload = json.dumps(data, ensure_ascii=False, default=str)
+    return f"event: {event_type}\ndata: {payload}\n\n"
+
+
+@router.post("/{session_id}/execute/stream")
+async def execute_agent_prompt_stream(
+    session_id: str = Path(..., description="Session ID"),
+    request: ExecuteRequest = ...,
+):
+    """
+    Execute prompt with real-time SSE log streaming.
+
+    Returns an SSE stream that emits log events as they are produced
+    during graph execution, then a final ``result`` event with the
+    full ExecuteResponse payload.
+
+    SSE event types:
+      - log       : a new log entry (same shape as LogEntry)
+      - status    : execution status update (running / completed / error)
+      - result    : final execution result (ExecuteResponse shape)
+      - done      : stream complete sentinel
+      - error     : top-level error
+    """
+    agent = agent_manager.get_agent(session_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
+
+    if not agent.is_alive():
+        raise HTTPException(
+            status_code=400,
+            detail=f"AgentSession is not running (status: {agent.status})",
+        )
+
+    async def event_stream():
+        start_time = time.time()
+
+        # Ensure session logger exists
+        session_logger = get_session_logger(session_id, create_if_missing=True)
+
+        # Snapshot the current cache length so we only emit *new* entries
+        cache_cursor = session_logger.get_cache_length()
+
+        yield _sse("status", {"status": "running", "message": "Execution started"})
+
+        # Launch graph execution in background task
+        exec_task: asyncio.Task | None = None
+        result_holder: dict = {}
+        error_holder: dict = {}
+
+        async def _run():
+            try:
+                if session_logger:
+                    session_logger.log_command(
+                        prompt=request.prompt,
+                        timeout=request.timeout,
+                        system_prompt=request.system_prompt,
+                        max_turns=request.max_turns,
+                    )
+                result_text = await agent.invoke(input_text=request.prompt)
+                duration_ms = int((time.time() - start_time) * 1000)
+                if session_logger:
+                    session_logger.log_response(
+                        success=True,
+                        output=result_text,
+                        duration_ms=duration_ms,
+                    )
+                result_holder.update({
+                    "success": True,
+                    "session_id": session_id,
+                    "output": result_text,
+                    "error": None,
+                    "duration_ms": duration_ms,
+                })
+            except Exception as e:
+                duration_ms = int((time.time() - start_time) * 1000)
+                logger.error(f"❌ Agent SSE execute failed: {e}", exc_info=True)
+                if session_logger:
+                    session_logger.log_response(
+                        success=False,
+                        error=str(e),
+                        duration_ms=duration_ms,
+                    )
+                error_holder["error"] = str(e)
+                error_holder["duration_ms"] = duration_ms
+
+        exec_task = asyncio.create_task(_run())
+
+        # Poll the session logger cache and stream new entries
+        try:
+            while not exec_task.done():
+                # Drain any new entries from the logger cache
+                new_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
+                for entry in new_entries:
+                    yield _sse("log", entry.to_dict())
+
+                await asyncio.sleep(0.15)
+
+            # Final drain — pick up entries written during last iteration
+            await asyncio.sleep(0.05)
+            final_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
+            for entry in final_entries:
+                yield _sse("log", entry.to_dict())
+
+            # Ensure any exception in exec_task is raised
+            await exec_task
+
+        except Exception as e:
+            logger.error(f"SSE stream error: {e}", exc_info=True)
+            yield _sse("error", {"error": str(e)})
+
+        # Emit final result
+        if error_holder:
+            yield _sse("status", {"status": "error", "message": error_holder.get("error", "Unknown error")})
+            yield _sse("result", {
+                "success": False,
+                "session_id": session_id,
+                "output": None,
+                "error": error_holder.get("error"),
+                "duration_ms": error_holder.get("duration_ms"),
+            })
+        else:
+            yield _sse("status", {"status": "completed", "message": "Execution completed"})
+            yield _sse("result", result_holder)
+
+        yield _sse("done", {})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 # ============================================================================

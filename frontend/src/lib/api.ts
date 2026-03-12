@@ -80,6 +80,74 @@ export const agentApi = {
       body: JSON.stringify(data),
     }),
 
+  /**
+   * POST /api/agents/{id}/execute/stream — SSE streaming execute.
+   *
+   * Streams real-time log events during execution, then a final result.
+   * The `onEvent` callback receives typed SSE events as they arrive.
+   * Returns a promise that resolves when the stream is complete, with
+   * an `abort()` function to cancel early.
+   */
+  executeStream: async (
+    id: string,
+    data: ExecuteRequest,
+    onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
+  ): Promise<void> => {
+    const res = await fetch(`/api/agents/${id}/execute/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      let message: string;
+      try {
+        const json = JSON.parse(body);
+        const raw = json.detail || json.message || json.error;
+        message = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : `HTTP ${res.status}`;
+      } catch {
+        message = body || `HTTP ${res.status}`;
+      }
+      throw new Error(message);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No response body');
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Parse SSE events from buffer
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() || '';
+
+      for (const part of parts) {
+        if (!part.trim()) continue;
+        let eventType = '';
+        let eventDataStr = '';
+        for (const line of part.split('\n')) {
+          if (line.startsWith('event: ')) eventType = line.slice(7);
+          else if (line.startsWith('data: ')) eventDataStr = line.slice(6);
+        }
+        if (eventType && eventDataStr) {
+          try {
+            const parsed = JSON.parse(eventDataStr);
+            onEvent(eventType, parsed);
+          } catch {
+            // skip malformed events
+          }
+        }
+      }
+    }
+  },
+
   /** POST /api/agents/{id}/stop — stop execution */
   stop: (id: string) =>
     apiCall<{ success: boolean }>(`/api/agents/${id}/stop`, {

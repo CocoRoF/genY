@@ -804,6 +804,28 @@ class SessionLogger:
         """
         return self.get_logs(limit=limit, level=LogLevel.GRAPH)
 
+    # ── Public API for cache-based streaming (used by SSE endpoint) ──
+
+    def get_cache_length(self) -> int:
+        """Return current number of entries in the in-memory log cache."""
+        with self._lock:
+            return len(self._log_cache)
+
+    def get_cache_entries_since(self, cursor: int) -> "tuple[list[LogEntry], int]":
+        """Return new cache entries after *cursor* and the updated cursor.
+
+        Args:
+            cursor: Previous cache length (as returned by this method).
+
+        Returns:
+            (new_entries, new_cursor) – list of LogEntry objects + updated cursor.
+        """
+        with self._lock:
+            current_len = len(self._log_cache)
+            if current_len > cursor:
+                return list(self._log_cache[cursor:current_len]), current_len
+            return [], cursor
+
     def get_logs(
         self,
         limit: int = 100,

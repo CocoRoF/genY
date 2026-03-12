@@ -11,6 +11,7 @@ export interface SessionData {
   output: string;
   status: string;
   statusText: string;
+  logEntries?: Array<{ timestamp: string; level: string; message: string; metadata?: Record<string, unknown> }>;
 }
 
 // ==================== App Store ====================
