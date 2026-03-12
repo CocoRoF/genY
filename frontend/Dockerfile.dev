@@ -1,0 +1,24 @@
+# ── Frontend Dockerfile (Development) ──────────────────────────────────
+# next dev로 실행하여 HMR(Hot Module Replacement) / Fast Refresh 지원
+# 소스 코드는 docker-compose.dev.yml에서 바인드 마운트됨
+# ──────────────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 의존성 설치 (바인드 마운트 전에 컨테이너 내부에 node_modules 생성)
+COPY package.json package-lock.json* ./
+RUN npm install
+
+# 소스는 바인드 마운트로 공급되므로 COPY 불필요
+# COPY . .  ← 생략 (docker-compose.dev.yml의 volumes에서 처리)
+
+ENV NODE_ENV=development
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV API_URL=http://backend:8000
+
+EXPOSE 3000
+
+# next dev — 파일 변경 시 HMR로 즉시 반영
+CMD ["npm", "run", "dev"]

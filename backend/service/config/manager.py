@@ -2,10 +2,12 @@
 Configuration Manager for Geny Agent.
 
 Handles:
-- Loading/saving configs from JSON files
+- Loading/saving configs from PostgreSQL database (primary)
+- Fallback to JSON files when DB is unavailable
 - Auto-discovery of config classes
 - Config validation
 - Thread-safe config access
+- Migration of existing JSON configs to database on first run
 """
 
 import json
@@ -29,30 +31,56 @@ class ConfigManager:
     """
     Manages configuration loading, saving, and access.
 
-    Configs are stored as JSON files in the config directory.
+    Primary storage: PostgreSQL database (persistent_configs table)
+    Fallback storage: JSON files in the config directory
+
     Automatically discovers and registers config classes.
+    On first run, migrates existing JSON configs to database.
     """
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Optional[Path] = None, app_db=None):
         """
         Initialize the config manager.
 
         Args:
-            config_dir: Directory to store config files.
-                       Defaults to 'service/config/variables' in project root.
+            config_dir: Directory to store config files (fallback).
+            app_db: AppDatabaseManager instance for DB-backed storage.
         """
         if config_dir is None:
-            # Default to service/config/variables
             config_dir = Path(__file__).parent / "variables"
 
         self.config_dir = Path(config_dir)
         self._ensure_config_dir()
 
+        # Database manager (set later via set_database or at init)
+        self._app_db = app_db
+
         # Cache for loaded configs
         self._configs: Dict[str, BaseConfig] = {}
-        self._lock = RLock()  # Use RLock to allow nested lock acquisition
+        self._lock = RLock()
 
         logger.info(f"ConfigManager initialized with config dir: {self.config_dir}")
+
+    def set_database(self, app_db) -> None:
+        """
+        Set the database manager for DB-backed config storage.
+        Called during application startup after DB initialization.
+
+        Args:
+            app_db: AppDatabaseManager instance
+        """
+        self._app_db = app_db
+        logger.info("ConfigManager: Database backend connected")
+
+    @property
+    def _db_available(self) -> bool:
+        """Check if database is available for config storage"""
+        if self._app_db is None:
+            return False
+        try:
+            return self._app_db.db_manager._is_pool_healthy()
+        except Exception:
+            return False
 
     def _ensure_config_dir(self):
         """Ensure config directory exists"""
@@ -68,11 +96,19 @@ class ConfigManager:
 
     def load_config(self, config_class: Type[T], create_if_missing: bool = True) -> T:
         """
-        Load a configuration from file.
+        Load a configuration.
+
+        Priority:
+        1. In-memory cache
+        2. PostgreSQL database (primary storage)
+        3. JSON file (fallback / legacy)
+        4. Create default if missing
+
+        When loading from JSON file and DB is available, auto-migrates to DB.
 
         Args:
             config_class: The config class to load
-            create_if_missing: If True, create default config if file doesn't exist
+            create_if_missing: If True, create default config if not found
 
         Returns:
             The loaded or default config instance
@@ -81,35 +117,58 @@ class ConfigManager:
         config_path = self._get_config_path(config_name)
 
         with self._lock:
-            # Check cache first
+            # 1. Check cache first
             if config_name in self._configs:
                 return self._configs[config_name]
 
-            if config_path.exists():
+            config = None
+            loaded_from = None
+
+            # 2. Try loading from database
+            if self._db_available:
+                try:
+                    data = self._load_from_db(config_name)
+                    if data:
+                        config = config_class.from_dict(data)
+                        loaded_from = "database"
+                        logger.info(f"Loaded config from DB: {config_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to load config from DB {config_name}: {e}")
+
+            # 3. Fall back to JSON file
+            if config is None and config_path.exists():
                 try:
                     with open(config_path, 'r', encoding='utf-8') as f:
                         data = json.load(f)
                     config = config_class.from_dict(data)
-                    logger.info(f"Loaded config: {config_name}")
+                    loaded_from = "file"
+                    logger.info(f"Loaded config from file: {config_name}")
+
+                    # Auto-migrate JSON config to database
+                    if self._db_available:
+                        try:
+                            self._save_to_db(config_name, config.to_dict())
+                            logger.info(f"Migrated config to DB: {config_name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to migrate config to DB: {config_name}: {e}")
                 except Exception as e:
-                    logger.error(f"Failed to load config {config_name}: {e}")
-                    if create_if_missing:
-                        config = config_class.get_default_instance()
-                        self.save_config(config)
-                    else:
+                    logger.error(f"Failed to load config from file {config_name}: {e}")
+                    if not create_if_missing:
                         raise
-            elif create_if_missing:
-                config = config_class.get_default_instance()
-                self.save_config(config)
-                logger.info(f"Created default config: {config_name}")
-            else:
-                raise FileNotFoundError(f"Config file not found: {config_path}")
+
+            # 4. Create default if missing
+            if config is None:
+                if create_if_missing:
+                    config = config_class.get_default_instance()
+                    loaded_from = "default"
+                    self.save_config(config)
+                    logger.info(f"Created default config: {config_name}")
+                else:
+                    raise FileNotFoundError(f"Config not found: {config_name}")
 
             self._configs[config_name] = config
 
-            # Sync loaded values to os.environ via apply_change callbacks.
-            # This ensures that values from JSON config files are available
-            # as environment variables even when .env file is missing.
+            # Sync loaded values to os.environ via apply_change callbacks
             self._sync_env_on_load(config)
 
             return config
@@ -150,27 +209,46 @@ class ConfigManager:
 
     def save_config(self, config: BaseConfig) -> bool:
         """
-        Save a configuration to file.
+        Save a configuration to database (primary) and file (backup).
 
         Args:
             config: The config instance to save
 
         Returns:
-            True if saved successfully
+            True if saved successfully (to at least one target)
         """
         config_name = config.get_config_name()
         config_path = self._get_config_path(config_name)
+        config_data = config.to_dict()
+        saved = False
 
         try:
             with self._lock:
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    json.dump(config.to_dict(), f, indent=2, ensure_ascii=False)
+                # 1. Save to database (primary)
+                if self._db_available:
+                    try:
+                        self._save_to_db(config_name, config_data)
+                        saved = True
+                        logger.debug(f"Saved config to DB: {config_name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to save config to DB {config_name}: {e}")
+
+                # 2. Save to file (backup / fallback)
+                try:
+                    with open(config_path, 'w', encoding='utf-8') as f:
+                        json.dump(config_data, f, indent=2, ensure_ascii=False)
+                    saved = True
+                    logger.debug(f"Saved config to file: {config_name}")
+                except Exception as e:
+                    logger.warning(f"Failed to save config to file {config_name}: {e}")
 
                 # Update cache
-                self._configs[config_name] = config
+                if saved:
+                    self._configs[config_name] = config
 
-            logger.info(f"Saved config: {config_name}")
-            return True
+            if saved:
+                logger.info(f"Saved config: {config_name}")
+            return saved
         except Exception as e:
             logger.error(f"Failed to save config {config_name}: {e}")
             return False
@@ -297,7 +375,7 @@ class ConfigManager:
 
     def delete_config(self, config_name: str) -> bool:
         """
-        Delete a config file.
+        Delete a config from database and file.
 
         Args:
             config_name: The config name to delete
@@ -309,6 +387,16 @@ class ConfigManager:
 
         try:
             with self._lock:
+                # Delete from database
+                if self._db_available:
+                    try:
+                        from service.database.db_config_helper import delete_config_group
+                        delete_config_group(self._app_db, config_name)
+                        logger.debug(f"Deleted config from DB: {config_name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete config from DB {config_name}: {e}")
+
+                # Delete file
                 if config_path.exists():
                     config_path.unlink()
 
@@ -324,7 +412,7 @@ class ConfigManager:
 
     def reload_config(self, config_name: str) -> Optional[BaseConfig]:
         """
-        Reload a config from file, bypassing cache.
+        Reload a config from DB/file, bypassing cache.
 
         Args:
             config_name: The config name to reload
@@ -338,14 +426,14 @@ class ConfigManager:
             return None
 
         with self._lock:
-            # Remove from cache
+            # Remove from cache to force reload
             if config_name in self._configs:
                 del self._configs[config_name]
 
         return self.load_config(config_classes[config_name])
 
     def reload_all_configs(self):
-        """Reload all configs from files"""
+        """Reload all configs from DB/files"""
         with self._lock:
             self._configs.clear()
 
@@ -397,6 +485,81 @@ class ConfigManager:
 
         return results
 
+    # ─── Database Helper Methods ──────────────────────────────────────────
+
+    def _load_from_db(self, config_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Load config data from the persistent_configs database table.
+
+        Each config field is stored as a separate row with:
+        - config_name = config name (e.g., "api", "github")
+        - config_key = field name (e.g., "anthropic_api_key")
+        - config_value = serialized value
+        - data_type = type hint for deserialization
+
+        Returns:
+            Dictionary of config field values, or None if no data found
+        """
+        from service.database.db_config_helper import get_config_group
+        return get_config_group(self._app_db, config_name)
+
+    def _save_to_db(self, config_name: str, config_data: Dict[str, Any]) -> None:
+        """
+        Save config data to the persistent_configs database table.
+
+        Each field in config_data is stored as a separate row.
+
+        Args:
+            config_name: The config name
+            config_data: Dictionary of field name -> value
+        """
+        from service.database.db_config_helper import save_config_group
+        save_config_group(self._app_db, config_name, config_data)
+
+    def migrate_all_to_db(self) -> Dict[str, bool]:
+        """
+        Migrate all existing JSON configs to the database.
+        Called during startup after DB initialization.
+
+        Returns:
+            Dictionary mapping config names to migration success status
+        """
+        if not self._db_available:
+            logger.warning("Cannot migrate configs: database not available")
+            return {}
+
+        results = {}
+        config_classes = self.get_registered_config_classes()
+
+        for config_name, config_class in config_classes.items():
+            config_path = self._get_config_path(config_name)
+            try:
+                # Check if already in DB
+                existing = self._load_from_db(config_name)
+                if existing:
+                    results[config_name] = True
+                    logger.debug(f"Config already in DB, skipping migration: {config_name}")
+                    continue
+
+                # Load from JSON file
+                if config_path.exists():
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    self._save_to_db(config_name, data)
+                    results[config_name] = True
+                    logger.info(f"Migrated config to DB: {config_name}")
+                else:
+                    # Create default and save
+                    default = config_class.get_default_instance()
+                    self._save_to_db(config_name, default.to_dict())
+                    results[config_name] = True
+                    logger.info(f"Created default config in DB: {config_name}")
+            except Exception as e:
+                logger.error(f"Failed to migrate config {config_name}: {e}")
+                results[config_name] = False
+
+        return results
+
 
 def get_config_manager() -> ConfigManager:
     """Get the global config manager instance"""
@@ -406,8 +569,14 @@ def get_config_manager() -> ConfigManager:
     return _config_manager
 
 
-def init_config_manager(config_dir: Optional[Path] = None) -> ConfigManager:
-    """Initialize the global config manager with custom config directory"""
+def init_config_manager(config_dir: Optional[Path] = None, app_db=None) -> ConfigManager:
+    """
+    Initialize the global config manager with custom config directory and optional DB backend.
+
+    Args:
+        config_dir: Directory to store config files (fallback)
+        app_db: AppDatabaseManager instance for DB-backed storage
+    """
     global _config_manager
-    _config_manager = ConfigManager(config_dir)
+    _config_manager = ConfigManager(config_dir, app_db=app_db)
     return _config_manager

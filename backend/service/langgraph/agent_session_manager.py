@@ -32,7 +32,7 @@ AgentSession 전용 메서드를 추가합니다.
 from logging import getLogger
 from typing import Dict, List, Optional
 
-from service.claude_manager.session_manager import SessionManager, is_redis_enabled, merge_mcp_configs
+from service.claude_manager.session_manager import SessionManager, merge_mcp_configs
 from service.claude_manager.models import (
     CreateSessionRequest,
     MCPConfig,
@@ -41,16 +41,16 @@ from service.claude_manager.models import (
     SessionStatus,
 )
 from service.claude_manager.process_manager import ClaudeProcess
-from service.redis.redis_client import RedisClient
-from service.pod.pod_info import get_pod_info
-from service.logging.session_logger import get_session_logger, remove_session_logger
 
+from service.logging.session_logger import get_session_logger, remove_session_logger
 from service.langgraph.agent_session import AgentSession
 from service.prompt.sections import build_agent_prompt
 from service.prompt.context_loader import ContextLoader
 from service.tool_policy import ToolPolicyEngine, ToolProfile
 from service.prompt.builder import PromptMode
+
 from service.claude_manager.session_store import get_session_store
+
 
 logger = getLogger(__name__)
 
@@ -76,14 +76,8 @@ class AgentSessionManager(SessionManager):
        - get_process() -> ClaudeProcess
     """
 
-    def __init__(self, redis_client: Optional[RedisClient] = None):
-        """
-        AgentSessionManager 초기화.
-
-        Args:
-            redis_client: Redis 클라이언트 (옵션)
-        """
-        super().__init__(redis_client)
+    def __init__(self):
+        super().__init__()
 
         # AgentSession 저장소 (로컬)
         self._local_agents: Dict[str, AgentSession] = {}
@@ -410,17 +404,8 @@ class AgentSessionManager(SessionManager):
                     shared_path=self._shared_folder_manager.shared_path,
                 )
 
-        # Pod 정보
-        pod_info = get_pod_info()
-
         # SessionInfo 생성
-        session_info = agent.get_session_info(
-            pod_name=pod_info.pod_name,
-            pod_ip=pod_info.pod_ip,
-        )
-
-        # Redis에 세션 메타데이터 저장
-        self._save_session_to_redis(session_id, session_info)
+        session_info = agent.get_session_info()
 
         # 세션 로거 생성
         session_logger = get_session_logger(session_id, request.session_name, create_if_missing=True)
@@ -525,11 +510,6 @@ class AgentSessionManager(SessionManager):
 
             # 세션 로거 제거
             remove_session_logger(session_id)
-
-            # Redis에서도 삭제
-            if self.redis and self.redis.is_connected:
-                self.redis.delete_session(session_id)
-                logger.info(f"[{session_id}] Session deleted from Redis")
 
             # Soft-delete in persistent store (keeps metadata for restore)
             self._store.soft_delete(session_id)

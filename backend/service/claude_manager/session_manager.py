@@ -17,16 +17,9 @@ from service.claude_manager.models import (
     CreateSessionRequest,
     MCPConfig
 )
-from service.redis.redis_client import RedisClient, get_redis_client
-from service.pod.pod_info import get_pod_info
 from service.logging.session_logger import get_session_logger, remove_session_logger
 
 logger = getLogger(__name__)
-
-
-def is_redis_enabled() -> bool:
-    """Check if Redis is enabled via environment variable."""
-    return os.getenv('USE_REDIS', 'false').lower() == 'true'
 
 
 def merge_mcp_configs(base: Optional[MCPConfig], override: Optional[MCPConfig]) -> Optional[MCPConfig]:
@@ -48,28 +41,16 @@ class SessionManager:
     """
     Claude Session Manager.
 
-    - Redis: True source for session metadata (multi-pod sharing)
     - Local memory: Manages processes running on current pod
     - Global MCP: MCP configuration automatically applied to all sessions
     """
 
-    def __init__(self, redis_client: Optional[RedisClient] = None):
-        # Local process storage (only processes running on current pod)
+    def __init__(self):
+        # Local process storage
         self._local_processes: Dict[str, ClaudeProcess] = {}
-
-        # Redis client (for session metadata storage)
-        self._redis: Optional[RedisClient] = redis_client
 
         # Global MCP configuration (automatically applied to all sessions)
         self._global_mcp_config: Optional[MCPConfig] = None
-
-        # Cache whether Redis is enabled at startup
-        self._redis_enabled: bool = is_redis_enabled()
-
-    def set_redis_client(self, redis_client: RedisClient):
-        """Set Redis client (lazy injection)."""
-        self._redis = redis_client
-        logger.info("✅ Redis client connected to SessionManager")
 
     def set_global_mcp_config(self, config: MCPConfig):
         """Set global MCP configuration (automatically applied to all sessions)."""
@@ -81,20 +62,6 @@ class SessionManager:
     def global_mcp_config(self) -> Optional[MCPConfig]:
         """Return global MCP configuration."""
         return self._global_mcp_config
-
-    @property
-    def redis(self) -> Optional[RedisClient]:
-        """Return Redis client (None if Redis is disabled)."""
-        # If Redis is disabled, don't even try to get the client
-        if not self._redis_enabled:
-            return None
-
-        if self._redis is None:
-            try:
-                self._redis = get_redis_client()
-            except Exception as e:
-                logger.warning(f"Could not get Redis client: {e}")
-        return self._redis
 
     @property
     def sessions(self) -> Dict[str, ClaudeProcess]:
@@ -158,9 +125,6 @@ class SessionManager:
         # Store local process
         self._local_processes[session_id] = process
 
-        # Get pod information
-        pod_info = get_pod_info()
-
         # Create SessionInfo
         session_info = SessionInfo(
             session_id=session_id,
@@ -173,14 +137,9 @@ class SessionManager:
             max_turns=process.max_turns,
             timeout=process.timeout,
             storage_path=process.storage_path,
-            pod_name=pod_info.pod_name,
-            pod_ip=pod_info.pod_ip,
             role=SessionRole(process.role),
             manager_id=process.manager_id
         )
-
-        # Save session metadata to Redis
-        self._save_session_to_redis(session_id, session_info)
 
         # Create session logger
         session_logger = get_session_logger(session_id, request.session_name, create_if_missing=True)
@@ -206,63 +165,22 @@ class SessionManager:
 
     def get_session_info(self, session_id: str) -> Optional[SessionInfo]:
         """
-        Get session metadata (Redis priority).
-
-        Retrieves session info from Redis (supports multi-pod environment).
+        Get session metadata from local process.
         """
-        # First try Redis
-        if self.redis and self.redis.is_connected:
-            session_data = self.redis.get_session(session_id)
-            if session_data:
-                return self._dict_to_session_info(session_data)
-
-        # If not in Redis, generate from local process
         process = self._local_processes.get(session_id)
         if process:
             return self._process_to_session_info(session_id, process)
-
         return None
 
     def list_sessions(self) -> List[SessionInfo]:
         """
-        List all sessions.
-
-        If Redis is available, queries Redis (all sessions across multi-pod).
-        Otherwise returns only local processes.
+        List all sessions (local processes only).
         """
         sessions_info = []
-
-        # Query all sessions from Redis (multi-pod environment)
-        if self.redis and self.redis.is_connected:
-            all_sessions = self.redis.get_all_sessions()
-
-            for session_data in all_sessions:
-                session_id = session_data.get('session_id')
-
-                # Update status if local process exists
-                local_process = self._local_processes.get(session_id)
-                if local_process:
-                    # Check and update process status
-                    if not local_process.is_alive() and local_process.status == SessionStatus.RUNNING:
-                        local_process.status = SessionStatus.STOPPED
-                        session_data['status'] = SessionStatus.STOPPED.value
-                        self.redis.update_session_field(session_id, 'status', SessionStatus.STOPPED.value)
-                    else:
-                        session_data['status'] = local_process.status.value
-                        session_data['pid'] = local_process.pid
-
-                sessions_info.append(self._dict_to_session_info(session_data))
-
-            return sessions_info
-
-        # Without Redis, return only local processes
         for session_id, process in self._local_processes.items():
-            # Update process status
             if not process.is_alive() and process.status == SessionStatus.RUNNING:
                 process.status = SessionStatus.STOPPED
-
             sessions_info.append(self._process_to_session_info(session_id, process))
-
         return sessions_info
 
     async def delete_session(self, session_id: str, cleanup_storage: bool = False) -> bool:
@@ -300,13 +218,6 @@ class SessionManager:
             # Remove from local
             del self._local_processes[session_id]
 
-        # Also delete from Redis
-        if self.redis and self.redis.is_connected:
-            self.redis.delete_session(session_id)
-            logger.info(f"[{session_id}] Session deleted from Redis")
-            return True
-
-        # If only deleted from local (no Redis)
         return process is not None
 
     async def cleanup_dead_sessions(self):
@@ -322,37 +233,6 @@ class SessionManager:
             await self.delete_session(session_id)
 
     # ========== Helper Methods ==========
-
-    def _save_session_to_redis(self, session_id: str, session_info: SessionInfo):
-        """Save session information to Redis (only if Redis is enabled)."""
-        # Skip silently if Redis is disabled
-        if not self._redis_enabled:
-            return
-
-        if not self.redis or not self.redis.is_connected:
-            # Only log warning if Redis was supposed to be available but isn't
-            logger.warning(f"Redis enabled but not connected - session {session_id} stored locally only")
-            return
-
-        session_data = {
-            'session_id': session_id,
-            'session_name': session_info.session_name,
-            'status': session_info.status.value if session_info.status else None,
-            'created_at': session_info.created_at,
-            'pid': session_info.pid,
-            'error_message': session_info.error_message,
-            'model': session_info.model,
-            'max_turns': session_info.max_turns,
-            'timeout': session_info.timeout,
-            'storage_path': session_info.storage_path,
-            'pod_name': session_info.pod_name,
-            'pod_ip': session_info.pod_ip,
-            'role': session_info.role.value if session_info.role else 'worker',
-            'manager_id': session_info.manager_id
-        }
-
-        self.redis.save_session(session_id, session_data)
-        logger.debug(f"Session saved to Redis: {session_id}")
 
     def _load_manager_prompt(self) -> Optional[str]:
         """Load the manager prompt from prompts/manager.md"""
@@ -374,7 +254,6 @@ class SessionManager:
 
     def _process_to_session_info(self, session_id: str, process: ClaudeProcess) -> SessionInfo:
         """Convert ClaudeProcess to SessionInfo."""
-        pod_info = get_pod_info()
         return SessionInfo(
             session_id=session_id,
             session_name=process.session_name,
@@ -386,8 +265,6 @@ class SessionManager:
             max_turns=process.max_turns,
             timeout=process.timeout,
             storage_path=process.storage_path,
-            pod_name=pod_info.pod_name,
-            pod_ip=pod_info.pod_ip,
             role=SessionRole(process.role),
             manager_id=process.manager_id
         )

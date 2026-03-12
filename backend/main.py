@@ -3,7 +3,6 @@ import sys
 import asyncio
 from logging import basicConfig, getLogger, INFO
 from pathlib import Path
-from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,11 +17,7 @@ from controller.workflow_controller import router as workflow_router
 from controller.tool_preset_controller import router as tool_preset_router
 from controller.shared_folder_controller import router as shared_folder_router
 from controller.chat_controller import router as chat_router
-from service.redis.redis_client import RedisClient, get_redis_client
-from service.config import get_config_manager, ConfigManager
-from service.pod.pod_info import init_pod_info, get_pod_info
-from service.middleware.session_router import SessionRoutingMiddleware
-from service.proxy.internal_proxy import get_internal_proxy
+from service.config import get_config_manager
 from service.mcp_loader import MCPLoader, get_global_mcp_config
 import uvicorn
 
@@ -83,42 +78,6 @@ def print_step_banner(step: str, title: str, description: str = ""):
     logger.info(banner)
 
 
-def init_redis_client(app: FastAPI) -> Optional[RedisClient]:
-    """Initialize Redis client and register in app.state
-
-    Only attempts Redis connection if USE_REDIS environment variable is set to 'true'.
-    Returns None if Redis is disabled.
-    """
-    use_redis = os.getenv('USE_REDIS', 'false').lower() == 'true'
-
-    if not use_redis:
-        logger.info("ℹ️  Redis disabled (USE_REDIS=false) - running in local memory mode")
-        app.state.redis_client = None
-        return None
-
-    redis_client = RedisClient()
-
-    # Register in FastAPI app.state for global access
-    app.state.redis_client = redis_client
-
-    if redis_client.is_connected:
-        logger.info("✅ Redis client initialization complete")
-        stats = redis_client.get_stats()
-        logger.info(f"   - Host: {stats['host']}:{stats['port']}")
-        logger.info(f"   - DB: {stats['db']}")
-        if stats.get('redis_info'):
-            logger.info(f"   - Redis Version: {stats['redis_info'].get('version')}")
-    else:
-        logger.warning("⚠️  Redis connection failed - running in local memory mode")
-
-    return redis_client
-
-
-def get_app_redis_client(app: FastAPI) -> RedisClient:
-    """Get Redis client from app.state"""
-    return getattr(app.state, 'redis_client', None)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle management"""
@@ -126,28 +85,59 @@ async def lifespan(app: FastAPI):
     print_step_banner("START", "GENY AGENT STARTUP", "Initializing agent session management system")
     logger.info("Starting Geny Agent")
 
-    # Initialize Pod info
-    print_step_banner("POD", "POD INFO", "Initializing pod information...")
-    pod_info = init_pod_info()
-    app.state.pod_info = pod_info
-    logger.info(f"   - Pod Name: {pod_info.pod_name}")
-    logger.info(f"   - Pod IP: {pod_info.pod_ip}")
-    logger.info(f"   - Service Port: {pod_info.service_port}")
+    # ── Step 1: Initialize PostgreSQL Database ─────────────────────────
+    app_db = None
+    try:
+        print_step_banner("DATABASE", "POSTGRESQL DATABASE", "Connecting to PostgreSQL...")
+        from service.database import AppDatabaseManager, database_config, APPLICATION_MODELS
+        from service.database.migrations import run_cleanup_migration
 
-    # Initialize Redis client and register in app.state (only if USE_REDIS=true)
-    use_redis = os.getenv('USE_REDIS', 'false').lower() == 'true'
-    if use_redis:
-        print_step_banner("REDIS", "REDIS CONNECTION", "Connecting to Redis server...")
-    else:
-        print_step_banner("REDIS", "REDIS DISABLED", "Running in local memory mode")
-    redis_client = init_redis_client(app)
+        app_db = AppDatabaseManager()
 
-    # Inject Redis client into AgentSessionManager
-    agent_manager.set_redis_client(redis_client)
+        # Register models first
+        app_db.register_models(APPLICATION_MODELS)
+        logger.info(f"   - Registered models: {len(APPLICATION_MODELS)}")
+        for model_cls in APPLICATION_MODELS:
+            inst = model_cls()
+            logger.info(f"     - {model_cls.__name__} -> {inst.get_table_name()}")
 
-    # Initialize Config Manager
+        # Initialize database (connect + create tables + auto-migration)
+        connected = app_db.initialize_database()
+        if connected:
+            logger.info(f"   - Host: {database_config.POSTGRES_HOST.value}:{database_config.POSTGRES_PORT.value}")
+            logger.info(f"   - Database: {database_config.POSTGRES_DB.value}")
+            logger.info(f"   - Auto-migration: {database_config.AUTO_MIGRATION.value}")
+            logger.info("   - Database tables initialized")
+
+            # Run data migrations (cleanup escaped configs, etc.)
+            run_cleanup_migration(app_db)
+            logger.info("   - Data migrations complete")
+
+            app.state.app_db = app_db
+        else:
+            logger.warning("   - Database connection failed, running in file-only mode")
+            app_db = None
+    except Exception as e:
+        logger.warning(f"   - Database initialization failed: {e}")
+        logger.warning("   - Running in file-only mode (configs stored in JSON files)")
+        app_db = None
+
+    # ── Step 2: Initialize Config Manager (with DB backend) ────────────
     print_step_banner("CONFIG", "CONFIG MANAGER", "Loading configurations...")
     config_manager = get_config_manager()
+
+    # Connect database to config manager if available
+    if app_db is not None:
+        config_manager.set_database(app_db)
+        logger.info("   - Config storage: PostgreSQL (primary) + JSON (backup)")
+
+        # Migrate existing JSON configs to database
+        migration_results = config_manager.migrate_all_to_db()
+        migrated = sum(1 for v in migration_results.values() if v)
+        logger.info(f"   - Config migration: {migrated}/{len(migration_results)} configs in DB")
+    else:
+        logger.info("   - Config storage: JSON files (database unavailable)")
+
     app.state.config_manager = config_manager
     registered_configs = config_manager.get_registered_config_classes()
     logger.info(f"   - Registered Configs: {len(registered_configs)}")
@@ -214,10 +204,6 @@ async def lifespan(app: FastAPI):
     print_step_banner("SHUTDOWN", "GENY AGENT SHUTDOWN", "Cleaning up sessions...")
     logger.info("Shutting down Geny Agent")
 
-    # Shutdown Internal Proxy client
-    proxy = get_internal_proxy()
-    await proxy.close()
-
     # Stop all active sessions (processes only — storage preserved)
     # Soft-delete all active sessions so they appear in "deleted sessions" on restart
     async def stop_all_sessions():
@@ -249,6 +235,14 @@ async def lifespan(app: FastAPI):
     except asyncio.TimeoutError:
         logger.warning("Session stop timed out, some processes may still be running")
 
+    # Close database connection pool
+    if hasattr(app.state, 'app_db') and app.state.app_db is not None:
+        try:
+            app.state.app_db.close()
+            logger.info("Database connection pool closed")
+        except Exception as e:
+            logger.warning(f"Error closing database connection: {e}")
+
 
 # Create FastAPI app
 app = FastAPI(
@@ -267,11 +261,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Session routing middleware (Session-based proxy for multi-pod environment)
-# Note: add_middleware executes in reverse order (last added runs first)
-app.add_middleware(SessionRoutingMiddleware)
-
-
 @app.get("/")
 async def root():
     """Redirect to dashboard"""
@@ -280,38 +269,25 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
+    """Detailed health check including database status"""
     sessions = agent_manager.list_sessions()
-    pod_info = get_pod_info()
 
-    # Check Redis status (get from app.state)
-    redis_client = get_app_redis_client(app)
-    redis_status = "disconnected"
-    if redis_client and redis_client.is_connected:
-        redis_status = "connected" if redis_client.health_check() else "error"
-
-    # Number of sessions running on current pod
-    local_sessions = len(agent_manager.sessions)
+    # Database health check
+    db_status = "not_configured"
+    if hasattr(app.state, 'app_db') and app.state.app_db is not None:
+        try:
+            healthy = app.state.app_db.db_manager.health_check()
+            db_status = "healthy" if healthy else "unhealthy"
+        except Exception:
+            db_status = "error"
 
     return {
         "status": "healthy",
-        "pod_name": pod_info.pod_name,
-        "pod_ip": pod_info.pod_ip,
-        "redis": redis_status,
         "total_sessions": len(sessions),
-        "local_sessions": local_sessions,
         "running_sessions": sum(1 for s in sessions if s.status == "running"),
-        "error_sessions": sum(1 for s in sessions if s.status == "error")
+        "error_sessions": sum(1 for s in sessions if s.status == "error"),
+        "database": db_status
     }
-
-
-@app.get("/redis/stats")
-async def redis_stats():
-    """Redis status and statistics"""
-    redis_client = get_app_redis_client(app)
-    if redis_client:
-        return redis_client.get_stats()
-    return {"error": "Redis client not initialized"}
 
 
 # Register routers
@@ -348,17 +324,8 @@ async def dashboard(request: Request):
     prompts_data = get_prompts_list()
 
     # Get health status
-    pod_info = get_pod_info()
-    redis_client = get_app_redis_client(app)
-    redis_status = "disconnected"
-    if redis_client and redis_client.is_connected:
-        redis_status = "connected" if redis_client.health_check() else "error"
-
     health_data = {
-        "status": "healthy",
-        "pod_name": pod_info.pod_name,
-        "pod_ip": pod_info.pod_ip,
-        "redis": redis_status
+        "status": "healthy"
     }
 
     # Calculate stats
