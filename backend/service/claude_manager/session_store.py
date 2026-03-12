@@ -1,11 +1,12 @@
 """
-SessionStore — Persistent session metadata storage via sessions.json.
+SessionStore — Persistent session metadata storage.
 
-Provides a file-based registry of ALL sessions (active + deleted) so that
+Primary storage: PostgreSQL database ('sessions' table)
+Fallback storage: sessions.json file
+
+Provides a registry of ALL sessions (active + deleted) so that
 session metadata survives server restarts and soft-deleted sessions can be
 restored.
-
-Storage location: geny_agent/service/claude_manager/sessions.json
 
 Each entry stores the full CreateSessionRequest parameters plus lifecycle
 metadata (created_at, deleted_at, status, last_output, etc.).
@@ -52,13 +53,57 @@ else:
 
 
 class SessionStore:
-    """Thread-safe, file-backed session metadata registry."""
+    """Thread-safe session metadata registry.
+
+    Primary storage: PostgreSQL (via session_db_helper).
+    Fallback: sessions.json file when DB is not available.
+    All writes go to both DB and file for resilience.
+    """
 
     def __init__(self, path: Path = _STORE_PATH):
         self._path = path
         self._lock = threading.Lock()
         self._data: Dict[str, Dict[str, Any]] = {}  # session_id -> record
+        self._app_db = None  # Set via set_database()
         self._load()
+
+    # ------------------------------------------------------------------
+    # Database integration
+    # ------------------------------------------------------------------
+
+    def set_database(self, app_db) -> None:
+        """Set the database manager for DB-backed session storage.
+
+        Called during application startup after DB initialization.
+        Triggers migration of existing JSON data to DB.
+        """
+        self._app_db = app_db
+        logger.info("SessionStore: Database backend connected")
+        # Migrate existing JSON records to DB
+        self._migrate_to_db()
+
+    @property
+    def _db_available(self) -> bool:
+        """Check if DB is available for session storage."""
+        if self._app_db is None:
+            return False
+        try:
+            from service.database.session_db_helper import _is_db_available
+            return _is_db_available(self._app_db)
+        except Exception:
+            return False
+
+    def _migrate_to_db(self) -> None:
+        """Migrate existing JSON session records to DB (one-time)."""
+        if not self._db_available or not self._data:
+            return
+        try:
+            from service.database.session_db_helper import db_migrate_sessions_from_json
+            count = db_migrate_sessions_from_json(self._app_db, self._data)
+            if count > 0:
+                logger.info(f"SessionStore: Migrated {count} sessions from JSON to DB")
+        except Exception as e:
+            logger.warning(f"SessionStore: Migration to DB failed: {e}")
 
     # ------------------------------------------------------------------
     # Persistence helpers
@@ -101,29 +146,45 @@ class SessionStore:
     def register(self, session_id: str, info: Dict[str, Any]):
         """Register a newly created session.
 
-        Args:
-            session_id: Unique session ID.
-            info: SessionInfo-like dict (from session_info.dict()).
+        Writes to DB (primary) and JSON file (backup).
         """
+        record = {
+            **info,
+            "session_id": session_id,
+            "is_deleted": False,
+            "deleted_at": None,
+            "registered_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_register_session
+                db_register_session(self._app_db, session_id, record)
+            except Exception as e:
+                logger.warning(f"[SessionStore] DB register failed for {session_id}: {e}")
+
+        # JSON backup
         with self._lock:
-            record = {
-                **info,
-                "session_id": session_id,
-                "is_deleted": False,
-                "deleted_at": None,
-                "registered_at": datetime.now(timezone.utc).isoformat(),
-            }
             self._data[session_id] = record
             self._save()
+
         logger.info(f"[SessionStore] Registered session {session_id}")
 
     def update(self, session_id: str, updates: Dict[str, Any]):
         """Update fields of an existing record.
 
-        Args:
-            session_id: Session ID.
-            updates: Dict of fields to merge.
+        Writes to DB (primary) and JSON file (backup).
         """
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_update_session
+                db_update_session(self._app_db, session_id, updates)
+            except Exception as e:
+                logger.warning(f"[SessionStore] DB update failed for {session_id}: {e}")
+
+        # JSON backup
         with self._lock:
             if session_id not in self._data:
                 return
@@ -135,6 +196,15 @@ class SessionStore:
 
         The record is kept with is_deleted=True and deleted_at timestamp.
         """
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_soft_delete_session
+                db_soft_delete_session(self._app_db, session_id)
+            except Exception as e:
+                logger.warning(f"[SessionStore] DB soft-delete failed for {session_id}: {e}")
+
+        # JSON backup
         with self._lock:
             if session_id not in self._data:
                 logger.warning(f"[SessionStore] Cannot soft-delete unknown session {session_id}")
@@ -150,46 +220,122 @@ class SessionStore:
 
         Returns True if found and restored, False otherwise.
         """
+        restored = False
+
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_restore_session
+                restored = db_restore_session(self._app_db, session_id)
+            except Exception as e:
+                logger.warning(f"[SessionStore] DB restore failed for {session_id}: {e}")
+
+        # JSON backup
         with self._lock:
             rec = self._data.get(session_id)
-            if not rec or not rec.get("is_deleted"):
-                return False
-            rec["is_deleted"] = False
-            rec["deleted_at"] = None
-            self._save()
-        logger.info(f"[SessionStore] Restored session {session_id}")
-        return True
+            if rec and rec.get("is_deleted"):
+                rec["is_deleted"] = False
+                rec["deleted_at"] = None
+                self._save()
+                restored = True
+
+        if restored:
+            logger.info(f"[SessionStore] Restored session {session_id}")
+        return restored
 
     def permanent_delete(self, session_id: str) -> bool:
         """Permanently remove a session record from the store.
 
         Returns True if found and removed, False otherwise.
         """
+        deleted = False
+
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_permanent_delete_session
+                deleted = db_permanent_delete_session(self._app_db, session_id)
+            except Exception as e:
+                logger.warning(f"[SessionStore] DB permanent-delete failed for {session_id}: {e}")
+
+        # JSON backup
         with self._lock:
-            if session_id not in self._data:
-                return False
-            del self._data[session_id]
-            self._save()
-        logger.info(f"[SessionStore] Permanently deleted session {session_id}")
-        return True
+            if session_id in self._data:
+                del self._data[session_id]
+                self._save()
+                deleted = True
+
+        if deleted:
+            logger.info(f"[SessionStore] Permanently deleted session {session_id}")
+        return deleted
 
     def get(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Get a session record by ID."""
+        """Get a session record by ID.
+
+        Reads from DB first, falls back to JSON file.
+        """
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_get_session
+                result = db_get_session(self._app_db, session_id)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.debug(f"[SessionStore] DB get failed for {session_id}: {e}")
+
+        # JSON fallback
         with self._lock:
             return self._data.get(session_id)
 
     def list_all(self) -> List[Dict[str, Any]]:
-        """Return all session records (active + deleted)."""
+        """Return all session records (active + deleted).
+
+        Reads from DB first, falls back to JSON file.
+        """
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_list_all_sessions
+                result = db_list_all_sessions(self._app_db)
+                if result:
+                    return result
+            except Exception as e:
+                logger.debug(f"[SessionStore] DB list_all failed: {e}")
+
         with self._lock:
             return list(self._data.values())
 
     def list_active(self) -> List[Dict[str, Any]]:
-        """Return only active (non-deleted) session records."""
+        """Return only active (non-deleted) session records.
+
+        Reads from DB first, falls back to JSON file.
+        """
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_list_active_sessions
+                result = db_list_active_sessions(self._app_db)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.debug(f"[SessionStore] DB list_active failed: {e}")
+
         with self._lock:
             return [r for r in self._data.values() if not r.get("is_deleted")]
 
     def list_deleted(self) -> List[Dict[str, Any]]:
-        """Return only soft-deleted session records."""
+        """Return only soft-deleted session records.
+
+        Reads from DB first, falls back to JSON file.
+        """
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_list_deleted_sessions
+                result = db_list_deleted_sessions(self._app_db)
+                if result is not None:
+                    return result
+            except Exception as e:
+                logger.debug(f"[SessionStore] DB list_deleted failed: {e}")
+
         with self._lock:
             return [r for r in self._data.values() if r.get("is_deleted")]
 
@@ -218,6 +364,14 @@ class SessionStore:
 
     def contains(self, session_id: str) -> bool:
         """Check if session_id exists in the store."""
+        # DB primary
+        if self._db_available:
+            try:
+                from service.database.session_db_helper import db_session_exists
+                return db_session_exists(self._app_db, session_id)
+            except Exception:
+                pass
+
         with self._lock:
             return session_id in self._data
 

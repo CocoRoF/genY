@@ -9,10 +9,16 @@ To add a new model:
 """
 from service.database.models.base_model import BaseModel
 from service.database.models.persistent_config import PersistentConfigModel
+from service.database.models.session import SessionModel
+from service.database.models.chat_room import ChatRoomModel
+from service.database.models.chat_message import ChatMessageModel
 
 __all__ = [
     'BaseModel',
     'PersistentConfigModel',
+    'SessionModel',
+    'ChatRoomModel',
+    'ChatMessageModel',
 ]
 
 # List of models used by the application
@@ -20,4 +26,7 @@ __all__ = [
 # and will be migrated with ALTER TABLE when schema changes are detected.
 APPLICATION_MODELS = [
     PersistentConfigModel,
+    SessionModel,
+    ChatRoomModel,
+    ChatMessageModel,
 ]

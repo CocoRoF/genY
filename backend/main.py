@@ -146,6 +146,24 @@ async def lifespan(app: FastAPI):
         config_manager.load_config(config_class)
         logger.info(f"     - {config_name}")
 
+    # ── Step 3: Connect SessionStore & ChatStore to DB ─────────────────
+    print_step_banner("SESSIONS", "SESSION STORE", "Connecting session stores to database...")
+    from service.claude_manager.session_store import get_session_store
+    from service.chat.conversation_store import get_chat_store
+
+    session_store = get_session_store()
+    chat_store = get_chat_store()
+
+    if app_db is not None:
+        session_store.set_database(app_db)
+        logger.info("   - SessionStore: PostgreSQL (primary) + JSON (backup)")
+
+        chat_store.set_database(app_db)
+        logger.info("   - ChatStore: PostgreSQL (primary) + JSON (backup)")
+    else:
+        logger.info("   - SessionStore: JSON files (database unavailable)")
+        logger.info("   - ChatStore: JSON files (database unavailable)")
+
     # Auto-load MCP configs and tools
     print_step_banner("MCP", "MCP LOADER", "Loading MCP configs and tools...")
     mcp_loader = MCPLoader()
