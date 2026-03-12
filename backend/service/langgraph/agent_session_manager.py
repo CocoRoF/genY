@@ -90,7 +90,19 @@ class AgentSessionManager(SessionManager):
         self._shared_folder_manager = None  # SharedFolderManager instance
         self._shared_folder_link_name: str = "_shared"
 
+        # Database reference (for per-session memory/log DB wiring)
+        self._app_db = None
+
         logger.info("✅ AgentSessionManager initialized")
+
+    def set_app_db(self, app_db) -> None:
+        """Store the AppDatabaseManager for per-session DB wiring.
+
+        Called once at startup from main.py lifespan.
+        Enables DB-backed memory for newly created sessions.
+        """
+        self._app_db = app_db
+        logger.info("AgentSessionManager: app_db set for per-session memory DB wiring")
 
     def set_shared_folder_config(
         self,
@@ -392,6 +404,14 @@ class AgentSessionManager(SessionManager):
         # 기존 호환성: ClaudeProcess도 _local_processes에 등록
         if agent.process:
             self._local_processes[session_id] = agent.process
+
+        # Wire DB into session memory manager (if available)
+        if self._app_db is not None and agent.memory_manager is not None:
+            try:
+                agent.memory_manager.set_database(self._app_db, session_id)
+                logger.info(f"[{session_id}] Memory DB backend enabled")
+            except Exception as e:
+                logger.warning(f"[{session_id}] Failed to wire memory DB: {e}")
 
         # Link shared folder into session's storage directory
         if agent.process and agent.process.storage_path:

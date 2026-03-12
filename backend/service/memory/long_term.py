@@ -71,6 +71,26 @@ class LongTermMemory:
         self._memory_dir = self._storage_path / self.MEMORY_DIR
         self._main_file = self._memory_dir / self.MAIN_FILE
 
+        # DB support (set via set_database)
+        self._db_manager = None
+        self._session_id: Optional[str] = None
+
+    def set_database(self, db_manager, session_id: str) -> None:
+        """Enable DB-backed persistence for this memory store.
+
+        Args:
+            db_manager: AppDatabaseManager instance.
+            session_id: Session ID for DB queries.
+        """
+        self._db_manager = db_manager
+        self._session_id = session_id
+        logger.debug("LongTermMemory: DB backend enabled for session %s", session_id)
+
+    @property
+    def _db_available(self) -> bool:
+        """True if DB is configured and the session ID is set."""
+        return self._db_manager is not None and self._session_id is not None
+
     @property
     def memory_dir(self) -> Path:
         return self._memory_dir
@@ -121,6 +141,20 @@ class LongTermMemory:
             len(text), self._main_file,
         )
 
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_ltm_append
+                db_ltm_append(
+                    self._db_manager,
+                    self._session_id,
+                    content=text,
+                    filename=str(self._main_file.relative_to(self._storage_path)),
+                    heading=heading or "",
+                )
+            except Exception as e:
+                logger.debug("LongTermMemory: DB append failed (non-critical): %s", e)
+
     def write_dated(self, text: str, *, date: Optional[datetime] = None) -> Path:
         """Write text to a dated file (memory/YYYY-MM-DD.md).
 
@@ -146,6 +180,20 @@ class LongTermMemory:
             "LongTermMemory.write_dated: wrote %d chars to %s",
             len(text), filepath,
         )
+
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_ltm_write_dated
+                db_ltm_write_dated(
+                    self._db_manager,
+                    self._session_id,
+                    content=text,
+                    date_str=date.strftime("%Y-%m-%d"),
+                )
+            except Exception as e:
+                logger.debug("LongTermMemory: DB write_dated failed (non-critical): %s", e)
+
         return filepath
 
     def write_topic(self, topic: str, text: str) -> Path:
@@ -173,6 +221,20 @@ class LongTermMemory:
             )
 
         logger.debug("LongTermMemory.write_topic: %s → %s", topic, filepath)
+
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_ltm_write_topic
+                db_ltm_write_topic(
+                    self._db_manager,
+                    self._session_id,
+                    topic=topic,
+                    content=text,
+                )
+            except Exception as e:
+                logger.debug("LongTermMemory: DB write_topic failed (non-critical): %s", e)
+
         return filepath
 
     # ------------------------------------------------------------------
@@ -182,9 +244,18 @@ class LongTermMemory:
     def load_all(self) -> List[MemoryEntry]:
         """Load all markdown files as MemoryEntry objects.
 
+        Tries DB first, falls back to file-system scan.
+
         Returns entries sorted by: MEMORY.md first, then dated files
         newest-first, then alphabetical.
         """
+        # Try DB first
+        if self._db_available:
+            db_entries = self._load_all_from_db()
+            if db_entries is not None:
+                return db_entries
+
+        # Fallback to file-system
         if not self._memory_dir.exists():
             return []
 
@@ -215,6 +286,42 @@ class LongTermMemory:
 
         return entries
 
+    def _load_all_from_db(self) -> Optional[List[MemoryEntry]]:
+        """Load all LTM entries from DB. Returns None if unavailable."""
+        try:
+            from service.database.memory_db_helper import db_ltm_load_all
+            rows = db_ltm_load_all(self._db_manager, self._session_id)
+            if rows is None:
+                return None
+
+            entries: list[MemoryEntry] = []
+            for row in rows:
+                content = row.get("content", "")
+                filename = row.get("filename", "")
+                ts_str = row.get("entry_timestamp", "")
+                timestamp = None
+                if ts_str:
+                    try:
+                        timestamp = datetime.fromisoformat(ts_str)
+                    except (ValueError, TypeError):
+                        pass
+
+                entries.append(MemoryEntry(
+                    source=MemorySource.LONG_TERM,
+                    content=content,
+                    timestamp=timestamp,
+                    filename=filename,
+                    metadata={
+                        "entry_type": row.get("entry_type", "text"),
+                        "heading": row.get("heading", ""),
+                        "topic": row.get("topic", ""),
+                    },
+                ))
+            return entries
+        except Exception as e:
+            logger.debug("LongTermMemory: DB load_all failed, falling back to file: %s", e)
+            return None
+
     def load_main(self) -> Optional[MemoryEntry]:
         """Load only the main MEMORY.md file."""
         if not self._main_file.exists():
@@ -243,6 +350,7 @@ class LongTermMemory:
     ) -> List[MemorySearchResult]:
         """Simple keyword search over all long-term memory files.
 
+        Tries DB first, falls back to file-based search.
         Scores are based on keyword hit density + recency bonus.
 
         Args:
@@ -252,6 +360,49 @@ class LongTermMemory:
         if not query.strip():
             return []
 
+        # Try DB first
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_ltm_search
+                db_rows = db_ltm_search(
+                    self._db_manager, self._session_id,
+                    query_text=query, max_results=max_results,
+                )
+                if db_rows is not None and len(db_rows) > 0:
+                    results: list[MemorySearchResult] = []
+                    for row in db_rows:
+                        content = row.get("content", "")
+                        ts_str = row.get("entry_timestamp", "")
+                        timestamp = None
+                        if ts_str:
+                            try:
+                                timestamp = datetime.fromisoformat(ts_str)
+                            except (ValueError, TypeError):
+                                pass
+
+                        entry = MemoryEntry(
+                            source=MemorySource.LONG_TERM,
+                            content=content,
+                            timestamp=timestamp,
+                            filename=row.get("filename", ""),
+                            metadata={
+                                "entry_type": row.get("entry_type", "text"),
+                                "heading": row.get("heading", ""),
+                                "topic": row.get("topic", ""),
+                            },
+                        )
+                        snippet = self._extract_snippet(content, query.split()[0]) if query.split() else content[:240]
+                        results.append(MemorySearchResult(
+                            entry=entry,
+                            score=1.0,
+                            snippet=snippet,
+                            match_type="db_keyword",
+                        ))
+                    return results
+            except Exception as e:
+                logger.debug("LongTermMemory: DB search failed: %s", e)
+
+        # Fallback to file-based search
         entries = self.load_all()
         query_lower = query.lower()
         keywords = [w for w in query_lower.split() if len(w) >= 2]

@@ -44,6 +44,8 @@ class ShortTermMemory:
     Each message exchanged with the LLM is persisted as a JSONL line,
     enabling post-session review, search, and context replay.
 
+    Supports DB-backed storage (primary) with JSONL file fallback.
+
     Usage::
 
         stm = ShortTermMemory("/tmp/sessions/abc123")
@@ -69,6 +71,26 @@ class ShortTermMemory:
         self._transcript_dir = self._storage_path / self.TRANSCRIPT_DIR
         self._main_file = self._transcript_dir / self.MAIN_FILE
         self._summary_file = self._transcript_dir / self.SUMMARY_FILE
+
+        # DB support (set via set_database)
+        self._db_manager = None
+        self._session_id: Optional[str] = None
+
+    def set_database(self, db_manager, session_id: str) -> None:
+        """Enable DB-backed persistence for this memory store.
+
+        Args:
+            db_manager: AppDatabaseManager instance.
+            session_id: Session ID for DB queries.
+        """
+        self._db_manager = db_manager
+        self._session_id = session_id
+        logger.debug("ShortTermMemory: DB backend enabled for session %s", session_id)
+
+    @property
+    def _db_available(self) -> bool:
+        """True if DB is configured and the session ID is set."""
+        return self._db_manager is not None and self._session_id is not None
 
     @property
     def transcript_file(self) -> Path:
@@ -118,6 +140,20 @@ class ShortTermMemory:
 
         self._append_jsonl(record)
 
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_add_message
+                db_stm_add_message(
+                    self._db_manager,
+                    self._session_id,
+                    role=role,
+                    content=content,
+                    metadata=metadata,
+                )
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB write failed (non-critical): %s", e)
+
     def add_event(
         self,
         event: str,
@@ -142,6 +178,19 @@ class ShortTermMemory:
 
         self._append_jsonl(record)
 
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_add_event
+                db_stm_add_event(
+                    self._db_manager,
+                    self._session_id,
+                    event_name=event,
+                    data=data,
+                )
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB event write failed (non-critical): %s", e)
+
     def write_summary(self, summary: str) -> None:
         """Write or overwrite the session summary.
 
@@ -155,12 +204,30 @@ class ShortTermMemory:
             len(summary), self._summary_file,
         )
 
+        # Dual-write to DB
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_write_summary
+                db_stm_write_summary(self._db_manager, self._session_id, summary)
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB summary write failed (non-critical): %s", e)
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------
 
     def load_all(self) -> List[MemoryEntry]:
-        """Load all transcript entries as MemoryEntry objects."""
+        """Load all transcript entries as MemoryEntry objects.
+
+        Tries DB first, falls back to JSONL file.
+        """
+        # Try DB first
+        if self._db_available:
+            db_entries = self._load_all_from_db()
+            if db_entries is not None:
+                return db_entries
+
+        # Fallback to file
         records = self._read_jsonl()
         entries: list[MemoryEntry] = []
 
@@ -191,17 +258,106 @@ class ShortTermMemory:
 
         return entries
 
+    def _load_all_from_db(self) -> Optional[List[MemoryEntry]]:
+        """Load all entries from DB. Returns None if unavailable."""
+        try:
+            from service.database.memory_db_helper import db_stm_load_all
+            rows = db_stm_load_all(self._db_manager, self._session_id)
+            if rows is None:
+                return None
+
+            entries: list[MemoryEntry] = []
+            for i, row in enumerate(rows):
+                entry_type = row.get("entry_type", "message")
+                role = row.get("role", "unknown")
+                content = row.get("content", "")
+                ts_str = row.get("entry_timestamp", "")
+
+                timestamp = None
+                if ts_str:
+                    try:
+                        timestamp = datetime.fromisoformat(ts_str)
+                    except (ValueError, TypeError):
+                        pass
+
+                if entry_type == "message":
+                    display = f"[{role}] {content}"
+                else:
+                    event_name = row.get("event_name", "event")
+                    display = f"[event:{event_name}]"
+
+                entries.append(MemoryEntry(
+                    source=MemorySource.SHORT_TERM,
+                    content=display,
+                    timestamp=timestamp,
+                    filename=str(self._main_file.relative_to(self._storage_path)),
+                    line_start=i + 1,
+                    line_end=i + 1,
+                    metadata={"role": role, **row.get("metadata", {})},
+                ))
+            return entries
+        except Exception as e:
+            logger.debug("ShortTermMemory: DB load_all failed, falling back to file: %s", e)
+            return None
+
     def get_recent(self, n: int = 20) -> List[MemoryEntry]:
         """Load the N most recent messages.
+
+        Tries DB first, falls back to JSONL file.
 
         Args:
             n: Number of messages to return.
         """
+        # Try DB first
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_get_recent
+                rows = db_stm_get_recent(self._db_manager, self._session_id, n=n)
+                if rows is not None:
+                    entries: list[MemoryEntry] = []
+                    for i, row in enumerate(rows):
+                        role = row.get("role", "unknown")
+                        content = row.get("content", "")
+                        ts_str = row.get("entry_timestamp", "")
+                        timestamp = None
+                        if ts_str:
+                            try:
+                                timestamp = datetime.fromisoformat(ts_str)
+                            except (ValueError, TypeError):
+                                pass
+                        entries.append(MemoryEntry(
+                            source=MemorySource.SHORT_TERM,
+                            content=f"[{role}] {content}",
+                            timestamp=timestamp,
+                            filename=str(self._main_file.relative_to(self._storage_path)),
+                            line_start=i + 1,
+                            line_end=i + 1,
+                            metadata={"role": role, **row.get("metadata", {})},
+                        ))
+                    return entries
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB get_recent failed: %s", e)
+
+        # Fallback
         all_entries = self.load_all()
         return all_entries[-n:] if len(all_entries) > n else all_entries
 
     def get_summary(self) -> Optional[str]:
-        """Load the session summary if it exists."""
+        """Load the session summary if it exists.
+
+        Tries DB first, falls back to file.
+        """
+        # Try DB first
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_get_summary
+                summary = db_stm_get_summary(self._db_manager, self._session_id)
+                if summary is not None:
+                    return summary
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB get_summary failed: %s", e)
+
+        # Fallback to file
         if not self._summary_file.exists():
             return None
         try:
@@ -217,6 +373,8 @@ class ShortTermMemory:
     ) -> List[MemorySearchResult]:
         """Keyword search over transcript messages.
 
+        Tries DB first, falls back to file-based search.
+
         Args:
             query: Search string.
             max_results: Maximum results to return.
@@ -224,6 +382,44 @@ class ShortTermMemory:
         if not query.strip():
             return []
 
+        # Try DB first
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_search
+                db_rows = db_stm_search(
+                    self._db_manager, self._session_id,
+                    query_text=query, max_results=max_results,
+                )
+                if db_rows is not None and len(db_rows) > 0:
+                    results: list[MemorySearchResult] = []
+                    for row in db_rows:
+                        content = f"[{row.get('role', 'unknown')}] {row.get('content', '')}"
+                        ts_str = row.get("entry_timestamp", "")
+                        timestamp = None
+                        if ts_str:
+                            try:
+                                timestamp = datetime.fromisoformat(ts_str)
+                            except (ValueError, TypeError):
+                                pass
+                        entry = MemoryEntry(
+                            source=MemorySource.SHORT_TERM,
+                            content=content,
+                            timestamp=timestamp,
+                            filename=str(self._main_file.relative_to(self._storage_path)),
+                            metadata={"role": row.get("role", ""), **row.get("metadata", {})},
+                        )
+                        snippet = content[:240] + "..." if len(content) > 240 else content
+                        results.append(MemorySearchResult(
+                            entry=entry,
+                            score=1.0,
+                            snippet=snippet,
+                            match_type="db_keyword",
+                        ))
+                    return results
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB search failed: %s", e)
+
+        # Fallback to file-based search
         entries = self.load_all()
         query_lower = query.lower()
         keywords = [w for w in query_lower.split() if len(w) >= 2]
@@ -261,7 +457,20 @@ class ShortTermMemory:
         return results[:max_results]
 
     def message_count(self) -> int:
-        """Count total messages in the transcript."""
+        """Count total messages in the transcript.
+
+        Tries DB first, falls back to file.
+        """
+        if self._db_available:
+            try:
+                from service.database.memory_db_helper import db_stm_message_count
+                count = db_stm_message_count(self._db_manager, self._session_id)
+                if count is not None:
+                    return count
+            except Exception as e:
+                logger.debug("ShortTermMemory: DB message_count failed: %s", e)
+
+        # Fallback
         records = self._read_jsonl()
         return sum(1 for r in records if r.get("type") == "message")
 

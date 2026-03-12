@@ -12,6 +12,8 @@ from service.database.models.persistent_config import PersistentConfigModel
 from service.database.models.session import SessionModel
 from service.database.models.chat_room import ChatRoomModel
 from service.database.models.chat_message import ChatMessageModel
+from service.database.models.session_log import SessionLogModel
+from service.database.models.session_memory_entry import SessionMemoryEntryModel
 
 __all__ = [
     'BaseModel',
@@ -19,6 +21,8 @@ __all__ = [
     'SessionModel',
     'ChatRoomModel',
     'ChatMessageModel',
+    'SessionLogModel',
+    'SessionMemoryEntryModel',
 ]
 
 # List of models used by the application
@@ -29,4 +33,6 @@ APPLICATION_MODELS = [
     SessionModel,
     ChatRoomModel,
     ChatMessageModel,
+    SessionLogModel,
+    SessionMemoryEntryModel,
 ]

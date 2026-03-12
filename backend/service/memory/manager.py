@@ -85,6 +85,21 @@ class SessionMemoryManager:
         self._vmm = VectorMemoryManager(storage_path)
 
         self._initialized = False
+        self._db_manager = None
+        self._session_id: Optional[str] = None
+
+    def set_database(self, db_manager, session_id: str) -> None:
+        """Enable DB-backed persistence for LTM and STM.
+
+        Args:
+            db_manager: AppDatabaseManager instance.
+            session_id: Session ID for DB queries.
+        """
+        self._db_manager = db_manager
+        self._session_id = session_id
+        self._ltm.set_database(db_manager, session_id)
+        self._stm.set_database(db_manager, session_id)
+        logger.info("SessionMemoryManager: DB backend enabled for session %s", session_id)
 
     @property
     def long_term(self) -> LongTermMemory:

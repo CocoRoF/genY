@@ -1,0 +1,82 @@
+"""
+Session Memory Entry Model — Database model for memory entries.
+
+Stores both long-term memory (markdown content) and short-term memory
+(JSONL transcript entries) in a unified table, so that memory survives
+container restarts and can be queried/searched via SQL.
+"""
+from typing import Dict, Any
+from service.database.models.base_model import BaseModel
+
+
+class SessionMemoryEntryModel(BaseModel):
+    """Model for storing session memory entries (LTM + STM)."""
+
+    def __init__(
+        self,
+        entry_id: str = "",
+        session_id: str = "",
+        source: str = "long_term",       # 'long_term' | 'short_term'
+        entry_type: str = "text",         # 'text' | 'message' | 'event' | 'dated' | 'topic' | 'summary'
+        content: str = "",
+        filename: str = "",              # relative path within session (e.g. memory/MEMORY.md)
+        heading: str = "",               # markdown heading for LTM entries
+        topic: str = "",                 # topic slug for topic LTM entries
+        role: str = "",                  # for STM messages: user/assistant/system
+        event_name: str = "",            # for STM events: tool_call, state_change, etc.
+        metadata_json: str = "{}",       # extra metadata stored as JSON text
+        entry_timestamp: str = "",       # when the entry was created (ISO format)
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.entry_id = entry_id
+        self.session_id = session_id
+        self.source = source
+        self.entry_type = entry_type
+        self.content = content
+        self.filename = filename
+        self.heading = heading
+        self.topic = topic
+        self.role = role
+        self.event_name = event_name
+        self.metadata_json = metadata_json
+        self.entry_timestamp = entry_timestamp
+
+    def get_table_name(self) -> str:
+        return "session_memory_entries"
+
+    def get_schema(self) -> Dict[str, str]:
+        return {
+            "entry_id": "VARCHAR(255) NOT NULL",
+            "session_id": "VARCHAR(255) NOT NULL",
+            "source": "VARCHAR(20) NOT NULL DEFAULT 'long_term'",
+            "entry_type": "VARCHAR(30) NOT NULL DEFAULT 'text'",
+            "content": "TEXT DEFAULT ''",
+            "filename": "VARCHAR(500) DEFAULT ''",
+            "heading": "VARCHAR(500) DEFAULT ''",
+            "topic": "VARCHAR(255) DEFAULT ''",
+            "role": "VARCHAR(50) DEFAULT ''",
+            "event_name": "VARCHAR(100) DEFAULT ''",
+            "metadata_json": "TEXT DEFAULT '{}'",
+            "entry_timestamp": "VARCHAR(100) DEFAULT ''",
+        }
+
+    @classmethod
+    def get_create_table_query(cls, db_type: str = "postgresql") -> str:
+        """Generate CREATE TABLE with UNIQUE constraint on entry_id."""
+        base_query = super().get_create_table_query(db_type)
+        constraint = ",\n            UNIQUE (entry_id)"
+        idx = base_query.rfind(")")
+        if idx != -1:
+            return base_query[:idx] + constraint + base_query[idx:]
+        return base_query
+
+    def get_indexes(self) -> list:
+        return [
+            ("idx_mem_entry_session", "session_id"),
+            ("idx_mem_entry_source", "source"),
+            ("idx_mem_entry_type", "entry_type"),
+            ("idx_mem_entry_session_source", "session_id, source"),
+            ("idx_mem_entry_role", "role"),
+            ("idx_mem_entry_ts", "entry_timestamp"),
+        ]

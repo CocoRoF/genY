@@ -164,6 +164,20 @@ async def lifespan(app: FastAPI):
         logger.info("   - SessionStore: JSON files (database unavailable)")
         logger.info("   - ChatStore: JSON files (database unavailable)")
 
+    # ── Step 4: Connect Logging & Memory to DB ─────────────────────────
+    print_step_banner("LOGGING", "SESSION LOGGING & MEMORY", "Connecting logging and memory to database...")
+    from service.logging.session_logger import set_log_database
+
+    if app_db is not None:
+        set_log_database(app_db)
+        logger.info("   - SessionLogger: PostgreSQL (primary) + file (backup)")
+
+        agent_manager.set_app_db(app_db)
+        logger.info("   - AgentSession memory: PostgreSQL (primary) + file (backup)")
+    else:
+        logger.info("   - SessionLogger: file only (database unavailable)")
+        logger.info("   - AgentSession memory: file only (database unavailable)")
+
     # Auto-load MCP configs and tools
     print_step_banner("MCP", "MCP LOADER", "Loading MCP configs and tools...")
     mcp_loader = MCPLoader()

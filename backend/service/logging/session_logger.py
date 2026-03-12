@@ -3,6 +3,7 @@ Session Logger
 
 Per-session logging system for Geny Agent.
 Each session gets its own log file in the logs/ directory.
+Supports DB-backed storage (primary) with file fallback.
 """
 import json
 from logging import getLogger
@@ -15,6 +16,21 @@ from threading import Lock
 from service.utils.utils import now_kst, format_kst
 
 logger = getLogger(__name__)
+
+# ── Module-level DB reference for standalone functions ─────────────────
+_log_db_manager = None
+
+
+def set_log_database(app_db) -> None:
+    """Set the module-level DB manager for session logging.
+
+    Called once at startup from main.py lifespan.
+    Enables DB-backed reads in module-level functions like
+    ``list_session_logs()`` and ``read_logs_from_file()``.
+    """
+    global _log_db_manager
+    _log_db_manager = app_db
+    logger.info("SessionLogger: DB backend enabled")
 
 
 class LogLevel(str, Enum):
@@ -127,7 +143,7 @@ class SessionLogger:
                 f.write(header)
 
     def _write_entry(self, entry: LogEntry):
-        """Write a log entry to file and cache."""
+        """Write a log entry to file, cache, and DB."""
         with self._lock:
             # Write to file
             with open(self._log_file, 'a', encoding='utf-8') as f:
@@ -139,6 +155,27 @@ class SessionLogger:
             # Trim cache if too large
             if len(self._log_cache) > self._max_cache_size:
                 self._log_cache = self._log_cache[-self._max_cache_size:]
+
+        # Write to DB (outside lock to avoid blocking)
+        self._write_entry_to_db(entry)
+
+    def _write_entry_to_db(self, entry: LogEntry):
+        """Write a single log entry to the database (best-effort)."""
+        global _log_db_manager
+        if _log_db_manager is None:
+            return
+        try:
+            from service.database.session_log_db_helper import db_insert_log_entry
+            db_insert_log_entry(
+                _log_db_manager,
+                session_id=self.session_id,
+                level=entry.level.value,
+                message=entry.message,
+                metadata=entry.metadata,
+                log_timestamp=entry.timestamp.isoformat() if entry.timestamp else "",
+            )
+        except Exception as e:
+            logger.debug(f"SessionLogger: DB write failed (non-critical): {e}")
 
     def log(
         self,
@@ -920,10 +957,12 @@ class SessionLogger:
         """
         Get log entries.
 
+        Priority: cache → DB → file.
+
         Args:
             limit: Maximum number of entries to return
             level: Filter by a single LogLevel or a set of LogLevels
-            from_cache: If True, read from cache; if False, read from file
+            from_cache: If True, read from cache; if False, try DB then file
 
         Returns:
             List of log entries as dictionaries
@@ -938,8 +977,41 @@ class SessionLogger:
                         entries = [e for e in entries if e.level == level]
                 return [e.to_dict() for e in entries]
         else:
-            # Read from file
+            # Try DB first
+            db_entries = self._read_logs_from_db(limit, level)
+            if db_entries is not None:
+                return db_entries
+            # Fallback to file
             return self._read_logs_from_file(limit, level)
+
+    def _read_logs_from_db(
+        self,
+        limit: int = 100,
+        level: Optional["LogLevel | set[LogLevel]"] = None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Read log entries from DB. Returns None if DB unavailable."""
+        global _log_db_manager
+        if _log_db_manager is None:
+            return None
+        try:
+            from service.database.session_log_db_helper import db_get_session_logs
+
+            level_filter: Optional[set] = None
+            if level:
+                if isinstance(level, set):
+                    level_filter = {lv.value for lv in level}
+                else:
+                    level_filter = {level.value}
+
+            return db_get_session_logs(
+                _log_db_manager,
+                session_id=self.session_id,
+                limit=limit,
+                level_filter=level_filter,
+            )
+        except Exception as e:
+            logger.debug(f"SessionLogger: DB read failed, falling back to file: {e}")
+            return None
 
     def _read_logs_from_file(
         self,
@@ -1081,9 +1153,24 @@ def list_session_logs() -> List[Dict[str, Any]]:
     """
     List all available session log files.
 
+    Tries DB first, falls back to file-system scan.
+
     Returns:
         List of log file info dictionaries
     """
+    global _log_db_manager
+
+    # Try DB first
+    if _log_db_manager is not None:
+        try:
+            from service.database.session_log_db_helper import db_list_session_log_summaries
+            db_results = db_list_session_log_summaries(_log_db_manager)
+            if db_results is not None and len(db_results) > 0:
+                return db_results
+        except Exception as e:
+            logger.debug(f"list_session_logs: DB read failed, falling back to files: {e}")
+
+    # Fallback to file-system scan
     logs_dir = Path(__file__).parent.parent.parent / "logs"
     if not logs_dir.exists():
         return []
@@ -1110,9 +1197,11 @@ def read_logs_from_file(
     level: Optional["LogLevel | set[LogLevel]"] = None
 ) -> List[Dict[str, Any]]:
     """
-    Read log entries directly from a log file.
+    Read log entries for a session.
 
-    This function reads logs from disk without requiring an active session logger.
+    Tries DB first, falls back to file-based reading.
+
+    This function reads logs without requiring an active session logger.
     Useful for reading historical logs from deleted sessions.
 
     Args:
@@ -1123,6 +1212,33 @@ def read_logs_from_file(
     Returns:
         List of log entries as dictionaries
     """
+    global _log_db_manager
+
+    # Try DB first
+    if _log_db_manager is not None:
+        try:
+            from service.database.session_log_db_helper import db_get_session_logs, db_session_has_logs
+
+            if db_session_has_logs(_log_db_manager, session_id):
+                level_filter: Optional[set] = None
+                if level:
+                    if isinstance(level, set):
+                        level_filter = {lv.value for lv in level}
+                    else:
+                        level_filter = {level.value}
+
+                db_entries = db_get_session_logs(
+                    _log_db_manager,
+                    session_id=session_id,
+                    limit=limit,
+                    level_filter=level_filter,
+                )
+                if db_entries is not None:
+                    return db_entries
+        except Exception as e:
+            logger.debug(f"read_logs_from_file: DB read failed, falling back to file: {e}")
+
+    # Fallback to file-based reading
     # Build a set of allowed level value strings for fast checking
     allowed_values: Optional[set] = None
     if level:
