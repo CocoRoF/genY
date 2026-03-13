@@ -61,7 +61,7 @@ from service.langgraph.state import (
     AutonomousState,
     make_initial_autonomous_state,
 )
-from service.langgraph.session_freshness import SessionFreshness
+from service.langgraph.session_freshness import SessionFreshness, FreshnessStatus
 from service.logging.session_logger import get_session_logger, SessionLogger
 from service.workflow.workflow_model import WorkflowDefinition
 from service.workflow.workflow_executor import WorkflowExecutor
@@ -169,9 +169,13 @@ class AgentSession:
         self._current_iteration: int = 0
         self._execution_count: int = 0
         self._execution_start_time: Optional[datetime] = None
+        self._is_executing: bool = False  # True while invoke/astream is running
 
         # Session freshness evaluator
         self._freshness = SessionFreshness()
+
+        # Process revival flag (set by _auto_revive when process is dead)
+        self._needs_process_restart = False
 
         # Initial status
         self._status = SessionStatus.STARTING
@@ -440,11 +444,17 @@ class AgentSession:
     # ========================================================================
 
     def _check_freshness(self) -> None:
-        """Evaluate session freshness and log or raise on staleness.
+        """Evaluate session freshness and handle staleness.
 
         Called at the top of ``invoke()`` and ``astream()`` to detect
-        sessions that are too old, idle, or large.  On STALE_RESET the
-        session is marked as ERROR to prevent further use.
+        sessions that are too old, idle, or large.
+
+        Design:
+            - STALE_IDLE → auto-revive (reset timestamps, restart process
+              if needed).  The session continues — the user never sees an
+              error.
+            - STALE_RESET → truly unrecoverable (extreme age, runaway
+              iterations, repeated revival failures).  Mark ERROR.
         """
         result = self._freshness.evaluate(
             created_at=self._created_at,
@@ -452,6 +462,16 @@ class AgentSession:
             iteration_count=self._current_iteration,
             message_count=0,  # message count resolved inside the graph
         )
+
+        if result.should_revive:
+            # Idle session detected — auto-revive instead of killing
+            logger.info(
+                f"[{self._session_id}] Session idle detected: {result.reason}. "
+                f"Auto-reviving..."
+            )
+            self._auto_revive(result)
+            return
+
         if result.should_reset:
             self._status = SessionStatus.ERROR
             self._error_message = f"Session stale: {result.reason}"
@@ -459,6 +479,210 @@ class AgentSession:
                 f"Session {self._session_id} is stale and should be recreated: "
                 f"{result.reason}"
             )
+
+    def _auto_revive(self, freshness_result=None) -> None:
+        """Perform synchronous revival of an idle session.
+
+        Resets timestamps so the session appears fresh.  If the underlying
+        CLI process has died during the idle period, the async ``revive()``
+        method must be called instead (this is done by invoke/astream when
+        they catch the dead-process condition).
+
+        This method is intentionally lightweight and never raises.
+        """
+        reason = freshness_result.reason if freshness_result else "idle auto-revive"
+        logger.info(f"[{self._session_id}] Auto-reviving session from IDLE: {reason}")
+
+        # Reset execution timestamps so freshness evaluates as FRESH
+        self._execution_start_time = datetime.now()
+
+        # Ensure status is RUNNING (might be IDLE/ERROR/STOPPED from previous state)
+        if self._status in (SessionStatus.IDLE, SessionStatus.ERROR, SessionStatus.STOPPED):
+            self._status = SessionStatus.RUNNING
+            self._error_message = None
+
+        # Record the revival attempt
+        self._freshness.record_revival()
+
+        # Check if the underlying process is still alive
+        if self._model and self._model.process and not self._model.process.is_alive():
+            logger.warning(
+                f"[{self._session_id}] Underlying process died during idle. "
+                f"Async revive() needed."
+            )
+            # Mark that full revival is needed — invoke/astream will handle it
+            self._needs_process_restart = True
+        else:
+            self._needs_process_restart = False
+
+        logger.info(
+            f"[{self._session_id}] Auto-revive complete "
+            f"(revive_count={self._freshness.revive_count})"
+        )
+
+    def mark_idle(self) -> bool:
+        """Transition this session to IDLE status.
+
+        Called by the background idle monitor when the session has had
+        no activity for ``idle_transition_seconds``.  This does NOT
+        destroy anything — the session sleeps and auto-revives on the
+        next execution request.
+
+        IMPORTANT: Sessions that are currently executing a command are
+        NEVER marked as idle, even if the execution takes longer than
+        the idle threshold.  The ``_is_executing`` guard prevents this.
+
+        Returns:
+            True if the session was transitioned to IDLE, False if not
+            applicable (e.g. already IDLE, STOPPED, ERROR, or executing).
+        """
+        if self._status != SessionStatus.RUNNING:
+            return False
+
+        # Never mark a session as idle while it is actively executing
+        if self._is_executing:
+            return False
+
+        # Evaluate freshness to confirm the session is actually idle
+        result = self._freshness.evaluate(
+            created_at=self._created_at,
+            last_activity=self._execution_start_time,
+            iteration_count=self._current_iteration,
+            message_count=0,
+        )
+
+        if result.status == FreshnessStatus.STALE_IDLE:
+            self._status = SessionStatus.IDLE
+            logger.info(
+                f"[{self._session_id}] Session transitioned to IDLE "
+                f"(idle {result.idle_seconds:.0f}s)"
+            )
+            return True
+
+        return False
+
+    async def revive(self) -> bool:
+        """Full async revival of the session.
+
+        Called when the session was idle and the underlying CLI process
+        has died.  Re-initializes the model and rebuilds the graph while
+        preserving the session identity (same session_id, same storage).
+
+        Returns:
+            True on success, False on failure.
+        """
+        logger.info(f"[{self._session_id}] Full session revival starting...")
+
+        try:
+            # 1. Reset timestamps
+            self._execution_start_time = datetime.now()
+            self._error_message = None
+
+            # 2. Clean up dead model (if any)
+            if self._model:
+                try:
+                    await self._model.cleanup()
+                except Exception:
+                    logger.debug(
+                        f"[{self._session_id}] Model cleanup during revive (non-critical)",
+                        exc_info=True,
+                    )
+
+            # 3. Re-create the model (spawns a new ClaudeProcess)
+            self._model = ClaudeCLIChatModel(
+                session_id=self._session_id,
+                session_name=self._session_name,
+                working_dir=self._working_dir,
+                model_name=self._model_name,
+                max_turns=self._max_turns,
+                timeout=self._timeout,
+                system_prompt=self._system_prompt,
+                env_vars=self._env_vars,
+                mcp_config=self._mcp_config,
+            )
+
+            success = await self._model.initialize()
+            if not success:
+                err = (
+                    self._model.process.error_message
+                    if self._model.process
+                    else "Unknown error"
+                )
+                self._error_message = f"Revival failed: {err}"
+                self._status = SessionStatus.ERROR
+                logger.error(
+                    f"[{self._session_id}] Revival failed: model init error: {err}"
+                )
+                return False
+
+            # 4. Re-initialize memory manager
+            self._init_memory()
+
+            # 4b. Initialize vector memory layer (async, non-blocking)
+            if self._memory_manager:
+                try:
+                    await self._memory_manager.initialize_vector_memory()
+                except Exception as ve:
+                    logger.debug(
+                        f"[{self._session_id}] Vector memory init skipped on revive: {ve}"
+                    )
+
+            # 5. Rebuild the graph
+            self._build_graph()
+
+            # 6. Mark as alive
+            self._initialized = True
+            self._status = SessionStatus.RUNNING
+            self._needs_process_restart = False
+
+            # Record revival and log success
+            self._freshness.record_revival()
+
+            logger.info(
+                f"[{self._session_id}] Session revival successful "
+                f"(revive_count={self._freshness.revive_count})"
+            )
+            return True
+
+        except Exception as e:
+            self._error_message = f"Revival failed: {e}"
+            self._status = SessionStatus.ERROR
+            logger.exception(
+                f"[{self._session_id}] Session revival failed: {e}"
+            )
+            return False
+
+    async def _ensure_alive(self) -> None:
+        """Ensure the session is alive before execution.
+
+        Called at the top of invoke() and astream() after freshness check.
+        If the process needs restart (flagged by _auto_revive), performs
+        full async revival.  If revival fails, raises RuntimeError.
+        """
+        if getattr(self, '_needs_process_restart', False):
+            logger.info(
+                f"[{self._session_id}] Process restart needed — "
+                f"performing full revival..."
+            )
+            success = await self.revive()
+            if not success:
+                raise RuntimeError(
+                    f"Session {self._session_id} could not be revived: "
+                    f"{self._error_message}"
+                )
+
+        # Also check if process died without freshness flagging it
+        if self._model and self._model.process and not self._model.process.is_alive():
+            logger.warning(
+                f"[{self._session_id}] Process found dead — "
+                f"attempting revival..."
+            )
+            success = await self.revive()
+            if not success:
+                raise RuntimeError(
+                    f"Session {self._session_id} process died and could not "
+                    f"be revived: {self._error_message}"
+                )
 
     def _init_memory(self):
         """Initialize the session memory manager if storage_path is available."""
@@ -671,10 +895,14 @@ class AgentSession:
         if not self._initialized or not self._graph:
             raise RuntimeError("AgentSession not initialized. Call initialize() first.")
 
-        # Freshness check — log warning or raise if stale
+        # Freshness check — auto-revive if idle, raise if hard limit
         self._check_freshness()
 
+        # Ensure underlying process is alive (restart if needed)
+        await self._ensure_alive()
+
         self._status = SessionStatus.RUNNING
+        self._is_executing = True          # guard: prevent idle monitor interference
         self._current_iteration = 0
         self._execution_start_time = datetime.now()
         thread_id = thread_id or self._current_thread_id
@@ -714,7 +942,12 @@ class AgentSession:
             # Execute the compiled graph
             result = await self._graph.ainvoke(initial_state, config)
             duration_ms = int((time.time() - start_time) * 1000)
+            self._is_executing = False       # execution complete
+            self._execution_start_time = datetime.now()   # refresh activity timestamp
             self._status = SessionStatus.RUNNING
+
+            # Successful execution — reset revive counter
+            self._freshness.reset_revive_counter()
 
             # Extract results — try various output fields
             final_output = (
@@ -760,6 +993,8 @@ class AgentSession:
 
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
+            self._is_executing = False       # execution complete (error path)
+            self._execution_start_time = datetime.now()
             self._status = SessionStatus.RUNNING
             self._error_message = str(e)
             logger.exception(f"[{self._session_id}] Error during invoke: {e}")
@@ -799,17 +1034,21 @@ class AgentSession:
         if not self._initialized or not self._graph:
             raise RuntimeError("AgentSession not initialized. Call initialize() first.")
 
-        # Freshness check
+        # Freshness check — auto-revive if idle
         self._check_freshness()
 
+        # Ensure underlying process is alive (restart if needed)
+        await self._ensure_alive()
+
         self._status = SessionStatus.RUNNING
+        self._is_executing = True              # guard: prevent idle monitor interference
         thread_id = thread_id or self._current_thread_id
 
         # Initialize logging for graph execution
         session_logger = self._get_logger()
         start_time = time.time()
         self._current_iteration = 0
-        self._execution_start_time = start_time
+        self._execution_start_time = datetime.now()  # fixed: was float, must be datetime
         effective_max_iterations = max_iterations or self._max_iterations
         event_count = 0
         last_event = None
@@ -894,9 +1133,18 @@ class AgentSession:
                             },
                         )
 
+                # Heartbeat: refresh activity timestamp on every streamed event
+                # so the idle monitor sees continuous activity during long runs
+                self._execution_start_time = datetime.now()
+
                 yield event
 
+            self._is_executing = False             # execution complete
+            self._execution_start_time = datetime.now()  # refresh activity timestamp
             self._status = SessionStatus.RUNNING
+
+            # Successful execution — reset revive counter
+            self._freshness.reset_revive_counter()
 
             # Log streaming completion
             duration_ms = int((time.time() - start_time) * 1000)
@@ -940,6 +1188,8 @@ class AgentSession:
                     )
 
         except Exception as e:
+            self._is_executing = False             # execution complete (error path)
+            self._execution_start_time = datetime.now()
             self._status = SessionStatus.RUNNING
             self._error_message = str(e)
             logger.exception(f"[{self._session_id}] Error during astream: {e}")

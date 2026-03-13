@@ -18,12 +18,15 @@ function SessionItem({ session, isSelected, onSelect }: {
 }) {
   const { t } = useI18n();
   const dotClass = session.status === 'running' ? 'bg-[var(--success-color)]'
+    : session.status === 'idle' ? 'bg-[var(--warning-color)]'
     : session.status === 'error' ? 'bg-[var(--danger-color)]'
     : session.status === 'starting' ? 'bg-[var(--warning-color)]'
     : 'bg-[var(--text-muted)]';
 
   const dotShadow = session.status === 'running'
     ? { boxShadow: '0 0 6px var(--success-color)' }
+    : session.status === 'idle'
+    ? { boxShadow: '0 0 6px var(--warning-color)' }
     : undefined;
 
   return (
@@ -73,7 +76,7 @@ function SidebarContent({ onSessionSelect }: { onSessionSelect?: () => void }) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SessionInfo | null>(null);
 
-  const running = sessions.filter(s => s.status === 'running').length;
+  const running = sessions.filter(s => s.status === 'running' || s.status === 'idle').length;
   const errors = sessions.filter(s => s.status === 'error').length;
 
   const handleDeleteClick = useCallback((e: React.MouseEvent, session: SessionInfo) => {

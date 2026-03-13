@@ -71,6 +71,7 @@ export default function InfoTab() {
   const getStatusBadgeStyle = (): React.CSSProperties => {
     if (isDeleted) return { background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' };
     if (data.status === 'running') return { background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' };
+    if (data.status === 'idle') return { background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b' };
     if (data.status === 'error') return { background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444' };
     if (data.status === 'starting') return { background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6' };
     return { background: 'rgba(107, 114, 128, 0.15)', color: '#9ca3af' };

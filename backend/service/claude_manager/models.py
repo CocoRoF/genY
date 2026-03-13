@@ -13,6 +13,7 @@ class SessionStatus(str, Enum):
     """Claude session status."""
     STARTING = "starting"
     RUNNING = "running"
+    IDLE = "idle"
     STOPPED = "stopped"
     ERROR = "error"
 

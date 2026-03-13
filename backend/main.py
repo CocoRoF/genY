@@ -228,6 +228,10 @@ async def lifespan(app: FastAPI):
         link_name=shared_folder_cfg.link_name,
     )
 
+    # Start background idle monitor (transitions idle sessions to IDLE status)
+    agent_manager.start_idle_monitor()
+    logger.info("   - Session idle monitor: started (10min threshold)")
+
     print_step_banner("READY", "GENY AGENT READY", "All systems operational!")
     logger.info("Geny Agent startup complete! Ready to serve requests.")
 
@@ -235,6 +239,9 @@ async def lifespan(app: FastAPI):
 
     print_step_banner("SHUTDOWN", "GENY AGENT SHUTDOWN", "Cleaning up sessions...")
     logger.info("Shutting down Geny Agent")
+
+    # Stop idle monitor
+    await agent_manager.stop_idle_monitor()
 
     # Stop all active sessions (processes only — storage preserved)
     # Soft-delete all active sessions so they appear in "deleted sessions" on restart

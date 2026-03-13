@@ -31,6 +31,7 @@ AgentSession 전용 메서드를 추가합니다.
 
 from logging import getLogger
 from typing import Dict, List, Optional
+import asyncio
 
 from service.claude_manager.session_manager import SessionManager, merge_mcp_configs
 from service.claude_manager.models import (
@@ -92,6 +93,11 @@ class AgentSessionManager(SessionManager):
 
         # Database reference (for per-session memory/log DB wiring)
         self._app_db = None
+
+        # Background idle monitor
+        self._idle_monitor_task: Optional[asyncio.Task] = None
+        self._idle_monitor_interval: float = 60.0  # check every 60 seconds
+        self._idle_monitor_running: bool = False
 
         logger.info("✅ AgentSessionManager initialized")
 
@@ -539,8 +545,11 @@ class AgentSessionManager(SessionManager):
     async def cleanup_dead_sessions(self):
         """
         죽은 세션 정리 (AgentSession 및 기존 방식 모두).
+
+        Philosophy: Try to REVIVE idle/dead agent sessions before deleting
+        them.  Only sessions that fail revival are removed.
         """
-        # AgentSession 정리
+        # AgentSession 정리 — try revival first
         dead_agents = [
             session_id
             for session_id, agent in self._local_agents.items()
@@ -548,7 +557,22 @@ class AgentSessionManager(SessionManager):
         ]
 
         for session_id in dead_agents:
-            logger.info(f"[{session_id}] Cleaning up dead AgentSession")
+            agent = self._local_agents[session_id]
+            logger.info(f"[{session_id}] Dead AgentSession detected — attempting revival")
+
+            try:
+                success = await agent.revive()
+                if success:
+                    logger.info(f"[{session_id}] ✅ AgentSession revived successfully")
+                    # Update process reference in _local_processes
+                    if agent.process:
+                        self._local_processes[session_id] = agent.process
+                    continue
+            except Exception as e:
+                logger.warning(f"[{session_id}] Revival failed: {e}")
+
+            # Revival failed — clean up
+            logger.info(f"[{session_id}] Cleaning up unrevivable AgentSession")
             await self.delete_session(session_id)
 
         # 기존 프로세스 정리 (AgentSession이 아닌 것만)
@@ -561,6 +585,88 @@ class AgentSessionManager(SessionManager):
         for session_id in dead_processes:
             logger.info(f"[{session_id}] Cleaning up dead session")
             await super().delete_session(session_id)
+
+    # ========================================================================
+    # Background Idle Monitor
+    # ========================================================================
+
+    def start_idle_monitor(self) -> None:
+        """Start the background idle monitor task.
+
+        Periodically scans all RUNNING sessions and transitions them to
+        IDLE if they have had no activity for ``idle_transition_seconds``
+        (default 10 minutes / 600 seconds).
+
+        Should be called once during application startup.
+        """
+        if self._idle_monitor_running:
+            logger.debug("Idle monitor already running")
+            return
+
+        self._idle_monitor_running = True
+        self._idle_monitor_task = asyncio.ensure_future(self._idle_monitor_loop())
+        logger.info(
+            f"✅ Idle monitor started (interval={self._idle_monitor_interval}s)"
+        )
+
+    async def stop_idle_monitor(self) -> None:
+        """Stop the background idle monitor task.
+
+        Called during application shutdown.
+        """
+        self._idle_monitor_running = False
+        if self._idle_monitor_task and not self._idle_monitor_task.done():
+            self._idle_monitor_task.cancel()
+            try:
+                await self._idle_monitor_task
+            except asyncio.CancelledError:
+                pass
+        self._idle_monitor_task = None
+        logger.info("Idle monitor stopped")
+
+    async def _idle_monitor_loop(self) -> None:
+        """Background loop that checks for idle sessions.
+
+        Runs every ``_idle_monitor_interval`` seconds and calls
+        ``mark_idle()`` on sessions whose freshness evaluates as
+        STALE_IDLE.  This causes their status to change from RUNNING
+        to IDLE, which is visible in the frontend.
+
+        When the user later sends a command, the session auto-revives
+        transparently.
+        """
+        logger.info("Idle monitor loop started")
+        while self._idle_monitor_running:
+            try:
+                await asyncio.sleep(self._idle_monitor_interval)
+                if not self._idle_monitor_running:
+                    break
+                self._scan_for_idle_sessions()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                logger.debug("Idle monitor tick error (non-critical)", exc_info=True)
+
+    def _scan_for_idle_sessions(self) -> None:
+        """Scan all agent sessions and mark idle ones.
+
+        This is a lightweight synchronous scan — no I/O, no process
+        restarts.  It only flips the status flag.
+        """
+        transitioned = 0
+        for session_id, agent in self._local_agents.items():
+            if agent.status == SessionStatus.RUNNING:
+                if agent.mark_idle():
+                    transitioned += 1
+                    # Update persistent store with IDLE status
+                    try:
+                        info = agent.get_session_info()
+                        self._store.register(session_id, info.model_dump(mode="json"))
+                    except Exception:
+                        pass  # non-critical
+
+        if transitioned > 0:
+            logger.info(f"Idle monitor: {transitioned} session(s) transitioned to IDLE")
 
     # ========================================================================
     # Compatibility: Upgrade/Convert

@@ -453,6 +453,8 @@ async def execute_agent_prompt(
     Execute prompt with AgentSession via the compiled StateGraph.
 
     The session's graph type determines the execution flow automatically.
+    If the session has been idle and the process died, invoke() will
+    auto-revive it transparently.
     """
     start_time = time.time()
 
@@ -460,11 +462,28 @@ async def execute_agent_prompt(
     if not agent:
         raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
 
+    # If process is dead, try automatic revival before rejecting
     if not agent.is_alive():
-        raise HTTPException(
-            status_code=400,
-            detail=f"AgentSession is not running (status: {agent.status})"
-        )
+        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before execute")
+        try:
+            revived = await agent.revive()
+            if revived:
+                logger.info(f"[{session_id}] ✅ Auto-revival successful")
+                # Update process reference in manager
+                if agent.process:
+                    agent_manager._local_processes[session_id] = agent.process
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"AgentSession is not running and revival failed (status: {agent.status})"
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"AgentSession revival failed: {e}"
+            )
 
     # 세션 로거
     session_logger = get_session_logger(session_id, create_if_missing=False)
@@ -547,11 +566,27 @@ async def start_agent_execution(
     if not agent:
         raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
 
+    # If process is dead, try automatic revival
     if not agent.is_alive():
-        raise HTTPException(
-            status_code=400,
-            detail=f"AgentSession is not running (status: {agent.status})",
-        )
+        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before start")
+        try:
+            revived = await agent.revive()
+            if revived:
+                logger.info(f"[{session_id}] ✅ Auto-revival successful (start)")
+                if agent.process:
+                    agent_manager._local_processes[session_id] = agent.process
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"AgentSession is not running and revival failed (status: {agent.status})",
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"AgentSession revival failed: {e}",
+            )
 
     # Prevent double execution
     if session_id in _active_executions and not _active_executions[session_id].get("done"):
@@ -710,11 +745,27 @@ async def execute_agent_prompt_stream(
     if not agent:
         raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
 
+    # If process is dead, try automatic revival
     if not agent.is_alive():
-        raise HTTPException(
-            status_code=400,
-            detail=f"AgentSession is not running (status: {agent.status})",
-        )
+        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before SSE stream")
+        try:
+            revived = await agent.revive()
+            if revived:
+                logger.info(f"[{session_id}] ✅ Auto-revival successful (SSE)")
+                if agent.process:
+                    agent_manager._local_processes[session_id] = agent.process
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"AgentSession is not running and revival failed (status: {agent.status})",
+                )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"AgentSession revival failed: {e}",
+            )
 
     async def event_stream():
         start_time = time.time()
