@@ -107,6 +107,7 @@ class AgentSession:
         graph_name: Optional[str] = None,
         tool_preset_id: Optional[str] = None,
         tool_preset_name: Optional[str] = None,
+        tool_search_mode: bool = False,
     ):
         """Initialize AgentSession.
 
@@ -125,6 +126,7 @@ class AgentSession:
             enable_checkpointing: Enable LangGraph MemorySaver checkpointing.
             workflow_id: Optional workflow ID (used to load WorkflowDefinition).
             graph_name: Human-readable graph/workflow name.
+            tool_search_mode: Whether tool search mode is active.
         """
         # Session identity
         self._session_id = session_id or str(uuid.uuid4())
@@ -152,6 +154,9 @@ class AgentSession:
         # Tool Preset
         self._tool_preset_id = tool_preset_id
         self._tool_preset_name = tool_preset_name
+
+        # Tool Search Mode
+        self._tool_search_mode = tool_search_mode
 
         # Internal components
         self._model: Optional[ClaudeCLIChatModel] = None
@@ -613,8 +618,13 @@ class AgentSession:
                 f"in store, falling back to template"
             )
 
-        # 2. Infer from graph_name
-        if self._graph_name and 'autonomous' in self._graph_name.lower():
+        # 2. Infer from graph_name, with tool_search_mode variants
+        is_autonomous = self._graph_name and 'autonomous' in self._graph_name.lower()
+        is_tool_search = getattr(self, '_tool_search_mode', False)
+
+        if is_tool_search:
+            template_id = "template-tool-search-autonomous" if is_autonomous else "template-tool-search-simple"
+        elif is_autonomous:
             template_id = "template-autonomous"
         else:
             template_id = "template-simple"
@@ -634,12 +644,18 @@ class AgentSession:
         from service.workflow.templates import (
             create_autonomous_template,
             create_simple_template,
+            create_tool_search_simple_template,
+            create_tool_search_autonomous_template,
         )
 
-        if template_id == "template-autonomous":
-            return create_autonomous_template()
-        else:
-            return create_simple_template()
+        _template_factories = {
+            "template-autonomous": create_autonomous_template,
+            "template-simple": create_simple_template,
+            "template-tool-search-simple": create_tool_search_simple_template,
+            "template-tool-search-autonomous": create_tool_search_autonomous_template,
+        }
+        factory = _template_factories.get(template_id, create_simple_template)
+        return factory()
 
     # ========================================================================
     # Execution Methods
@@ -698,6 +714,7 @@ class AgentSession:
             # Always include agent identity for relevance gate (chat mode)
             kwargs.setdefault("agent_name", self._session_name or self._session_id[:8])
             kwargs.setdefault("agent_role", self._role.value if hasattr(self._role, 'value') else str(self._role))
+            kwargs.setdefault("tool_search_mode", self._tool_search_mode)
             initial_state = make_initial_autonomous_state(
                 input_text,
                 max_iterations=effective_max_iterations,
@@ -830,6 +847,7 @@ class AgentSession:
             # Always include agent identity for relevance gate (chat mode)
             kwargs.setdefault("agent_name", self._session_name or self._session_id[:8])
             kwargs.setdefault("agent_role", self._role.value if hasattr(self._role, 'value') else str(self._role))
+            kwargs.setdefault("tool_search_mode", self._tool_search_mode)
             initial_state = make_initial_autonomous_state(
                 input_text,
                 max_iterations=effective_max_iterations,
@@ -1083,6 +1101,7 @@ class AgentSession:
             tool_preset_id=self._tool_preset_id,
             tool_preset_name=self._tool_preset_name,
             system_prompt=self._system_prompt,
+            tool_search_mode=self._tool_search_mode,
         )
 
     # ========================================================================
