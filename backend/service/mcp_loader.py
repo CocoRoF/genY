@@ -106,7 +106,10 @@ class MCPLoader:
         if self.tools:
             self._register_tools_as_mcp()
 
-        # 4. Create global config
+        # 4. Register tools in ToolRegistry (for graph-based search)
+        self._populate_tool_registry()
+
+        # 5. Create global config
         config = MCPConfig(servers=self.servers)
         set_global_mcp_config(config)
 
@@ -393,6 +396,27 @@ if __name__ == "__main__":
         logger.info(f"   📝 Generated MCP server script: {script_path}")
 
         return script_path
+
+    def _populate_tool_registry(self) -> None:
+        """Register loaded tools in the ToolRegistry for search/retrieval.
+
+        Registers built-in tools (from tools/ folder) into the registry.
+        MCP server tools are registered lazily when their tool lists become
+        available (they require the server process to be running).
+        """
+        try:
+            from service.tool_registry import get_tool_registry
+            registry = get_tool_registry()
+
+            # Register built-in tools
+            if self.tools:
+                registry.register_builtin_tools(self.tools)
+
+            registry.finalize()
+            logger.info(f"   Tool Registry: {registry.tool_count} tools indexed")
+
+        except Exception as e:
+            logger.warning(f"   Tool Registry population failed: {e}")
 
     def get_server_count(self) -> int:
         """Return number of loaded servers"""
