@@ -21,6 +21,7 @@ from service.logging.session_logger import (
     remove_session_logger,
     read_logs_from_file,
     get_log_file_path,
+    count_logs_for_session,
     LogLevel
 )
 
@@ -358,13 +359,15 @@ async def list_all_session_logs():
 async def get_session_logs(
     session_id: str,
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of log entries"),
-    level: Optional[str] = Query(None, description="Filter by log level. Single level (e.g. 'INFO') or comma-separated (e.g. 'INFO,COMMAND,RESPONSE')")
+    level: Optional[str] = Query(None, description="Filter by log level. Single level (e.g. 'INFO') or comma-separated (e.g. 'INFO,COMMAND,RESPONSE')"),
+    offset: int = Query(0, ge=0, description="Number of entries to skip (for pagination)"),
 ):
     """
     Get log entries for a specific session.
 
     Reads logs from persistent log files. Logs are preserved even after session deletion.
     Supports filtering by a single level or multiple comma-separated levels.
+    Supports pagination via offset and limit. Returns newest entries first.
     """
     # Parse level filter — supports single level or comma-separated set
     level_filter = None
@@ -381,27 +384,36 @@ async def get_session_logs(
         elif parsed:
             level_filter = parsed                 # set[LogLevel]
 
+    # Get total count for pagination
+    total = count_logs_for_session(session_id, level=level_filter)
+
     # Try to get from active session logger first (fastest — uses in-memory cache)
     session_logger = get_session_logger(session_id, create_if_missing=False)
     entries = []
 
     if session_logger:
-        entries = session_logger.get_logs(limit=limit, level=level_filter)
+        entries = session_logger.get_logs(
+            limit=limit, level=level_filter,
+            offset=offset, newest_first=True,
+        )
     else:
         # Read from DB first, then fall back to file (for historical/deleted sessions)
-        entries = read_logs_from_file(session_id, limit=limit, level=level_filter)
+        entries = read_logs_from_file(
+            session_id, limit=limit, level=level_filter,
+            offset=offset, newest_first=True,
+        )
 
     # Resolve file path (informational — may be None if logs are DB-only)
     log_file_path = get_log_file_path(session_id)
 
-    if not entries and not log_file_path:
+    if not entries and not log_file_path and total == 0:
         raise HTTPException(status_code=404, detail=f"No logs found for session: {session_id}")
 
     return SessionLogsResponse(
         session_id=session_id,
         log_file=log_file_path,
         entries=[SessionLogEntry(**e) for e in entries],
-        total_entries=len(entries)
+        total_entries=total
     )
 
 

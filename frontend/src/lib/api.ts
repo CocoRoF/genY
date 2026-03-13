@@ -25,6 +25,21 @@ async function apiCall<T = unknown>(endpoint: string, options: RequestInit = {})
   return res.json() as Promise<T>;
 }
 
+// ==================== Backend Direct URL ====================
+// Next.js rewrites() proxy buffers ALL responses (including SSE streams),
+// so EventSource must connect directly to the backend, bypassing the proxy.
+function getBackendUrl(): string {
+  // NEXT_PUBLIC_API_URL is set in .env / docker-compose for prod.
+  // Fallback: same hostname as the browser page, port 8000.
+  if (typeof window !== 'undefined') {
+    return (
+      process.env.NEXT_PUBLIC_API_URL ||
+      `${window.location.protocol}//${window.location.hostname}:8000`
+    );
+  }
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+}
+
 // ==================== Agent API ====================
 
 import type {
@@ -81,71 +96,76 @@ export const agentApi = {
     }),
 
   /**
-   * POST /api/agents/{id}/execute/stream — SSE streaming execute.
+   * Two-step SSE streaming execute.
    *
-   * Streams real-time log events during execution, then a final result.
-   * The `onEvent` callback receives typed SSE events as they arrive.
-   * Returns a promise that resolves when the stream is complete, with
-   * an `abort()` function to cancel early.
+   * Step 1: POST /api/agents/{id}/execute/start — starts execution in background.
+   * Step 2: GET  /api/agents/{id}/execute/events — EventSource SSE stream.
+   *
+   * Uses native EventSource (GET-based SSE) which bypasses Next.js proxy
+   * buffering that affects POST-based streams.
    */
   executeStream: async (
     id: string,
     data: ExecuteRequest,
     onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
   ): Promise<void> => {
-    const res = await fetch(`/api/agents/${id}/execute/stream`, {
+    // Step 1: start execution (returns immediately)
+    const startRes = await fetch(`/api/agents/${id}/execute/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
 
-    if (!res.ok) {
-      const body = await res.text();
+    if (!startRes.ok) {
+      const body = await startRes.text();
       let message: string;
       try {
         const json = JSON.parse(body);
         const raw = json.detail || json.message || json.error;
-        message = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : `HTTP ${res.status}`;
+        message = typeof raw === 'string' ? raw : raw ? JSON.stringify(raw) : `HTTP ${startRes.status}`;
       } catch {
-        message = body || `HTTP ${res.status}`;
+        message = body || `HTTP ${startRes.status}`;
       }
       throw new Error(message);
     }
 
-    const reader = res.body?.getReader();
-    if (!reader) throw new Error('No response body');
+    // Step 2: connect EventSource DIRECTLY to backend (bypass Next.js proxy buffering)
+    return new Promise<void>((resolve) => {
+      const backendUrl = getBackendUrl();
+      const evtSource = new EventSource(`${backendUrl}/api/agents/${id}/execute/events`);
 
-    const decoder = new TextDecoder();
-    let buffer = '';
+      const cleanup = () => {
+        evtSource.close();
+      };
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Parse SSE events from buffer
-      const parts = buffer.split('\n\n');
-      buffer = parts.pop() || '';
-
-      for (const part of parts) {
-        if (!part.trim()) continue;
-        let eventType = '';
-        let eventDataStr = '';
-        for (const line of part.split('\n')) {
-          if (line.startsWith('event: ')) eventType = line.slice(7);
-          else if (line.startsWith('data: ')) eventDataStr = line.slice(6);
+      evtSource.addEventListener('log', (e) => {
+        try { onEvent('log', JSON.parse(e.data)); } catch { /* skip */ }
+      });
+      evtSource.addEventListener('status', (e) => {
+        try { onEvent('status', JSON.parse(e.data)); } catch { /* skip */ }
+      });
+      evtSource.addEventListener('result', (e) => {
+        try { onEvent('result', JSON.parse(e.data)); } catch { /* skip */ }
+      });
+      evtSource.addEventListener('error', (e) => {
+        // SSE error event — could be connection error or custom error event
+        if (e instanceof MessageEvent && e.data) {
+          try { onEvent('error', JSON.parse(e.data)); } catch { /* skip */ }
         }
-        if (eventType && eventDataStr) {
-          try {
-            const parsed = JSON.parse(eventDataStr);
-            onEvent(eventType, parsed);
-          } catch {
-            // skip malformed events
-          }
-        }
-      }
-    }
+      });
+      evtSource.addEventListener('done', () => {
+        onEvent('done', {});
+        cleanup();
+        resolve();
+      });
+
+      // Handle connection errors
+      evtSource.onerror = () => {
+        // EventSource fires onerror on close too — only reject if not resolving
+        cleanup();
+        resolve(); // graceful close
+      };
+    });
   },
 
   /** POST /api/agents/{id}/stop — stop execution */
@@ -306,8 +326,8 @@ export const commandApi = {
     apiCall<{ name: string; content: string }>(`/api/command/prompts/${encodeURIComponent(name)}`),
 
   /** GET /api/command/logs/{id} — get session logs */
-  getLogs: (id: string, limit = 200, level?: string) => {
-    const params = new URLSearchParams({ limit: String(limit) });
+  getLogs: (id: string, limit = 200, level?: string, offset = 0) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (level) params.set('level', level);
     return apiCall<SessionLogsResponse>(`/api/command/logs/${id}?${params}`);
   },

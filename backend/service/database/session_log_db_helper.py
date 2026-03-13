@@ -124,6 +124,8 @@ def db_get_session_logs(
     session_id: str,
     limit: int = 100,
     level_filter: Optional[Set[str]] = None,
+    offset: int = 0,
+    newest_first: bool = True,
 ) -> Optional[List[Dict[str, Any]]]:
     """Get log entries for a session.
 
@@ -132,6 +134,8 @@ def db_get_session_logs(
         session_id: Session ID.
         limit: Max entries to return.
         level_filter: Optional set of level strings to filter by.
+        offset: Number of entries to skip (for pagination).
+        newest_first: If True, return newest entries first (DESC).
 
     Returns:
         List of log entry dicts, or None on failure.
@@ -140,6 +144,8 @@ def db_get_session_logs(
     if not _is_db_available(db_manager):
         return None
 
+    order = "DESC" if newest_first else "ASC"
+
     try:
         if level_filter:
             placeholders = ", ".join(["%s"] * len(level_filter))
@@ -147,24 +153,24 @@ def db_get_session_logs(
                 f"SELECT session_id, level, message, metadata_json, log_timestamp "
                 f"FROM {TABLE} "
                 f"WHERE session_id = %s AND level IN ({placeholders}) "
-                f"ORDER BY id DESC LIMIT %s"
+                f"ORDER BY id {order} LIMIT %s OFFSET %s"
             )
-            params = (session_id, *level_filter, limit)
+            params = (session_id, *level_filter, limit, offset)
         else:
             query = (
                 f"SELECT session_id, level, message, metadata_json, log_timestamp "
                 f"FROM {TABLE} "
                 f"WHERE session_id = %s "
-                f"ORDER BY id DESC LIMIT %s"
+                f"ORDER BY id {order} LIMIT %s OFFSET %s"
             )
-            params = (session_id, limit)
+            params = (session_id, limit, offset)
 
         rows = mgr.execute_query(query, params)
         if rows is None:
             return None
 
         entries = []
-        for row in reversed(rows):  # Reverse to get chronological order
+        for row in rows:
             metadata = {}
             meta_str = row.get("metadata_json", "{}")
             if meta_str:
@@ -181,6 +187,46 @@ def db_get_session_logs(
         return entries
     except Exception as e:
         logger.debug(f"Failed to read logs for {session_id}: {e}")
+        return None
+
+
+def db_count_session_logs(
+    db_manager,
+    session_id: str,
+    level_filter: Optional[Set[str]] = None,
+) -> Optional[int]:
+    """Count total log entries for a session (for pagination).
+
+    Args:
+        db_manager: AppDatabaseManager or DatabaseManager.
+        session_id: Session ID.
+        level_filter: Optional set of level strings to filter by.
+
+    Returns:
+        Total count or None on failure.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    try:
+        if level_filter:
+            placeholders = ", ".join(["%s"] * len(level_filter))
+            query = (
+                f"SELECT COUNT(*) as cnt FROM {TABLE} "
+                f"WHERE session_id = %s AND level IN ({placeholders})"
+            )
+            params = (session_id, *level_filter)
+        else:
+            query = f"SELECT COUNT(*) as cnt FROM {TABLE} WHERE session_id = %s"
+            params = (session_id,)
+
+        rows = mgr.execute_query(query, params)
+        if rows and len(rows) > 0:
+            return rows[0].get("cnt", 0)
+        return 0
+    except Exception as e:
+        logger.debug(f"Failed to count logs for {session_id}: {e}")
         return None
 
 

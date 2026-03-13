@@ -5,7 +5,18 @@ import { useAppStore } from '@/store/useAppStore';
 import { commandApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
-import { ClipboardList, Wrench, Search, BookOpen, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ClipboardList,
+  Wrench,
+  Search,
+  BookOpen,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
 import type { LogEntry } from '@/types';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
@@ -13,17 +24,12 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
 }
 
 // ==================== Log Group Definitions ====================
-// Each group is a superset of the previous — additive layering.
 
 interface LogGroup {
   id: string;
-  /** i18n key for label (under logsTab.*) */
   labelKey: string;
-  /** i18n key for description */
   descKey: string;
-  /** Levels included in this group */
   levels: string[];
-  /** Icon component for quick scanning */
   Icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 
@@ -53,7 +59,7 @@ const LOG_GROUPS: LogGroup[] = [
     id: 'all',
     labelKey: 'groupAll',
     descKey: 'groupAllDesc',
-    levels: [],  // empty = all levels, no filter
+    levels: [],
     Icon: BookOpen,
   },
 ];
@@ -74,49 +80,60 @@ const LEVEL_STYLE_MAP: Record<string, React.CSSProperties> = {
   GRAPH:    { backgroundColor: 'rgba(139, 92, 246, 0.2)',  color: '#8b5cf6' },
 };
 
+const PAGE_SIZE = 50;
+
 export default function LogsTab() {
   const { selectedSessionId } = useAppStore();
   const { t } = useI18n();
   const [entries, setEntries] = useState<LogEntry[]>([]);
-  // filter stores either:
-  //   ''            → no filter (all)
-  //   'group:xxx'   → group id
-  //   'LEVEL'       → single level
+  const [totalEntries, setTotalEntries] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState('group:default');
-  const [autoRefresh, setAutoRefresh] = useState(true);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const totalPages = Math.max(1, Math.ceil(totalEntries / PAGE_SIZE));
 
   /** Resolve the current filter to a comma-separated level string for the API. */
   const apiLevelParam = useMemo(() => {
-    if (!filter) return undefined;                       // all
+    if (!filter) return undefined;
     if (filter.startsWith('group:')) {
       const groupId = filter.slice(6);
       const group = LOG_GROUPS.find(g => g.id === groupId);
-      if (!group || group.levels.length === 0) return undefined;  // "all" group
+      if (!group || group.levels.length === 0) return undefined;
       return group.levels.join(',');
     }
-    return filter;  // single level
+    return filter;
   }, [filter]);
 
-  const fetchLogs = useCallback(async () => {
+  const fetchLogs = useCallback(async (page: number) => {
     if (!selectedSessionId) return;
+    setLoading(true);
     try {
-      const res = await commandApi.getLogs(selectedSessionId, 200, apiLevelParam);
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await commandApi.getLogs(selectedSessionId, PAGE_SIZE, apiLevelParam, offset);
       setEntries(res.entries || []);
+      setTotalEntries(res.total_entries || 0);
+      setExpandedIdx(null);
     } catch { /* ignore */ }
+    finally { setLoading(false); }
   }, [selectedSessionId, apiLevelParam]);
 
+  // Fetch on session/filter/page change
   useEffect(() => {
-    fetchLogs();
-    if (!autoRefresh) return;
-    const interval = setInterval(fetchLogs, 3000);
-    return () => clearInterval(interval);
-  }, [fetchLogs, autoRefresh]);
+    fetchLogs(currentPage);
+  }, [fetchLogs, currentPage]);
 
+  // Reset to page 1 when session or filter changes
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [entries.length]);
+    setCurrentPage(1);
+  }, [selectedSessionId, apiLevelParam]);
+
+  // Scroll to top when entries change
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [entries]);
 
   if (!selectedSessionId) {
     return (
@@ -129,13 +146,16 @@ export default function LogsTab() {
     );
   }
 
+  const pageStart = (currentPage - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, totalEntries);
+
   return (
     <div className="flex flex-col flex-1 p-3 md:p-6 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-3 md:mb-5 flex-wrap gap-2 md:gap-3 shrink-0">
+      <div className="flex justify-between items-center mb-3 md:mb-4 flex-wrap gap-2 md:gap-3 shrink-0">
         <h3 className="text-[0.9375rem] md:text-[1rem] font-semibold">{t('logsTab.title')}</h3>
         <div className="flex gap-2 md:gap-3 items-center flex-wrap">
-          {/* ── Filter selector: groups + separator + individual levels ── */}
+          {/* Filter selector */}
           <select
             className="py-1.5 pl-2.5 pr-7 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-[6px] text-[var(--text-primary)] text-[0.75rem] font-medium cursor-pointer appearance-none transition-all hover:border-[var(--text-muted)] hover:bg-[var(--bg-secondary)] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_2px_rgba(59,130,246,0.15)]"
             style={{
@@ -144,43 +164,40 @@ export default function LogsTab() {
               backgroundPosition: 'right 8px center',
             }}
             value={filter}
-            onChange={e => setFilter(e.target.value)}
+            onChange={e => { setFilter(e.target.value); setCurrentPage(1); }}
           >
-            {/* ── Groups ── */}
             {LOG_GROUPS.map(g => (
               <option key={g.id} value={`group:${g.id}`}>
                 {t(`logsTab.${g.labelKey}`)} — {t(`logsTab.${g.descKey}`)}
               </option>
             ))}
-            {/* ── Separator ── */}
             <option disabled>{'─'.repeat(20)}</option>
-            {/* ── Individual levels ── */}
             {ALL_LEVELS.map(l => (
               <option key={l} value={l}>{l}</option>
             ))}
           </select>
 
-          <label className="flex items-center gap-2 text-[0.8125rem] text-[var(--text-secondary)] cursor-pointer">
-            <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
-            {t('logsTab.autoRefresh')}
-          </label>
           <button
             className={cn(
               "py-2 px-4 bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[0.8125rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border border-[var(--border-color)]",
               "!py-1.5 !px-3 text-[0.75rem] inline-flex items-center gap-1.5",
+              loading && "opacity-60 pointer-events-none",
             )}
-            onClick={fetchLogs}
+            onClick={() => fetchLogs(currentPage)}
+            disabled={loading}
           >
-            <RefreshCw size={12} /> {t('common.refresh')}
+            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> {t('common.refresh')}
           </button>
         </div>
       </div>
 
       {/* Log Content */}
-      <div className="flex-1 min-h-0 overflow-auto bg-[var(--bg-secondary)] rounded-[var(--border-radius)] p-1">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto bg-[var(--bg-secondary)] rounded-[var(--border-radius)] p-1">
         {entries.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
-            <p className="text-[0.8125rem] text-[var(--text-muted)]">{t('logsTab.noLogs')}</p>
+            <p className="text-[0.8125rem] text-[var(--text-muted)]">
+              {loading ? 'Loading...' : t('logsTab.noLogs')}
+            </p>
           </div>
         ) : (
           entries.map((entry, idx) => {
@@ -197,15 +214,15 @@ export default function LogsTab() {
                   <div className="flex items-center gap-2">
                     <span
                       className="inline-block py-[2px] px-2 rounded-[4px] text-[0.625rem] md:text-[0.6875rem] font-semibold min-w-[52px] md:min-w-[64px] text-center uppercase tracking-[0.025em]"
-                    style={LEVEL_STYLE_MAP[entry.level] || {}}
-                  >
-                    {entry.level}
-                  </span>
-                  {isExpandable && (
-                    <span className={`text-[0.75rem] transition-transform ${isExpanded ? 'text-[var(--primary-color)]' : 'text-[var(--text-muted)]'}`}>
-                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      style={LEVEL_STYLE_MAP[entry.level] || {}}
+                    >
+                      {entry.level}
                     </span>
-                  )}
+                    {isExpandable && (
+                      <span className={`text-[0.75rem] transition-transform ${isExpanded ? 'text-[var(--primary-color)]' : 'text-[var(--text-muted)]'}`}>
+                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isExpandable && !isExpanded ? (
@@ -223,8 +240,75 @@ export default function LogsTab() {
             );
           })
         )}
-        <div ref={logsEndRef} />
       </div>
+
+      {/* Pagination Bar */}
+      {totalEntries > 0 && (
+        <div className="shrink-0 flex items-center justify-between pt-3 px-1">
+          <span className="text-[0.75rem] text-[var(--text-muted)]">
+            {pageStart}–{pageEnd} of {totalEntries.toLocaleString()} entries (newest first)
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none border border-transparent hover:border-[var(--border-color)]"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(1)}
+              title="First page"
+            >
+              <ChevronsLeft size={14} />
+            </button>
+            <button
+              className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none border border-transparent hover:border-[var(--border-color)]"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              title="Previous page"
+            >
+              <ChevronLeft size={14} />
+            </button>
+
+            {/* Page number buttons */}
+            {(() => {
+              const pages: number[] = [];
+              const maxVisible = 5;
+              let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+              const end = Math.min(totalPages, start + maxVisible - 1);
+              if (end - start + 1 < maxVisible) start = Math.max(1, end - maxVisible + 1);
+              for (let i = start; i <= end; i++) pages.push(i);
+              return pages.map(p => (
+                <button
+                  key={p}
+                  className={cn(
+                    "w-8 h-8 rounded-md flex items-center justify-center text-[0.75rem] font-medium transition-colors border",
+                    p === currentPage
+                      ? "bg-[var(--primary-color)] text-white border-[var(--primary-color)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] border-transparent hover:border-[var(--border-color)]",
+                  )}
+                  onClick={() => setCurrentPage(p)}
+                >
+                  {p}
+                </button>
+              ));
+            })()}
+
+            <button
+              className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none border border-transparent hover:border-[var(--border-color)]"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              title="Next page"
+            >
+              <ChevronRight size={14} />
+            </button>
+            <button
+              className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-30 disabled:pointer-events-none border border-transparent hover:border-[var(--border-color)]"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(totalPages)}
+              title="Last page"
+            >
+              <ChevronsRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

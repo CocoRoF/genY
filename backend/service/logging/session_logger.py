@@ -830,7 +830,9 @@ class SessionLogger:
         self,
         limit: int = 100,
         level: Optional["LogLevel | set[LogLevel]"] = None,
-        from_cache: bool = True
+        from_cache: bool = True,
+        offset: int = 0,
+        newest_first: bool = True,
     ) -> List[Dict[str, Any]]:
         """
         Get log entries.
@@ -841,31 +843,83 @@ class SessionLogger:
             limit: Maximum number of entries to return
             level: Filter by a single LogLevel or a set of LogLevels
             from_cache: If True, read from cache; if False, try DB then file
+            offset: Number of entries to skip (for pagination)
+            newest_first: If True, return newest entries first
 
         Returns:
             List of log entries as dictionaries
         """
         if from_cache:
             with self._lock:
-                entries = self._log_cache[-limit:]
+                all_entries = list(self._log_cache)
                 if level:
                     if isinstance(level, set):
-                        entries = [e for e in entries if e.level in level]
+                        all_entries = [e for e in all_entries if e.level in level]
                     else:
-                        entries = [e for e in entries if e.level == level]
+                        all_entries = [e for e in all_entries if e.level == level]
+                if newest_first:
+                    all_entries = list(reversed(all_entries))
+                entries = all_entries[offset:offset + limit]
                 return [e.to_dict() for e in entries]
         else:
             # Try DB first
-            db_entries = self._read_logs_from_db(limit, level)
+            db_entries = self._read_logs_from_db(limit, level, offset, newest_first)
             if db_entries is not None:
                 return db_entries
             # Fallback to file
             return self._read_logs_from_file(limit, level)
 
+    def count_logs(
+        self,
+        level: Optional["LogLevel | set[LogLevel]"] = None,
+        from_cache: bool = True,
+    ) -> int:
+        """
+        Count total log entries (for pagination).
+
+        Args:
+            level: Filter by a single LogLevel or a set of LogLevels
+            from_cache: If True, count from cache; if False, try DB
+
+        Returns:
+            Total count of matching entries
+        """
+        if from_cache:
+            with self._lock:
+                if not level:
+                    return len(self._log_cache)
+                if isinstance(level, set):
+                    return sum(1 for e in self._log_cache if e.level in level)
+                return sum(1 for e in self._log_cache if e.level == level)
+        else:
+            global _log_db_manager
+            if _log_db_manager is not None:
+                try:
+                    from service.database.session_log_db_helper import db_count_session_logs
+                    level_filter: Optional[set] = None
+                    if level:
+                        if isinstance(level, set):
+                            level_filter = {lv.value for lv in level}
+                        else:
+                            level_filter = {level.value}
+                    result = db_count_session_logs(
+                        _log_db_manager,
+                        session_id=self.session_id,
+                        level_filter=level_filter,
+                    )
+                    if result is not None:
+                        return result
+                except Exception:
+                    pass
+            # Fallback to cache
+            return self.count_logs(level=level, from_cache=True)
+
     def _read_logs_from_db(
         self,
         limit: int = 100,
         level: Optional["LogLevel | set[LogLevel]"] = None,
+        offset: int = 0,
+        newest_first: bool = True,
     ) -> Optional[List[Dict[str, Any]]]:
         """Read log entries from DB. Returns None if DB unavailable."""
         global _log_db_manager
@@ -886,6 +940,8 @@ class SessionLogger:
                 session_id=self.session_id,
                 limit=limit,
                 level_filter=level_filter,
+                offset=offset,
+                newest_first=newest_first,
             )
         except Exception as e:
             logger.debug(f"SessionLogger: DB read failed, falling back to file: {e}")
@@ -1072,7 +1128,9 @@ def list_session_logs() -> List[Dict[str, Any]]:
 def read_logs_from_file(
     session_id: str,
     limit: int = 100,
-    level: Optional["LogLevel | set[LogLevel]"] = None
+    level: Optional["LogLevel | set[LogLevel]"] = None,
+    offset: int = 0,
+    newest_first: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Read log entries for a session.
@@ -1086,6 +1144,8 @@ def read_logs_from_file(
         session_id: Session ID (used to find the log file)
         limit: Maximum number of entries to return
         level: Filter by a single LogLevel or a set of LogLevels
+        offset: Number of entries to skip (for pagination)
+        newest_first: If True, return newest entries first
 
     Returns:
         List of log entries as dictionaries
@@ -1110,6 +1170,8 @@ def read_logs_from_file(
                     session_id=session_id,
                     limit=limit,
                     level_filter=level_filter,
+                    offset=offset,
+                    newest_first=newest_first,
                 )
                 if db_entries is not None:
                     return db_entries
@@ -1194,3 +1256,48 @@ def get_log_file_path(session_id: str) -> Optional[str]:
     logs_dir = Path(__file__).parent.parent.parent / "logs"
     log_file = logs_dir / f"{session_id}.log"
     return str(log_file) if log_file.exists() else None
+
+
+def count_logs_for_session(
+    session_id: str,
+    level: Optional["LogLevel | set[LogLevel]"] = None,
+) -> int:
+    """
+    Count total log entries for a session (for pagination).
+
+    Tries active session logger cache first, then DB.
+
+    Args:
+        session_id: Session ID
+        level: Filter by a single LogLevel or a set of LogLevels
+
+    Returns:
+        Total count of matching entries
+    """
+    # If active logger exists, use cache
+    session_logger = get_session_logger(session_id, create_if_missing=False)
+    if session_logger:
+        return session_logger.count_logs(level=level, from_cache=True)
+
+    # Try DB
+    global _log_db_manager
+    if _log_db_manager is not None:
+        try:
+            from service.database.session_log_db_helper import db_count_session_logs
+            level_filter: Optional[set] = None
+            if level:
+                if isinstance(level, set):
+                    level_filter = {lv.value for lv in level}
+                else:
+                    level_filter = {level.value}
+            result = db_count_session_logs(
+                _log_db_manager,
+                session_id=session_id,
+                level_filter=level_filter,
+            )
+            if result is not None:
+                return result
+        except Exception:
+            pass
+
+    return 0
