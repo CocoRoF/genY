@@ -18,6 +18,7 @@ except ImportError:
 
 # Import tools
 from tools.example_tool import TOOLS as example_tool_TOOLS
+from tools.tool_search_tools import TOOLS as tool_search_tools_TOOLS
 
 # Create MCP server
 mcp = FastMCP("builtin-tools")
@@ -25,6 +26,7 @@ mcp = FastMCP("builtin-tools")
 # Collect all tools
 all_tools = []
 all_tools.extend(example_tool_TOOLS)
+all_tools.extend(tool_search_tools_TOOLS)
 
 # Register each tool to MCP
 for tool_obj in all_tools:
