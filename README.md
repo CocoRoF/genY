@@ -445,7 +445,9 @@ Geny works on Windows, macOS, and Linux:
 - **Windows**: Uses `%LOCALAPPDATA%\geny_agent_sessions`, auto-detects `.cmd`/`.exe` executables
 - **macOS/Linux**: Uses `/tmp/geny_agent_sessions`, standard executable paths
 
-### Community
+---
+
+## Community
 
 | Author|  Name | Description | URL |
 |-------|-------|-------------|----------|
