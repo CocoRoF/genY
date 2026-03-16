@@ -401,8 +401,144 @@ class SessionLogger:
         }
         metadata = {k: v for k, v in metadata.items() if v is not None}
 
+        # Extract structured file change data for IDE-like display
+        file_changes = self._extract_file_changes(tool_name, tool_input)
+        if file_changes:
+            metadata["file_changes"] = file_changes
+
+        # Extract command data for terminal-like display
+        command_data = self._extract_command_data(tool_name, tool_input)
+        if command_data:
+            metadata["command_data"] = command_data
+
+        # Extract file read data for code viewer
+        file_read = self._extract_file_read_data(tool_name, tool_input)
+        if file_read:
+            metadata["file_read"] = file_read
+
         message = f"🔧 {tool_name}: {detail}"
         self.log(LogLevel.TOOL_USE, message, metadata)
+
+    def _extract_file_changes(self, tool_name: str, tool_input: Optional[Dict]) -> Optional[Dict[str, Any]]:
+        """
+        Extract structured file change data for IDE-like diff display.
+
+        Returns a dict with file_path, operation, changes (hunks), and summary
+        if the tool is a file modification tool, otherwise None.
+        """
+        if not tool_input:
+            return None
+
+        MAX_CONTENT_SIZE = 50000  # 50KB max per content field
+
+        try:
+            name_lower = tool_name.lower()
+
+            # Write / create file: entire content is new
+            if name_lower in ("write", "writefile", "write_file", "create_file", "create"):
+                file_path = tool_input.get("file_path", tool_input.get("path", tool_input.get("file", "")))
+                content = tool_input.get("content", tool_input.get("text", ""))
+                if file_path and content:
+                    content_truncated = content[:MAX_CONTENT_SIZE] if len(content) > MAX_CONTENT_SIZE else content
+                    lines_added = content.count("\n") + 1
+                    return {
+                        "file_path": file_path,
+                        "operation": "create" if name_lower in ("create_file", "create") else "write",
+                        "changes": [{"new_str": content_truncated}],
+                        "lines_added": lines_added,
+                        "lines_removed": 0,
+                        "is_content_truncated": len(content) > MAX_CONTENT_SIZE,
+                    }
+
+            # Edit / patch file: old_str -> new_str replacement
+            elif name_lower in ("edit", "edit_file", "patch", "replace", "str_replace_editor"):
+                file_path = tool_input.get("file_path", tool_input.get("path", tool_input.get("file", "")))
+                old_str = tool_input.get("old_str", tool_input.get("old_string", tool_input.get("search", "")))
+                new_str = tool_input.get("new_str", tool_input.get("new_string", tool_input.get("replace", "")))
+                if file_path and (old_str or new_str):
+                    old_truncated = old_str[:MAX_CONTENT_SIZE] if old_str and len(old_str) > MAX_CONTENT_SIZE else old_str
+                    new_truncated = new_str[:MAX_CONTENT_SIZE] if new_str and len(new_str) > MAX_CONTENT_SIZE else new_str
+                    lines_removed = old_str.count("\n") + 1 if old_str else 0
+                    lines_added = new_str.count("\n") + 1 if new_str else 0
+                    return {
+                        "file_path": file_path,
+                        "operation": "edit",
+                        "changes": [{"old_str": old_truncated or "", "new_str": new_truncated or ""}],
+                        "lines_added": lines_added,
+                        "lines_removed": lines_removed,
+                        "is_content_truncated": (
+                            (old_str and len(old_str) > MAX_CONTENT_SIZE) or
+                            (new_str and len(new_str) > MAX_CONTENT_SIZE)
+                        ),
+                    }
+
+            # Multi-edit: multiple hunks
+            elif name_lower in ("multi_edit", "multiedit"):
+                file_path = tool_input.get("file_path", tool_input.get("path", ""))
+                edits = tool_input.get("edits", tool_input.get("changes", []))
+                if file_path and edits and isinstance(edits, list):
+                    changes = []
+                    total_added = 0
+                    total_removed = 0
+                    for edit in edits[:20]:  # Limit to 20 hunks
+                        old_s = edit.get("old_str", edit.get("old_string", ""))
+                        new_s = edit.get("new_str", edit.get("new_string", ""))
+                        changes.append({
+                            "old_str": old_s[:MAX_CONTENT_SIZE] if old_s else "",
+                            "new_str": new_s[:MAX_CONTENT_SIZE] if new_s else "",
+                        })
+                        total_removed += old_s.count("\n") + 1 if old_s else 0
+                        total_added += new_s.count("\n") + 1 if new_s else 0
+                    return {
+                        "file_path": file_path,
+                        "operation": "multi_edit",
+                        "changes": changes,
+                        "lines_added": total_added,
+                        "lines_removed": total_removed,
+                        "total_edits": len(edits),
+                    }
+
+        except Exception as e:
+            logger.debug(f"Failed to extract file changes: {e}")
+
+        return None
+
+    def _extract_command_data(self, tool_name: str, tool_input: Optional[Dict]) -> Optional[Dict[str, Any]]:
+        """Extract structured command/shell data for terminal-like display."""
+        if not tool_input:
+            return None
+
+        try:
+            name_lower = tool_name.lower()
+            if name_lower in ("bash", "shell", "execute", "terminal", "run"):
+                command = tool_input.get("command", tool_input.get("cmd", ""))
+                if command:
+                    return {
+                        "command": command[:10000],  # Max 10KB
+                        "working_dir": tool_input.get("working_dir", tool_input.get("cwd", "")),
+                    }
+        except Exception:
+            pass
+        return None
+
+    def _extract_file_read_data(self, tool_name: str, tool_input: Optional[Dict]) -> Optional[Dict[str, Any]]:
+        """Extract structured file read data for code viewer display."""
+        if not tool_input:
+            return None
+
+        try:
+            name_lower = tool_name.lower()
+            if name_lower in ("read", "readfile", "read_file", "view", "cat"):
+                file_path = tool_input.get("file_path", tool_input.get("path", tool_input.get("file", "")))
+                if file_path:
+                    return {
+                        "file_path": file_path,
+                        "start_line": tool_input.get("start_line", tool_input.get("offset")),
+                        "end_line": tool_input.get("end_line", tool_input.get("limit")),
+                    }
+        except Exception:
+            pass
+        return None
 
     def _format_tool_detail(self, tool_name: str, tool_input: Optional[Dict]) -> str:
         """
@@ -527,8 +663,16 @@ class SessionLogger:
             duration_ms: Tool execution time
         """
         result_length = len(result) if result else 0
-        is_truncated = result_length > 500
-        result_preview = result[:500] + "..." if result and is_truncated else result
+
+        # For file-related tools, keep more result content for IDE display
+        name_lower = tool_name.lower()
+        is_file_tool = name_lower in (
+            "read", "readfile", "read_file", "view", "cat",
+            "bash", "shell", "execute", "terminal", "run",
+        )
+        max_preview = 5000 if is_file_tool else 500
+        is_truncated = result_length > max_preview
+        result_preview = result[:max_preview] + "..." if result and is_truncated else result
 
         metadata = {
             "type": "tool_result",
@@ -537,7 +681,8 @@ class SessionLogger:
             "is_error": is_error,
             "result_preview": result_preview,
             "result_length": result_length,
-            "duration_ms": duration_ms
+            "duration_ms": duration_ms,
+            "is_truncated": is_truncated,
         }
         metadata = {k: v for k, v in metadata.items() if v is not None}
 

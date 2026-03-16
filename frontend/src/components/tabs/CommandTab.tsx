@@ -4,116 +4,30 @@ import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
 import { useAppStore, type SessionData } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import type { LogEntry } from '@/types';
+import ExecutionTimeline from '@/components/execution/ExecutionTimeline';
+import StepDetailPanel from '@/components/execution/StepDetailPanel';
 import {
   Square,
   Loader2,
   Terminal,
   Zap,
   Wrench,
-  ChevronDown,
-  ChevronRight,
   Clock,
   CheckCircle2,
   XCircle,
-  ArrowDown,
   Play,
+  PanelRightClose,
 } from 'lucide-react';
-
-// ── Level badge colours ──
-const LEVEL_COLORS: Record<string, { bg: string; text: string; gutter: string }> = {
-  DEBUG:    { bg: 'rgba(113,113,122,0.08)', text: '#71717a', gutter: '#71717a' },
-  INFO:     { bg: 'rgba(59,130,246,0.08)',  text: '#3b82f6', gutter: '#3b82f6' },
-  WARNING:  { bg: 'rgba(245,158,11,0.08)',  text: '#f59e0b', gutter: '#f59e0b' },
-  ERROR:    { bg: 'rgba(239,68,68,0.10)',   text: '#ef4444', gutter: '#ef4444' },
-  COMMAND:  { bg: 'rgba(16,185,129,0.08)',  text: '#10b981', gutter: '#10b981' },
-  RESPONSE: { bg: 'rgba(168,85,247,0.08)',  text: '#a855f7', gutter: '#a855f7' },
-  ITER:     { bg: 'rgba(251,146,60,0.08)',  text: '#fb923c', gutter: '#fb923c' },
-  TOOL:     { bg: 'rgba(34,211,238,0.08)',  text: '#22d3ee', gutter: '#22d3ee' },
-  TOOL_RES: { bg: 'rgba(6,182,212,0.06)',   text: '#06b6d4', gutter: '#06b6d4' },
-  STREAM:   { bg: 'rgba(148,163,184,0.06)', text: '#94a3b8', gutter: '#64748b' },
-  GRAPH:    { bg: 'rgba(139,92,246,0.08)',   text: '#8b5cf6', gutter: '#8b5cf6' },
-};
-
-// Primary execution log levels (shown by default)
-const PRIMARY_LEVELS = new Set([
-  'COMMAND', 'RESPONSE', 'ERROR', 'WARNING', 'GRAPH', 'TOOL', 'ITER',
-]);
-
-interface LogEntry {
-  timestamp: string;
-  level: string;
-  message: string;
-  metadata?: Record<string, unknown>;
-}
-
-// ── Single log line (terminal-style) ──
-function LogLine({ entry }: { entry: LogEntry }) {
-  const [expanded, setExpanded] = useState(false);
-  const isLong = entry.message.length > 400;
-  const colors = LEVEL_COLORS[entry.level] || { bg: 'rgba(100,116,139,0.08)', text: '#64748b', gutter: '#64748b' };
-
-  const shortTime = useMemo(() => {
-    try {
-      const d = new Date(entry.timestamp);
-      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    } catch {
-      return entry.timestamp.slice(11, 19);
-    }
-  }, [entry.timestamp]);
-
-  const displayMsg = entry.message.replace(/^PROMPT:\s*/, '').replace(/^SUCCESS:\s*/, '').replace(/^ERROR:\s*/, '');
-
-  return (
-    <div
-      className="flex gap-0 hover:bg-[var(--bg-tertiary)] transition-colors group"
-      onClick={() => isLong && setExpanded(!expanded)}
-      style={{ cursor: isLong ? 'pointer' : 'default' }}
-    >
-      {/* Gutter: colored left strip */}
-      <div className="w-[3px] shrink-0 rounded-sm" style={{ backgroundColor: colors.gutter, opacity: 0.6 }} />
-      {/* Content */}
-      <div className="flex-1 min-w-0 py-[5px] pl-3 pr-2">
-        <div className="flex items-start gap-2">
-          <span className="text-[0.5625rem] text-[var(--text-muted)] font-mono tabular-nums shrink-0 opacity-50 w-[52px] pt-[1px]">
-            {shortTime}
-          </span>
-          <span
-            className="inline-flex items-center justify-center rounded px-1.5 py-[0.5px] text-[0.5rem] font-bold uppercase tracking-wider shrink-0 min-w-[40px]"
-            style={{ backgroundColor: colors.bg, color: colors.text }}
-          >
-            {entry.level}
-          </span>
-          <span className={`text-[0.75rem] leading-snug min-w-0 whitespace-pre-wrap break-words ${
-            entry.level === 'ERROR' || entry.level === 'WARNING'
-              ? `font-medium`
-              : ''
-          }`} style={{ color: entry.level === 'ERROR' ? 'var(--danger-color)' : entry.level === 'WARNING' ? 'var(--warning-color)' : 'var(--text-secondary)' }}>
-            {isLong && !expanded ? (
-              <span>
-                {displayMsg.slice(0, 200)}...
-                <ChevronRight size={10} className="inline-block ml-1 text-[var(--text-muted)] opacity-50" />
-              </span>
-            ) : (
-              displayMsg
-            )}
-          </span>
-          {isLong && expanded && (
-            <ChevronDown size={10} className="shrink-0 text-[var(--text-muted)] opacity-50" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function CommandTab() {
   const { selectedSessionId, sessions, isExecuting, setIsExecuting, getSessionData, updateSessionData } = useAppStore();
   const { t } = useI18n();
-  const outputEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [showAllLevels, setShowAllLevels] = useState(false);
+  const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
+  const [detailPanelWidth, setDetailPanelWidth] = useState(55); // percentage
+  const [isResizing, setIsResizing] = useState(false);
 
   const session = sessions.find(s => s.session_id === selectedSessionId);
   const sessionData: SessionData | null = selectedSessionId ? getSessionData(selectedSessionId) : null;
@@ -122,30 +36,43 @@ export default function CommandTab() {
     [sessionData?.logEntries],
   );
 
-  // Filter logs
-  const visibleLogs = useMemo(
-    () => showAllLevels ? logEntries : logEntries.filter(e => PRIMARY_LEVELS.has(e.level)),
-    [logEntries, showAllLevels],
-  );
-  const hiddenCount = logEntries.length - visibleLogs.length;
+  // Selected entry
+  const selectedEntry = selectedStepIndex !== null ? logEntries[selectedStepIndex] : null;
 
-  // Auto-scroll
+  // Clear selection when session changes
   useEffect(() => {
-    if (!showScrollBtn) {
-      outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logEntries.length, sessionData?.output, showScrollBtn]);
+    setSelectedStepIndex(null);
+  }, [selectedSessionId]);
 
-  const handleScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 100);
-  }, []);
+  // ── Resize handler for split pane ──
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = detailPanelWidth;
 
-  const scrollToBottom = useCallback(() => {
-    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setShowScrollBtn(false);
-  }, []);
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const container = (e.target as HTMLElement).parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const deltaPercent = ((moveEvent.clientX - startX) / rect.width) * 100;
+      const newWidth = Math.max(25, Math.min(75, startWidth - deltaPercent));
+      setDetailPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [detailPanelWidth]);
 
   // Auto-resize textarea
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -160,6 +87,7 @@ export default function CommandTab() {
     if (!selectedSessionId || !sessionData?.input?.trim()) return;
     const prompt = sessionData.input.trim();
     setIsExecuting(true);
+    setSelectedStepIndex(null);
     updateSessionData(selectedSessionId, {
       status: 'running',
       statusText: t('commandTab.statusExecuting'),
@@ -306,6 +234,16 @@ export default function CommandTab() {
                 {sessionData.statusText}
               </div>
             )}
+            {/* Detail panel toggle */}
+            {selectedEntry && (
+              <button
+                onClick={() => setSelectedStepIndex(null)}
+                className="h-7 w-7 rounded-md bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] flex items-center justify-center transition-all border border-[var(--border-color)] cursor-pointer"
+                title="Close detail panel"
+              >
+                <PanelRightClose size={13} />
+              </button>
+            )}
             {isExecuting && (
               <button className="h-7 w-7 rounded-md bg-[var(--danger-color)] hover:brightness-110 text-white flex items-center justify-center transition-all border-none cursor-pointer" onClick={handleStop} title={t('commandTab.stopBtn')}>
                 <Square size={12} />
@@ -339,10 +277,11 @@ export default function CommandTab() {
         <span className="text-[0.5625rem] text-[var(--text-muted)] opacity-50 mt-0.5 block px-0.5">Enter to execute · Shift+Enter for newline</span>
       </div>
 
-      {/* ── Execution output area (BELOW) ── */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto scroll-smooth" onScroll={handleScroll}>
+      {/* ── Main execution area: Split pane (Timeline | Detail) ── */}
+      <div className="flex-1 flex min-h-0 relative">
         {!hasContent ? (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
+          /* Empty state */
+          <div className="flex flex-col items-center justify-center w-full h-full text-center px-4">
             <div className="w-16 h-16 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-color)] flex items-center justify-center mb-5">
               <Terminal size={28} className="text-[var(--text-muted)] opacity-40" />
             </div>
@@ -350,110 +289,106 @@ export default function CommandTab() {
             <p className="text-[0.75rem] text-[var(--text-muted)] opacity-60">Results appear here. Full history is in the Logs tab.</p>
           </div>
         ) : (
-          <div className="flex flex-col h-full">
-            {/* ── Submitted command echo ── */}
-            {commandEntry && (
-              <div className="shrink-0 px-4 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
-                <span className="text-[0.75rem] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap break-words">
-                  {commandEntry.message.replace(/^PROMPT:\s*/, '')}
-                </span>
+          <>
+            {/* ── Left pane: Timeline + Result ── */}
+            <div
+              className="flex flex-col min-w-0 border-r border-[var(--border-color)]"
+              style={{ width: selectedEntry ? `${100 - detailPanelWidth}%` : '100%', transition: isResizing ? 'none' : 'width 0.2s ease' }}
+            >
+              {/* Submitted command echo */}
+              {commandEntry && (
+                <div className="shrink-0 px-4 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
+                  <span className="text-[0.75rem] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap break-words">
+                    {commandEntry.message.replace(/^PROMPT:\s*/, '')}
+                  </span>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <ExecutionTimeline
+                  entries={logEntries}
+                  selectedIndex={selectedStepIndex}
+                  onSelectEntry={setSelectedStepIndex}
+                  showAllLevels={showAllLevels}
+                  onToggleShowAll={() => setShowAllLevels(!showAllLevels)}
+                  isExecuting={isExecuting}
+                  statusText={sessionData?.statusText}
+                />
               </div>
-            )}
 
-            {/* ── Log stream ── */}
-            <div className="flex-1 min-h-0">
-              {visibleLogs.length > 0 && (
-                <div className="font-mono text-[0.75rem]">
-                  <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--bg-secondary)] border-b border-[var(--border-color)]">
-                    <span className="text-[0.625rem] text-[var(--text-muted)] uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                      <Terminal size={9} className="opacity-60" />
-                      Execution Log
-                      <span className="font-normal opacity-70">({visibleLogs.length}{hiddenCount > 0 ? `/${logEntries.length}` : ''})</span>
-                    </span>
-                    {hiddenCount > 0 && (
-                      <button
-                        className="text-[0.5625rem] text-[var(--text-muted)] hover:text-[var(--primary-color)] transition-colors flex items-center gap-0.5 uppercase tracking-wider font-medium"
-                        onClick={() => setShowAllLevels(!showAllLevels)}
-                      >
-                        {showAllLevels ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
-                        {showAllLevels ? 'Hide' : 'Show'} detail ({hiddenCount})
-                      </button>
-                    )}
-                  </div>
-                  <div className="divide-y divide-[var(--border-color)]/20">
-                    {visibleLogs.map((entry, i) => <LogLine key={i} entry={entry} />)}
-                  </div>
-                </div>
-              )}
-
-              {/* ── Running indicator ── */}
-              {isExecuting && (
-                <div className="flex items-center gap-3 px-4 py-3 border-t border-[var(--border-color)]">
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary-color)] animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary-color)] animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary-color)] animate-bounce [animation-delay:300ms]" />
-                  </div>
-                  <span className="text-[0.75rem] text-[var(--text-muted)]">{sessionData?.statusText || 'Executing...'}</span>
-                </div>
-              )}
-
-              {/* ── Result panel ── */}
+              {/* Result panel at bottom of timeline */}
               {hasFinished && (
-                <div className="px-3 pt-4 pb-6">
-                  <div className={`rounded-lg border overflow-hidden ${
+                <div className="shrink-0 border-t border-[var(--border-color)]">
+                  <div className={`${
                     sessionData?.status === 'success'
-                      ? 'border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.04)]'
-                      : 'border-[rgba(239,68,68,0.3)] bg-[rgba(239,68,68,0.04)]'
+                      ? 'bg-[rgba(16,185,129,0.04)]'
+                      : 'bg-[rgba(239,68,68,0.04)]'
                   }`}>
-                    <div className={`flex items-center justify-between px-4 py-2 ${
+                    <div className={`flex items-center justify-between px-4 py-1.5 ${
                       sessionData?.status === 'success'
                         ? 'bg-[rgba(16,185,129,0.08)] border-b border-[rgba(16,185,129,0.15)]'
                         : 'bg-[rgba(239,68,68,0.08)] border-b border-[rgba(239,68,68,0.15)]'
                     }`}>
                       <div className="flex items-center gap-2">
                         {sessionData?.status === 'success'
-                          ? <CheckCircle2 size={14} className="text-[var(--success-color)]" />
-                          : <XCircle size={14} className="text-[var(--danger-color)]" />}
-                        <span className={`text-[0.75rem] font-semibold uppercase tracking-wider ${
+                          ? <CheckCircle2 size={12} className="text-[var(--success-color)]" />
+                          : <XCircle size={12} className="text-[var(--danger-color)]" />}
+                        <span className={`text-[0.6875rem] font-semibold uppercase tracking-wider ${
                           sessionData?.status === 'success' ? 'text-[var(--success-color)]' : 'text-[var(--danger-color)]'
                         }`}>
                           {sessionData?.status === 'success' ? 'Result' : 'Error'}
                         </span>
                       </div>
                       {sessionData?.statusText && (
-                        <span className="text-[0.6875rem] text-[var(--text-muted)]">{sessionData.statusText}</span>
+                        <span className="text-[0.625rem] text-[var(--text-muted)]">{sessionData.statusText}</span>
                       )}
                     </div>
-                    <div className="px-4 py-3">
+                    <div className="px-4 py-2 max-h-[150px] overflow-auto">
                       {responseEntry ? (
-                        <div className="text-[0.8125rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words">
-                          {responseEntry.message.replace(/^SUCCESS:\s*/, '').replace(/^ERROR:\s*/, '')}
+                        <div className="text-[0.75rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words">
+                          {responseEntry.message.replace(/^SUCCESS:\s*/, '').replace(/^ERROR:\s*/, '').slice(0, 1000)}
+                          {responseEntry.message.length > 1000 && (
+                            <span className="text-[var(--text-muted)]">... (click RESPONSE in timeline for full text)</span>
+                          )}
                         </div>
                       ) : sessionData?.output ? (
-                        <pre className="text-[0.8125rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words font-[inherit]">
-                          {sessionData.output}
+                        <pre className="text-[0.75rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words font-[inherit] m-0">
+                          {sessionData.output.slice(0, 1000)}
+                          {sessionData.output.length > 1000 && '...'}
                         </pre>
                       ) : null}
                     </div>
                   </div>
                 </div>
               )}
-
-              <div ref={outputEndRef} />
             </div>
-          </div>
+
+            {/* ── Resize handle ── */}
+            {selectedEntry && (
+              <div
+                className="shrink-0 w-[4px] cursor-col-resize hover:bg-[var(--primary-color)] active:bg-[var(--primary-color)] transition-colors z-10"
+                style={{ backgroundColor: isResizing ? 'var(--primary-color)' : 'transparent' }}
+                onMouseDown={handleResizeStart}
+              />
+            )}
+
+            {/* ── Right pane: Step Detail ── */}
+            {selectedEntry && (
+              <div
+                className="min-w-0 border-l border-[var(--border-color)]"
+                style={{ width: `${detailPanelWidth}%`, transition: isResizing ? 'none' : 'width 0.2s ease' }}
+              >
+                <StepDetailPanel
+                  entry={selectedEntry}
+                  allEntries={logEntries}
+                  onClose={() => setSelectedStepIndex(null)}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {/* Scroll-to-bottom */}
-      {showScrollBtn && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-          <button className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[0.75rem] text-[var(--text-muted)] shadow-lg hover:bg-[var(--bg-hover)] transition-all" onClick={scrollToBottom}>
-            <ArrowDown size={12} /> New events
-          </button>
-        </div>
-      )}
     </div>
   );
 }

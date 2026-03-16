@@ -134,16 +134,95 @@ export interface HealthStatus {
 
 // ==================== Log Types ====================
 
+/** Structured file change hunk for diff display */
+export interface FileChangeHunk {
+  old_str?: string;
+  new_str?: string;
+}
+
+/** File change data attached to tool_use logs for IDE-like diff display */
+export interface FileChanges {
+  file_path: string;
+  operation: 'write' | 'create' | 'edit' | 'multi_edit';
+  changes: FileChangeHunk[];
+  lines_added: number;
+  lines_removed: number;
+  is_content_truncated?: boolean;
+  total_edits?: number;
+}
+
+/** Command/shell data for terminal-like display */
+export interface CommandData {
+  command: string;
+  working_dir?: string;
+}
+
+/** File read data for code viewer */
+export interface FileReadData {
+  file_path: string;
+  start_line?: number;
+  end_line?: number;
+}
+
+/** Rich metadata for log entries — matches backend SessionLogger output */
+export interface LogEntryMetadata {
+  // Common
+  type?: 'command' | 'response' | 'tool_use' | 'tool_result' | 'iteration_complete' | 'stream_event' | string;
+  is_truncated?: boolean;
+  preview?: string;
+
+  // Command metadata
+  prompt_length?: number;
+  timeout?: number;
+  system_prompt_preview?: string;
+  max_turns?: number;
+
+  // Response metadata
+  success?: boolean;
+  duration_ms?: number;
+  cost_usd?: number;
+  output_length?: number;
+  tool_call_count?: number;
+  num_turns?: number;
+
+  // Tool use metadata
+  tool_name?: string;
+  tool_id?: string;
+  detail?: string;
+  input_preview?: string;
+  input_length?: number;
+
+  // Tool result metadata
+  is_error?: boolean;
+  result_preview?: string;
+  result_length?: number;
+
+  // Iteration metadata
+  iteration?: number;
+  is_complete?: boolean;
+  stop_reason?: string;
+
+  // Graph event metadata
+  event_id?: string;
+  event_type?: string;
+  node_name?: string;
+  state_snapshot?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+
+  // Rich structured data for IDE display (injected by enhanced logger)
+  file_changes?: FileChanges;
+  command_data?: CommandData;
+  file_read?: FileReadData;
+
+  // Catch-all
+  [key: string]: unknown;
+}
+
 export interface LogEntry {
   timestamp: string;
   level: string;
   message: string;
-  metadata?: {
-    is_truncated?: boolean;
-    preview?: string;
-    prompt_length?: number;
-    output_length?: number;
-  };
+  metadata?: LogEntryMetadata;
 }
 
 export interface SessionLogsResponse {
