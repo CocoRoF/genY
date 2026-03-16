@@ -35,6 +35,7 @@ export interface CreateAgentRequest {
   workflow_id?: string;
   graph_name?: string;
   tool_preset_id?: string;
+  tool_search_mode?: boolean;
 }
 
 export interface ExecuteRequest {
@@ -285,6 +286,7 @@ export interface ToolPreset {
   description: string;
   allowed_servers: string[];
   allowed_tools: string[];
+  tool_search_mode: boolean;
   is_template: boolean;
   created_at: string;
   updated_at: string;

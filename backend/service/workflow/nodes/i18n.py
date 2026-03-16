@@ -2230,3 +2230,241 @@ RELEVANCE_GATE_I18N = {
         ),
     ),
 }
+
+
+# ====================================================================
+#  TOOL DISCOVERY NODES
+# ====================================================================
+
+TOOL_DISCOVERY_POST_I18N = {
+    "en": NodeI18n(
+        label="Tool Discovery Post",
+        description=(
+            "Post-processing node that extracts tool discovery results from agent output. "
+            "Placed after model calls in tool_search_mode workflows. Scans the agent's "
+            "output for tool_search/tool_schema results and updates the discovered_tools "
+            "state dict for cross-turn tool tracking. No-op when tool_search_mode is off."
+        ),
+        parameters={
+            "source_field": {
+                "label": "Source State Field",
+                "description": (
+                    "State field containing the agent output to scan for tool discovery results. "
+                    "Typically 'last_output' which holds the most recent model response."
+                ),
+            },
+        },
+        output_ports={"default": {"label": "Next"}},
+        groups={"state_fields": "State Fields"},
+        help=_help(
+            "Tool Discovery Post Node",
+            "Extracts tool discovery results from agent output and tracks them in graph state for cross-turn awareness.",
+            [
+                ("Overview", (
+                    "The Tool Discovery Post node is a **post-processing node** that runs after each model call "
+                    "in tool_search_mode workflows. It scans the agent's output for results from the discovery tools "
+                    "(`tool_search`, `tool_schema`, `tool_browse`) and records the discovered tools in the graph state.\n\n"
+                    "This enables the system to track which tools the agent has found across multiple turns, "
+                    "so the Tool Discovery Summary node can inject this information before subsequent LLM calls."
+                )),
+                ("How It Works", (
+                    "1. Checks if `tool_search_mode` is active — if not, returns immediately (no-op).\n"
+                    "2. Reads the configured source field (default: `last_output`) from state.\n"
+                    "3. Scans for JSON blocks containing tool_search or tool_schema results.\n"
+                    "4. Extracts tool names, descriptions, and parameter schemas.\n"
+                    "5. Merges newly discovered tools into the `discovered_tools` state dict.\n\n"
+                    "Three detection patterns are used:\n"
+                    "- **tool_schema results**: JSON with `name` and `parameters` fields\n"
+                    "- **tool_search results**: JSON with `results` array containing tool entries\n"
+                    "- **Markdown mentions**: Lines like `- **tool_name**: description`"
+                )),
+                ("Placement", (
+                    "Place this node **after every Post Model node** in tool_search_mode workflows.\n\n"
+                    "Typical chain:\n"
+                    "```\nLLM Call → Post Model → Tool Discovery Post → (next node)\n```\n\n"
+                    "In the autonomous template, one instance is placed after each difficulty path's post-processing."
+                )),
+                ("Usage Tips", (
+                    "1. This node is automatically included in tool-search workflow templates.\n"
+                    "2. When tool_search_mode is off, this node has zero overhead (immediate return).\n"
+                    "3. Only genuinely new tools are logged — re-discoveries are silently merged.\n"
+                    "4. Pair with Tool Discovery Summary node for complete cross-turn tool awareness."
+                )),
+            ],
+        ),
+    ),
+    "ko": NodeI18n(
+        label="도구 발견 후처리",
+        description=(
+            "에이전트 출력에서 도구 발견 결과를 추출하는 후처리 노드입니다. "
+            "tool_search_mode 워크플로우에서 모델 호출 이후에 배치됩니다. "
+            "에이전트의 출력에서 tool_search/tool_schema 결과를 스캔하여 "
+            "discovered_tools 상태 딕셔너리를 업데이트합니다. "
+            "tool_search_mode가 꺼져 있으면 동작하지 않습니다."
+        ),
+        parameters={
+            "source_field": {
+                "label": "소스 상태 필드",
+                "description": (
+                    "도구 발견 결과를 스캔할 에이전트 출력이 담긴 상태 필드입니다. "
+                    "일반적으로 가장 최근 모델 응답이 저장된 'last_output'을 사용합니다."
+                ),
+            },
+        },
+        output_ports={"default": {"label": "다음"}},
+        groups={"state_fields": "상태 필드"},
+        help=_help(
+            "도구 발견 후처리 노드",
+            "에이전트 출력에서 도구 발견 결과를 추출하여 그래프 상태에 기록합니다.",
+            [
+                ("개요", (
+                    "도구 발견 후처리 노드는 tool_search_mode 워크플로우에서 "
+                    "각 모델 호출 이후에 실행되는 **후처리 노드**입니다. "
+                    "에이전트의 출력에서 발견 도구(`tool_search`, `tool_schema`, `tool_browse`)의 "
+                    "결과를 스캔하고, 발견된 도구를 그래프 상태에 기록합니다.\n\n"
+                    "이를 통해 여러 턴에 걸쳐 에이전트가 발견한 도구를 추적할 수 있으며, "
+                    "도구 발견 요약 노드가 후속 LLM 호출 전에 이 정보를 주입할 수 있습니다."
+                )),
+                ("동작 방식", (
+                    "1. `tool_search_mode` 활성 여부를 확인합니다 — 비활성이면 즉시 반환 (no-op).\n"
+                    "2. 구성된 소스 필드(기본값: `last_output`)를 상태에서 읽습니다.\n"
+                    "3. tool_search 또는 tool_schema 결과가 포함된 JSON 블록을 스캔합니다.\n"
+                    "4. 도구 이름, 설명, 파라미터 스키마를 추출합니다.\n"
+                    "5. 새로 발견된 도구를 `discovered_tools` 상태 딕셔너리에 병합합니다.\n\n"
+                    "세 가지 감지 패턴이 사용됩니다:\n"
+                    "- **tool_schema 결과**: `name`과 `parameters` 필드가 있는 JSON\n"
+                    "- **tool_search 결과**: 도구 항목이 포함된 `results` 배열이 있는 JSON\n"
+                    "- **마크다운 언급**: `- **tool_name**: description` 형태의 줄"
+                )),
+                ("배치 위치", (
+                    "tool_search_mode 워크플로우에서 **모든 Post Model 노드 뒤에** 배치하세요.\n\n"
+                    "일반적인 체인:\n"
+                    "```\nLLM 호출 → 후처리 → 도구 발견 후처리 → (다음 노드)\n```\n\n"
+                    "자율 실행 템플릿에서는 각 난이도 경로의 후처리 이후에 하나씩 배치됩니다."
+                )),
+                ("사용 팁", (
+                    "1. 도구 검색 워크플로우 템플릿에 자동으로 포함됩니다.\n"
+                    "2. tool_search_mode가 꺼져 있으면 오버헤드가 없습니다 (즉시 반환).\n"
+                    "3. 진정으로 새로운 도구만 로그에 기록됩니다 — 재발견은 자동 병합됩니다.\n"
+                    "4. 완전한 크로스턴 도구 인식을 위해 도구 발견 요약 노드와 함께 사용하세요."
+                )),
+            ],
+        ),
+    ),
+}
+
+TOOL_DISCOVERY_SUMMARY_I18N = {
+    "en": NodeI18n(
+        label="Tool Discovery Summary",
+        description=(
+            "Injects a summary of previously discovered tools into agent context. "
+            "Placed before model calls in tool_search_mode workflows to help the agent "
+            "remember which tools it has already found without re-searching. "
+            "No-op when tool_search_mode is off or no tools have been discovered."
+        ),
+        parameters={
+            "max_tools_in_summary": {
+                "label": "Max Tools in Summary",
+                "description": (
+                    "Maximum number of discovered tools to include in the context summary. "
+                    "Tools beyond this limit are noted with a count but not listed individually."
+                ),
+            },
+        },
+        output_ports={"default": {"label": "Next"}},
+        groups={"behavior": "Behavior"},
+        help=_help(
+            "Tool Discovery Summary Node",
+            "Injects previously discovered tool information into agent context to prevent redundant searches.",
+            [
+                ("Overview", (
+                    "The Tool Discovery Summary node runs **before model calls** in tool_search_mode workflows. "
+                    "It reads the `discovered_tools` dict from graph state and generates a concise Markdown summary "
+                    "listing all tools the agent has found so far, including whether their schema has been loaded.\n\n"
+                    "This prevents the agent from re-searching for tools it has already discovered, "
+                    "saving both tokens and execution rounds."
+                )),
+                ("How It Works", (
+                    "1. Checks if `tool_search_mode` is active and tools have been discovered.\n"
+                    "2. Builds a Markdown summary: `## Previously Discovered Tools` with bullet list.\n"
+                    "3. Each tool shows name, description, and schema status.\n"
+                    "4. Merges the summary into the `memory_context` state field.\n"
+                    "5. The summary is injected into the agent's prompt by downstream memory injection.\n\n"
+                    "**Example output:**\n"
+                    "```\n## Previously Discovered Tools\n"
+                    "- **read_file**: Read file contents (schema loaded)\n"
+                    "- **write_file**: Write to a file (use tool_schema to get params)\n```"
+                )),
+                ("Placement", (
+                    "Place this node **before the first model call** in the workflow, typically after Memory Inject.\n\n"
+                    "Typical chain:\n"
+                    "```\nMemory Inject → Tool Discovery Summary → Context Guard → LLM Call\n```\n\n"
+                    "In the autonomous template, it is placed once at the entry point before classification."
+                )),
+                ("Usage Tips", (
+                    "1. Pair with Tool Discovery Post node for complete tool tracking.\n"
+                    "2. Adjust 'Max Tools in Summary' if the agent discovers many tools (default: 20).\n"
+                    "3. When no tools are discovered yet, this node is a no-op.\n"
+                    "4. The summary is appended to existing memory_context, not replacing it."
+                )),
+            ],
+        ),
+    ),
+    "ko": NodeI18n(
+        label="도구 발견 요약",
+        description=(
+            "이전에 발견한 도구 요약을 에이전트 컨텍스트에 주입합니다. "
+            "tool_search_mode 워크플로우에서 모델 호출 전에 배치되어 "
+            "에이전트가 이미 찾은 도구를 재검색 없이 기억하도록 돕습니다. "
+            "tool_search_mode가 꺼져 있거나 발견된 도구가 없으면 동작하지 않습니다."
+        ),
+        parameters={
+            "max_tools_in_summary": {
+                "label": "요약 내 최대 도구 수",
+                "description": (
+                    "컨텍스트 요약에 포함할 발견 도구의 최대 수입니다. "
+                    "이 제한을 초과하는 도구는 개수만 표기되고 개별 나열되지 않습니다."
+                ),
+            },
+        },
+        output_ports={"default": {"label": "다음"}},
+        groups={"behavior": "동작"},
+        help=_help(
+            "도구 발견 요약 노드",
+            "이전에 발견한 도구 정보를 에이전트 컨텍스트에 주입하여 중복 검색을 방지합니다.",
+            [
+                ("개요", (
+                    "도구 발견 요약 노드는 tool_search_mode 워크플로우에서 **모델 호출 전에** 실행됩니다. "
+                    "그래프 상태의 `discovered_tools` 딕셔너리를 읽고, 에이전트가 지금까지 "
+                    "발견한 모든 도구를 스키마 로드 여부와 함께 간결한 마크다운 요약으로 생성합니다.\n\n"
+                    "이를 통해 에이전트가 이미 발견한 도구를 재검색하는 것을 방지하여 "
+                    "토큰과 실행 라운드를 절약합니다."
+                )),
+                ("동작 방식", (
+                    "1. `tool_search_mode` 활성 여부와 도구 발견 여부를 확인합니다.\n"
+                    "2. 마크다운 요약을 생성합니다: `## Previously Discovered Tools` + 불릿 리스트.\n"
+                    "3. 각 도구에 이름, 설명, 스키마 상태를 표시합니다.\n"
+                    "4. 요약을 `memory_context` 상태 필드에 병합합니다.\n"
+                    "5. 하류 메모리 주입에 의해 에이전트 프롬프트에 주입됩니다.\n\n"
+                    "**출력 예시:**\n"
+                    "```\n## Previously Discovered Tools\n"
+                    "- **read_file**: 파일 내용 읽기 (스키마 로드됨)\n"
+                    "- **write_file**: 파일에 쓰기 (tool_schema로 파라미터 확인 필요)\n```"
+                )),
+                ("배치 위치", (
+                    "워크플로우의 **첫 번째 모델 호출 전에** 배치하세요. "
+                    "일반적으로 Memory Inject 이후입니다.\n\n"
+                    "일반적인 체인:\n"
+                    "```\n메모리 주입 → 도구 발견 요약 → 컨텍스트 가드 → LLM 호출\n```\n\n"
+                    "자율 실행 템플릿에서는 분류 전 진입점에 한 번 배치됩니다."
+                )),
+                ("사용 팁", (
+                    "1. 완전한 도구 추적을 위해 도구 발견 후처리 노드와 함께 사용하세요.\n"
+                    "2. 에이전트가 많은 도구를 발견하면 '요약 내 최대 도구 수'를 조정하세요 (기본값: 20).\n"
+                    "3. 아직 발견된 도구가 없으면 이 노드는 동작하지 않습니다.\n"
+                    "4. 요약은 기존 memory_context에 추가되며, 대체하지 않습니다."
+                )),
+            ],
+        ),
+    ),
+}

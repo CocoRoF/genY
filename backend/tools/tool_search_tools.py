@@ -1,8 +1,8 @@
 """
 Tool Search & Execute Tools — agent-facing tools for dynamic tool discovery and execution.
 
-These tools are the core of the "deferred tool" pattern inspired by
-graph-tool-call. Instead of receiving all tool definitions in their
+These tools are the core of the "deferred tool" pattern. Instead
+of receiving all tool definitions in their
 context window, agents receive only these search/execute tools and use
 them to discover, inspect, and execute the specific tools they need.
 

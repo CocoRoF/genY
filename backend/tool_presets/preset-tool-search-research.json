@@ -1,0 +1,25 @@
+{
+  "id": "preset-tool-search-research",
+  "name": "Tool Search (Research)",
+  "description": "Dynamic tool discovery + research-focused MCP servers. The agent discovers and uses search, web, and knowledge tools dynamically.",
+  "allowed_servers": [
+    "_builtin_tools",
+    "web",
+    "search",
+    "brave",
+    "perplexity",
+    "google",
+    "bing",
+    "arxiv",
+    "wikipedia",
+    "fetch",
+    "browser"
+  ],
+  "allowed_tools": [
+    "*"
+  ],
+  "tool_search_mode": true,
+  "is_template": true,
+  "created_at": "2026-03-16T00:39:44.253048+00:00",
+  "updated_at": "2026-03-16T00:39:44.302364+00:00"
+}

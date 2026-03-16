@@ -24,6 +24,10 @@ from service.workflow.nodes.base import (
     NodeParameter,
     register_node,
 )
+from service.workflow.nodes.i18n import (
+    TOOL_DISCOVERY_POST_I18N,
+    TOOL_DISCOVERY_SUMMARY_I18N,
+)
 from service.workflow.workflow_state import NodeStateUsage
 
 logger = getLogger(__name__)
@@ -163,6 +167,7 @@ class ToolDiscoveryPostNode(BaseNode):
     category = "resilience"
     icon = "search"
     color = "#8b5cf6"
+    i18n = TOOL_DISCOVERY_POST_I18N
     state_usage = NodeStateUsage(
         reads=["tool_search_mode", "discovered_tools", "last_output", "iteration"],
         writes=["discovered_tools"],
@@ -247,6 +252,7 @@ class ToolDiscoverySummaryNode(BaseNode):
     category = "resilience"
     icon = "list"
     color = "#8b5cf6"
+    i18n = TOOL_DISCOVERY_SUMMARY_I18N
     state_usage = NodeStateUsage(
         reads=["tool_search_mode", "discovered_tools"],
         writes=["memory_context"],

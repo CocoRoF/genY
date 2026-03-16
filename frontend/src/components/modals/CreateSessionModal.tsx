@@ -55,6 +55,39 @@ export default function CreateSessionModal({ onClose }: Props) {
   const [customPresets, setCustomPresets] = useState<ToolPreset[]>([]);
   const [selectedToolPreset, setSelectedToolPreset] = useState('preset-full');
 
+  // Map regular workflow IDs ↔ tool-search workflow IDs
+  const TOOL_SEARCH_WORKFLOW_MAP: Record<string, string> = {
+    'template-simple': 'template-tool-search-simple',
+    'template-autonomous': 'template-tool-search-autonomous',
+  };
+  const REVERSE_WORKFLOW_MAP: Record<string, string> = Object.fromEntries(
+    Object.entries(TOOL_SEARCH_WORKFLOW_MAP).map(([k, v]) => [v, k])
+  );
+
+  /** Check if the given preset has tool_search_mode enabled */
+  const isToolSearchPreset = (presetId: string): boolean => {
+    const allPresets = [...templatePresets, ...customPresets];
+    const preset = allPresets.find(p => p.id === presetId);
+    return preset?.tool_search_mode ?? false;
+  };
+
+  /** Handle tool preset change — auto-switch workflow when tool_search_mode changes */
+  const handleToolPresetChange = (presetId: string) => {
+    const wasToolSearch = isToolSearchPreset(selectedToolPreset);
+    const isToolSearch = isToolSearchPreset(presetId);
+    setSelectedToolPreset(presetId);
+
+    if (isToolSearch && !wasToolSearch) {
+      // Switching TO tool-search → map workflow to tool-search variant
+      const mapped = TOOL_SEARCH_WORKFLOW_MAP[selectedWorkflow];
+      if (mapped) setSelectedWorkflow(mapped);
+    } else if (!isToolSearch && wasToolSearch) {
+      // Switching FROM tool-search → map workflow back to regular variant
+      const mapped = REVERSE_WORKFLOW_MAP[selectedWorkflow];
+      if (mapped) setSelectedWorkflow(mapped);
+    }
+  };
+
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
 
   // Load available workflows
@@ -110,6 +143,10 @@ export default function CreateSessionModal({ onClose }: Props) {
       // Tool preset
       if (selectedToolPreset) {
         payload.tool_preset_id = selectedToolPreset;
+        // Explicitly send tool_search_mode so backend doesn't rely solely on preset lookup
+        if (isToolSearchPreset(selectedToolPreset)) {
+          payload.tool_search_mode = true;
+        }
       }
       await createSession(payload);
       onClose();
@@ -219,7 +256,7 @@ export default function CreateSessionModal({ onClose }: Props) {
           </div>
 
           {/* Max Iterations (for non-simple workflows) */}
-          {selectedWorkflow !== 'template-simple' && (
+          {!selectedWorkflow.endsWith('-simple') && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.maxIterations')} <InfoTooltip text={t('createSession.maxIterationsHelp')} /></label>
@@ -231,7 +268,7 @@ export default function CreateSessionModal({ onClose }: Props) {
           {/* Tool Preset */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.toolPreset')} <InfoTooltip text={t('createSession.toolPresetTooltip')} /></label>
-            <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedToolPreset} onChange={e => setSelectedToolPreset(e.target.value)}>
+            <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedToolPreset} onChange={e => handleToolPresetChange(e.target.value)}>
               {templatePresets.length > 0 && (
                 <optgroup label={t('createSession.officialTemplates')}>
                   {templatePresets.map(p => (
@@ -254,6 +291,13 @@ export default function CreateSessionModal({ onClose }: Props) {
                 return tp?.description || t('createSession.toolPresetHelp');
               })()}
             </small>
+            {isToolSearchPreset(selectedToolPreset) && (
+              <div className="flex items-center gap-2 mt-1 py-1.5 px-2.5 rounded-md bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.15)]">
+                <span className="text-[0.6875rem] text-[#60a5fa]">
+                  {t('createSession.toolSearchModeInfo')}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* System Prompt */}

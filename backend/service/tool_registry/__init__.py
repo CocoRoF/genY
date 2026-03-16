@@ -1,9 +1,9 @@
 """
-Tool Registry — graph-based tool indexing and retrieval for Geny agents.
+Tool Registry — tool indexing and retrieval for Geny agents.
 
-Wraps graph-tool-call's ToolGraph to register all MCP and built-in tools
-at startup, then provides search/browse/schema APIs that agents use
-instead of receiving the full tool list.
+Registers all MCP and built-in tools at startup, then provides
+search/browse/schema APIs that agents use instead of receiving
+the full tool list.
 
 Public API:
     get_tool_registry() → ToolRegistry singleton

@@ -43,6 +43,15 @@ class ToolPreset(BaseModel):
         description="Built-in tool names to include in this preset",
     )
 
+    tool_search_mode: bool = Field(
+        default=False,
+        description=(
+            "When True, the session uses dynamic tool discovery mode. "
+            "The agent receives only 5 ToolSearch tools and discovers/executes "
+            "other tools dynamically via tool_search → tool_schema → tool_execute."
+        ),
+    )
+
     is_template: bool = Field(
         default=False,
         description="Whether this is a built-in read-only template",
@@ -68,4 +77,5 @@ class ToolPresetSummary(BaseModel):
     description: str = ""
     server_count: int = 0
     tool_count: int = 0
+    tool_search_mode: bool = False
     is_template: bool = False

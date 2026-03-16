@@ -224,6 +224,11 @@ function PresetCard({
           <h4 className="text-[0.875rem] font-semibold text-[var(--text-primary)] truncate">{preset.name}</h4>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {preset.tool_search_mode && (
+            <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(59,130,246,0.12)] text-[#60a5fa] border border-[rgba(59,130,246,0.2)] uppercase tracking-wide">
+              Tool Search
+            </span>
+          )}
           {preset.is_template && (
             <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(168,85,247,0.12)] text-[#c084fc] border border-[rgba(168,85,247,0.2)] uppercase tracking-wide">
               {t('toolPresets.template')}
@@ -331,6 +336,11 @@ function ViewPanel({
           <div className="flex items-center gap-2 min-w-0">
             <Shield size={16} className="text-[var(--primary-color)] shrink-0" />
             <h3 className="text-[0.9375rem] font-semibold text-[var(--text-primary)] truncate">{preset.name}</h3>
+            {preset.tool_search_mode && (
+              <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(59,130,246,0.12)] text-[#60a5fa] border border-[rgba(59,130,246,0.2)] uppercase tracking-wide shrink-0">
+                Tool Search
+              </span>
+            )}
             {preset.is_template && (
               <span className="text-[10px] font-semibold py-0.5 px-1.5 rounded-md bg-[rgba(168,85,247,0.12)] text-[#c084fc] border border-[rgba(168,85,247,0.2)] uppercase tracking-wide shrink-0">
                 {t('toolPresets.template')}

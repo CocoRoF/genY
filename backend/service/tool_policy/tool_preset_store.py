@@ -86,6 +86,64 @@ class ToolPresetStore:
                 allowed_tools=["*"],
                 is_template=True,
             ),
+            # ── Tool Search presets (tool_search_mode=True) ──
+            ToolPreset(
+                id="preset-tool-search-full",
+                name="Tool Search (Full Access)",
+                description=(
+                    "Dynamic tool discovery mode — the agent starts with only 5 ToolSearch tools "
+                    "and discovers/executes other tools on demand. All MCP servers available."
+                ),
+                allowed_servers=["*"],
+                allowed_tools=["*"],
+                tool_search_mode=True,
+                is_template=True,
+            ),
+            ToolPreset(
+                id="preset-tool-search-coding",
+                name="Tool Search (Coding)",
+                description=(
+                    "Dynamic tool discovery + coding-focused MCP servers. "
+                    "The agent discovers and uses filesystem, git, and code tools dynamically."
+                ),
+                allowed_servers=[
+                    "_builtin_tools",
+                    "filesystem",
+                    "git",
+                    "github",
+                    "code",
+                    "lint",
+                    "docker",
+                    "terminal",
+                ],
+                allowed_tools=["*"],
+                tool_search_mode=True,
+                is_template=True,
+            ),
+            ToolPreset(
+                id="preset-tool-search-research",
+                name="Tool Search (Research)",
+                description=(
+                    "Dynamic tool discovery + research-focused MCP servers. "
+                    "The agent discovers and uses search, web, and knowledge tools dynamically."
+                ),
+                allowed_servers=[
+                    "_builtin_tools",
+                    "web",
+                    "search",
+                    "brave",
+                    "perplexity",
+                    "google",
+                    "bing",
+                    "arxiv",
+                    "wikipedia",
+                    "fetch",
+                    "browser",
+                ],
+                allowed_tools=["*"],
+                tool_search_mode=True,
+                is_template=True,
+            ),
         ]
 
         for tmpl in templates:
@@ -166,6 +224,7 @@ class ToolPresetStore:
             description=source.description,
             allowed_servers=list(source.allowed_servers),
             allowed_tools=list(source.allowed_tools),
+            tool_search_mode=source.tool_search_mode,
             is_template=False,
         )
         self.save(cloned)

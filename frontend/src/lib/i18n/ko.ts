@@ -473,6 +473,7 @@ const ko: Translations = {
     creating: '생성 중...',
     createSession: '세션 생성',
     failedToCreate: '세션 생성에 실패했습니다',
+    toolSearchModeInfo: 'Tool Search 모드: 에이전트가 검색 → 스키마 → 실행을 통해 도구를 동적으로 탐색하고 실행합니다.',
   },
 
   // ─── Delete Session Modal ───

@@ -327,6 +327,11 @@ class AgentSessionManager(SessionManager):
         role = request.role.value if request.role else "worker"
         tool_search_mode = getattr(request, 'tool_search_mode', False) or False
 
+        # Auto-enable tool_search_mode when preset carries the flag
+        if tool_preset_id and preset and getattr(preset, 'tool_search_mode', False):
+            tool_search_mode = True
+            logger.info(f"  tool_search_mode auto-enabled by preset {tool_preset_id}")
+
         # If a tool preset specifies an explicit tool list, use it as override
         explicit_tools = request.allowed_tools
         if preset_tool_filter is not None:

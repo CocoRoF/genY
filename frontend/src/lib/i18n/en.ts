@@ -473,6 +473,7 @@ const en = {
     creating: 'Creating...',
     createSession: 'Create Session',
     failedToCreate: 'Failed to create session',
+    toolSearchModeInfo: 'Tool Search mode: Agent discovers and executes tools dynamically via search → schema → execute.',
   },
 
   // ─── Delete Session Modal ───

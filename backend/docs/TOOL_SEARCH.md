@@ -1,6 +1,6 @@
 # Tool Search Architecture
 
-Dynamic tool discovery and execution for Geny agents, inspired by [graph-tool-call](https://github.com/SonAIengine/graph-tool-call).
+Dynamic tool discovery and execution for Geny agents.
 
 ## Problem
 
@@ -31,10 +31,7 @@ MCPLoader (startup)
   ├── loads built-in tools from tools/ folder
   ├── populates ToolRegistry with all tools
   │     │
-  │     ├── ToolGraph (graph-tool-call)               ← optional, graph-based retrieval
-  │     │     BM25 + graph traversal + embeddings
-  │     │
-  │     └── Keyword fallback                          ← always available
+  │     └── Keyword search
   │           word overlap + name bonus scoring
   │
   └── populates ToolExecutor with all tools           ← NEW (Phase 2)
@@ -90,10 +87,10 @@ Agent Session (tool_search_mode=True)
 Central index of all available tools (`backend/service/tool_registry/registry.py`).
 
 - **Registration**: `register_mcp_tools(server, tools)` and `register_builtin_tools(tools)` called at startup by MCPLoader
-- **Search**: Uses graph-tool-call's `ToolGraph.retrieve()` for hybrid BM25 + graph retrieval, falls back to keyword matching
+- **Search**: Uses keyword-based scoring (word overlap + name bonus) for tool retrieval
 - **Schema**: `get_tool_schema(name)` returns full parameter definition
 - **Browse**: `browse_categories()` groups tools by server
-- **Workflow**: `get_workflow(name)` follows PRECEDES edges in the tool graph
+- **Workflow**: `get_workflow(name)` returns tool execution chains (currently stub)
 - **Singleton**: accessed via `get_tool_registry()`
 
 ### ToolExecutor (Phase 2)
@@ -170,10 +167,7 @@ request_b = CreateSessionRequest(
 
 ### Graceful Degradation
 
-The `graph-tool-call` library is optional. When not installed:
-- `ToolRegistry` falls back to keyword-based search (word overlap + name bonus scoring)
-- All other functionality (schema retrieval, browse, workflow templates) works unchanged
-- No runtime errors — the import is wrapped in a try/except
+The system uses keyword-based search for tool discovery. All functionality works without any external search libraries.
 
 ## Files
 
@@ -196,7 +190,7 @@ The `graph-tool-call` library is optional. When not installed:
 ### Modified Files
 | File | Change |
 |------|--------|
-| `pyproject.toml` | Added `graph-tool-call>=0.9.0` dependency |
+| `pyproject.toml` | Dependencies (no external search library needed) |
 | `service/mcp_loader.py` | Added `_populate_tool_registry()` + `_populate_tool_executor()` steps |
 | `service/claude_manager/models.py` | `tool_search_mode` field on request/session models |
 | `service/tool_policy/policy.py` | `TOOL_SEARCH` profile with `tool_execute` in allowed set |

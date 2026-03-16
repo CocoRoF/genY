@@ -1,14 +1,12 @@
 """
 ToolRegistry — indexes all available tools and provides search/retrieval.
 
-Uses graph-tool-call's ToolGraph for graph-based hybrid retrieval
-(BM25 + graph traversal + optional embedding). Falls back to a simple
-keyword search when graph-tool-call is not installed.
+Uses keyword-based search (word overlap + name/description bonus scoring)
+to find relevant tools from the registry.
 
 Design:
     - All tools are registered at startup via MCPLoader integration.
     - Each tool is stored as a ToolEntry with full schema information.
-    - ToolGraph provides relationship-aware search (e.g. tool A precedes B).
     - The registry is a singleton accessed via get_tool_registry().
 
 Integration points:
@@ -26,16 +24,6 @@ from logging import getLogger
 from typing import Any, Dict, List, Optional
 
 logger = getLogger(__name__)
-
-# Try to import graph-tool-call; degrade gracefully if unavailable
-try:
-    from graph_tool_call import ToolGraph, ToolSchema
-    HAS_GRAPH_TOOL_CALL = True
-except ImportError:
-    HAS_GRAPH_TOOL_CALL = False
-    ToolGraph = None  # type: ignore[assignment, misc]
-    ToolSchema = None  # type: ignore[assignment, misc]
-    logger.info("graph-tool-call not installed — using fallback keyword search")
 
 
 # ---------------------------------------------------------------------------
@@ -98,23 +86,11 @@ class ToolRegistry:
         - Lookup: get_tool_schema(name) → dict | None
         - Browse: browse_categories() → dict
         - Listing: list_all_tools() → list[str]
-
-    Uses graph-tool-call for graph-based hybrid retrieval when available.
-    Falls back to simple keyword matching otherwise.
     """
 
     def __init__(self) -> None:
         # Primary storage: name → ToolEntry
         self._tools: Dict[str, ToolEntry] = {}
-
-        # graph-tool-call integration (optional)
-        self._tool_graph: Any = None
-        if HAS_GRAPH_TOOL_CALL:
-            self._tool_graph = ToolGraph()
-            logger.info("ToolRegistry: graph-tool-call ToolGraph initialized")
-        else:
-            logger.info("ToolRegistry: using fallback mode (no ToolGraph)")
-
         self._initialized = False
 
     # ========================================================================
@@ -137,7 +113,6 @@ class ToolRegistry:
             Number of tools registered.
         """
         count = 0
-        mcp_format_tools = []
 
         for tool_def in tools:
             name = tool_def.get("name", "")
@@ -155,23 +130,6 @@ class ToolRegistry:
             )
             self._tools[name] = entry
             count += 1
-
-            # Collect for batch ToolGraph registration
-            if self._tool_graph is not None:
-                mcp_format_tools.append(tool_def)
-
-        # Batch register in ToolGraph
-        if self._tool_graph is not None and mcp_format_tools:
-            try:
-                self._tool_graph.ingest_mcp_tools(
-                    mcp_format_tools,
-                    server_name=server_name,
-                )
-            except Exception as e:
-                logger.warning(
-                    f"ToolRegistry: ToolGraph.ingest_mcp_tools failed "
-                    f"for server '{server_name}': {e}"
-                )
 
         logger.info(
             f"ToolRegistry: registered {count} tools from MCP server '{server_name}'"
@@ -194,7 +152,6 @@ class ToolRegistry:
             Number of tools registered.
         """
         count = 0
-        openai_format_tools = []
 
         for tool_obj in tools:
             name, description, parameters = self._extract_tool_info(tool_obj)
@@ -210,28 +167,6 @@ class ToolRegistry:
             )
             self._tools[name] = entry
             count += 1
-
-            # Convert to OpenAI function format for ToolGraph
-            if self._tool_graph is not None:
-                openai_tool = {
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "description": description,
-                        "parameters": parameters,
-                    },
-                }
-                openai_format_tools.append(openai_tool)
-
-        # Batch register in ToolGraph
-        if self._tool_graph is not None and openai_format_tools:
-            try:
-                self._tool_graph.add_tools(openai_format_tools)
-            except Exception as e:
-                logger.warning(
-                    f"ToolRegistry: ToolGraph.add_tools failed for "
-                    f"built-in tools: {e}"
-                )
 
         logger.info(f"ToolRegistry: registered {count} built-in tools")
         return count
@@ -261,21 +196,6 @@ class ToolRegistry:
         )
         self._tools[name] = entry
 
-        # Also add to ToolGraph
-        if self._tool_graph is not None:
-            try:
-                openai_tool = {
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "description": description,
-                        "parameters": parameters or {},
-                    },
-                }
-                self._tool_graph.add_tool(openai_tool)
-            except Exception as e:
-                logger.warning(f"ToolRegistry: ToolGraph.add_tool failed for '{name}': {e}")
-
     def finalize(self) -> None:
         """Mark registration as complete.
 
@@ -285,13 +205,6 @@ class ToolRegistry:
         self._initialized = True
         tool_count = len(self._tools)
         logger.info(f"ToolRegistry: finalized with {tool_count} tools")
-
-        if self._tool_graph is not None:
-            try:
-                graph_info = repr(self._tool_graph)
-                logger.info(f"ToolRegistry: ToolGraph = {graph_info}")
-            except Exception:
-                pass
 
     # ========================================================================
     # Search & Retrieval
@@ -305,8 +218,7 @@ class ToolRegistry:
     ) -> List[ToolEntry]:
         """Search for tools matching a natural-language query.
 
-        Uses graph-tool-call's hybrid retrieval (BM25 + graph traversal)
-        when available, otherwise falls back to keyword matching.
+        Uses keyword-based scoring (word overlap + name/description bonus).
 
         Args:
             query: Natural language search query.
@@ -319,27 +231,6 @@ class ToolRegistry:
         if not self._tools:
             return []
 
-        # Try ToolGraph retrieval first
-        if self._tool_graph is not None:
-            try:
-                results = self._tool_graph.retrieve(
-                    query,
-                    top_k=top_k,
-                    history=history,
-                )
-                # Map ToolSchema results back to ToolEntry
-                entries = []
-                for tool_schema in results:
-                    entry = self._tools.get(tool_schema.name)
-                    if entry:
-                        entries.append(entry)
-                if entries:
-                    return entries
-            except Exception as e:
-                logger.warning(f"ToolRegistry: ToolGraph.retrieve failed: {e}")
-                # Fall through to keyword search
-
-        # Fallback: simple keyword search
         return self._keyword_search(query, top_k)
 
     def get_tool_schema(self, tool_name: str) -> Optional[Dict[str, Any]]:
@@ -366,17 +257,7 @@ class ToolRegistry:
         Returns a tree structure grouping tools by their MCP server
         or source type.
         """
-        # If ToolGraph is available and has categories, use it
-        if self._tool_graph is not None:
-            try:
-                api = self._tool_graph.search_api
-                tree = api.browse_categories()
-                if tree.get("domains") or tree.get("uncategorized"):
-                    return tree
-            except Exception:
-                pass
-
-        # Fallback: group by server_name
+        # Group by server_name
         by_server: Dict[str, List[str]] = {}
         for name, entry in self._tools.items():
             server = entry.server_name or "_unknown"
@@ -397,18 +278,10 @@ class ToolRegistry:
     def get_workflow(self, tool_name: str) -> List[str]:
         """Get the execution workflow chain for a tool.
 
-        Follows PRECEDES relations in the tool graph to find
-        the typical execution sequence.
-
         Returns:
             Ordered list of tool names in the workflow chain.
+            Currently returns empty — workflow chain detection is not implemented.
         """
-        if self._tool_graph is not None:
-            try:
-                api = self._tool_graph.search_api
-                return api.get_workflow(tool_name)
-            except Exception:
-                pass
         return []
 
     def list_all_tools(self) -> List[str]:
@@ -424,21 +297,12 @@ class ToolRegistry:
             server = entry.server_name or "_unknown"
             by_server[server] = by_server.get(server, 0) + 1
 
-        stats: Dict[str, Any] = {
+        return {
             "total_tools": len(self._tools),
             "by_source": by_source,
             "by_server": by_server,
-            "has_tool_graph": self._tool_graph is not None,
             "initialized": self._initialized,
         }
-
-        if self._tool_graph is not None:
-            try:
-                stats["tool_graph"] = repr(self._tool_graph)
-            except Exception:
-                pass
-
-        return stats
 
     # ========================================================================
     # Filtering (for ToolPolicy integration)
@@ -540,11 +404,6 @@ class ToolRegistry:
         return (name, description, parameters)
 
     @property
-    def tool_graph(self) -> Any:
-        """Access the underlying ToolGraph (may be None)."""
-        return self._tool_graph
-
-    @property
     def tool_count(self) -> int:
         return len(self._tools)
 
@@ -553,10 +412,8 @@ class ToolRegistry:
         return self._initialized
 
     def __repr__(self) -> str:
-        graph_str = repr(self._tool_graph) if self._tool_graph else "None"
         return (
             f"ToolRegistry(tools={len(self._tools)}, "
-            f"graph={graph_str}, "
             f"initialized={self._initialized})"
         )
 
