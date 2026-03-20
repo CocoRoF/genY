@@ -8,18 +8,17 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
   return twMerge(classes.filter(Boolean).join(' '));
 }
 
-const GLOBAL_TAB_IDS = ['main', 'playground', 'workflows', 'tools', 'sharedFolder', 'settings'] as const;
+const GLOBAL_TAB_IDS = ['main', 'playground', 'workflows', 'sharedFolder', 'settings'] as const;
 const SESSION_TAB_DEFS = [
   { id: 'command', accent: true },
   { id: 'graph' },
-  { id: 'sessionTools' },
   { id: 'storage' },
   { id: 'logs' },
 ] as const;
 
 // Tabs hidden in Normal mode
-const DEV_ONLY_GLOBAL = new Set(['workflows', 'tools', 'settings']);
-const DEV_ONLY_SESSION = new Set(['logs', 'graph', 'sessionTools']);
+const DEV_ONLY_GLOBAL = new Set(['workflows', 'settings']);
+const DEV_ONLY_SESSION = new Set(['logs', 'graph']);
 
 const TAB_BASE =
   'relative py-1.5 px-3.5 text-[0.8125rem] font-medium bg-transparent border-none rounded-[6px] cursor-pointer transition-all duration-150 whitespace-nowrap';

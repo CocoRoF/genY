@@ -358,7 +358,6 @@ class SessionStore:
             "role": rec.get("role", "worker"),
             "graph_name": rec.get("graph_name"),
             "workflow_id": rec.get("workflow_id"),
-            "tool_preset_id": rec.get("tool_preset_id"),
         }
 
     def contains(self, session_id: str) -> bool:

@@ -63,7 +63,6 @@ from service.langgraph.state import (
 )
 from service.langgraph.session_freshness import SessionFreshness, FreshnessStatus
 from service.logging.session_logger import get_session_logger, SessionLogger
-from service.tool_executor.context import set_session_allowed_tools, clear_session_allowed_tools
 from service.workflow.workflow_model import WorkflowDefinition
 from service.workflow.workflow_executor import WorkflowExecutor
 from service.workflow.nodes.base import ExecutionContext
@@ -106,9 +105,6 @@ class AgentSession:
         enable_checkpointing: bool = False,
         workflow_id: Optional[str] = None,
         graph_name: Optional[str] = None,
-        tool_preset_id: Optional[str] = None,
-        tool_preset_name: Optional[str] = None,
-        tool_search_mode: bool = False,
     ):
         """Initialize AgentSession.
 
@@ -127,7 +123,6 @@ class AgentSession:
             enable_checkpointing: Enable LangGraph MemorySaver checkpointing.
             workflow_id: Optional workflow ID (used to load WorkflowDefinition).
             graph_name: Human-readable graph/workflow name.
-            tool_search_mode: Whether tool search mode is active.
         """
         # Session identity
         self._session_id = session_id or str(uuid.uuid4())
@@ -151,17 +146,6 @@ class AgentSession:
         self._workflow_id = workflow_id
         self._graph_name = graph_name
         self._workflow: Optional[WorkflowDefinition] = None
-
-        # Tool Preset
-        self._tool_preset_id = tool_preset_id
-        self._tool_preset_name = tool_preset_name
-
-        # Tool Search Mode
-        self._tool_search_mode = tool_search_mode
-
-        # Per-session allowed tools (set by agent_session_manager from tool preset / request)
-        # None means unrestricted; a list restricts which tools are visible/executable
-        self._session_allowed_tools: Optional[List[str]] = None
 
         # Internal components
         self._model: Optional[ClaudeCLIChatModel] = None
@@ -424,15 +408,6 @@ class AgentSession:
         if self._model and self._model.process:
             return self._model.process.storage_path
         return None
-
-    @property
-    def session_allowed_tools(self) -> Optional[List[str]]:
-        """Per-session allowed tools filter (None = unrestricted)."""
-        return self._session_allowed_tools
-
-    @session_allowed_tools.setter
-    def session_allowed_tools(self, tools: Optional[List[str]]) -> None:
-        self._session_allowed_tools = tools
 
     @property
     def memory_manager(self) -> Optional["SessionMemoryManager"]:
@@ -856,13 +831,10 @@ class AgentSession:
                 f"in store, falling back to template"
             )
 
-        # 2. Infer from graph_name, with tool_search_mode variants
+        # 2. Infer from graph_name
         is_autonomous = self._graph_name and 'autonomous' in self._graph_name.lower()
-        is_tool_search = getattr(self, '_tool_search_mode', False)
 
-        if is_tool_search:
-            template_id = "template-tool-search-autonomous" if is_autonomous else "template-tool-search-simple"
-        elif is_autonomous:
+        if is_autonomous:
             template_id = "template-autonomous"
         else:
             template_id = "template-simple"
@@ -882,15 +854,11 @@ class AgentSession:
         from service.workflow.templates import (
             create_autonomous_template,
             create_simple_template,
-            create_tool_search_simple_template,
-            create_tool_search_autonomous_template,
         )
 
         _template_factories = {
             "template-autonomous": create_autonomous_template,
             "template-simple": create_simple_template,
-            "template-tool-search-simple": create_tool_search_simple_template,
-            "template-tool-search-autonomous": create_tool_search_autonomous_template,
         }
         factory = _template_factories.get(template_id, create_simple_template)
         return factory()
@@ -956,7 +924,6 @@ class AgentSession:
             # Always include agent identity for relevance gate (chat mode)
             kwargs.setdefault("agent_name", self._session_name or self._session_id[:8])
             kwargs.setdefault("agent_role", self._role.value if hasattr(self._role, 'value') else str(self._role))
-            kwargs.setdefault("tool_search_mode", self._tool_search_mode)
             initial_state = make_initial_autonomous_state(
                 input_text,
                 max_iterations=effective_max_iterations,
@@ -970,13 +937,8 @@ class AgentSession:
                 except Exception:
                     logger.debug("Failed to record user message — non-critical", exc_info=True)
 
-            # Set per-session tool filtering context
-            _ctx_token = set_session_allowed_tools(self._session_allowed_tools)
-            try:
-                # Execute the compiled graph
-                result = await self._graph.ainvoke(initial_state, config)
-            finally:
-                clear_session_allowed_tools(_ctx_token)
+            # Execute the compiled graph
+            result = await self._graph.ainvoke(initial_state, config)
             duration_ms = int((time.time() - start_time) * 1000)
             self._is_executing = False       # execution complete
             self._execution_start_time = datetime.now()   # refresh activity timestamp
@@ -1105,7 +1067,6 @@ class AgentSession:
             # Always include agent identity for relevance gate (chat mode)
             kwargs.setdefault("agent_name", self._session_name or self._session_id[:8])
             kwargs.setdefault("agent_role", self._role.value if hasattr(self._role, 'value') else str(self._role))
-            kwargs.setdefault("tool_search_mode", self._tool_search_mode)
             initial_state = make_initial_autonomous_state(
                 input_text,
                 max_iterations=effective_max_iterations,
@@ -1121,9 +1082,6 @@ class AgentSession:
 
             # Accumulate state updates for LTM recording
             accumulated_state: Dict[str, Any] = {}
-
-            # Set per-session tool filtering context
-            _ctx_token = set_session_allowed_tools(self._session_allowed_tools)
 
             # Stream the compiled graph
             async for event in self._graph.astream(initial_state, config):
@@ -1253,9 +1211,6 @@ class AgentSession:
 
             raise
 
-        finally:
-            clear_session_allowed_tools(_ctx_token)
-
     async def execute(
         self,
         prompt: str,
@@ -1373,10 +1328,7 @@ class AgentSession:
             role=self._role,
             workflow_id=self._workflow_id,
             graph_name=self._graph_name,
-            tool_preset_id=self._tool_preset_id,
-            tool_preset_name=self._tool_preset_name,
             system_prompt=self._system_prompt,
-            tool_search_mode=self._tool_search_mode,
         )
 
     # ========================================================================

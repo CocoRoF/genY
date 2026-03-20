@@ -13,7 +13,7 @@ Structure::
         structured_output.py  # Pydantic schemas for LLM output
         model/                # LLM-powered processing
         logic/                # Routing, gating, state management
-        resilience/           # Guards, post-processing, tool discovery
+        resilience/           # Guards, post-processing
         task/                 # Todo management, reviews, final answers
         memory/               # Context injection, transcript recording
 
@@ -40,8 +40,6 @@ from service.workflow.nodes.logic import relevance_gate_node       # noqa: F401
 # ── Resilience / Guard nodes ────────────────────────────────
 from service.workflow.nodes.resilience import context_guard_node        # noqa: F401
 from service.workflow.nodes.resilience import post_model_node           # noqa: F401
-from service.workflow.nodes.resilience import tool_discovery_post_node     # noqa: F401
-from service.workflow.nodes.resilience import tool_discovery_summary_node  # noqa: F401
 
 # ── Task nodes ───────────────────────────────────────────────
 from service.workflow.nodes.task import create_todos_node         # noqa: F401

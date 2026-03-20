@@ -21,8 +21,6 @@ class SessionModel(BaseModel):
         role: str = "worker",
         workflow_id: str = "",
         graph_name: str = "",
-        tool_preset_id: str = "",
-        tool_preset_name: str = "",
         max_turns: int = 100,
         timeout: float = 1800.0,
         max_iterations: int = 100,
@@ -43,8 +41,6 @@ class SessionModel(BaseModel):
         self.role = role
         self.workflow_id = workflow_id
         self.graph_name = graph_name
-        self.tool_preset_id = tool_preset_id
-        self.tool_preset_name = tool_preset_name
         self.max_turns = max_turns
         self.timeout = timeout
         self.max_iterations = max_iterations
@@ -68,8 +64,6 @@ class SessionModel(BaseModel):
             "role": "VARCHAR(50) DEFAULT 'worker'",
             "workflow_id": "VARCHAR(255) DEFAULT ''",
             "graph_name": "VARCHAR(255) DEFAULT ''",
-            "tool_preset_id": "VARCHAR(255) DEFAULT ''",
-            "tool_preset_name": "VARCHAR(255) DEFAULT ''",
             "max_turns": "INTEGER DEFAULT 100",
             "timeout": "DOUBLE PRECISION DEFAULT 1800.0",
             "max_iterations": "INTEGER DEFAULT 100",
@@ -104,7 +98,7 @@ class SessionModel(BaseModel):
         known_fields = {
             "session_id", "session_name", "status", "model", "storage_path",
             "role", "workflow_id", "graph_name",
-            "tool_preset_id", "tool_preset_name", "max_turns", "timeout",
+            "max_turns", "timeout",
             "max_iterations", "pid", "error_message", "is_deleted",
             "deleted_at", "registered_at", "extra_data",
             "id", "created_at", "updated_at",

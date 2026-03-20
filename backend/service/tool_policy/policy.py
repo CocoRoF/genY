@@ -79,7 +79,14 @@ class ToolProfile(str, Enum):
 # case-insensitively.  A server whose name starts with any prefix in the
 # group is considered a member.
 
-_BUILTIN_SERVERS: FrozenSet[str] = frozenset({"_builtin_tools"})
+# Geny platform tools — always available regardless of mode
+_GENY_SERVERS: FrozenSet[str] = frozenset({"_geny_tools"})
+
+# Custom tools (browser, web search, web fetch, ...) — non-TS sessions only
+_CUSTOM_SERVERS: FrozenSet[str] = frozenset({"_custom_tools"})
+
+# Tool search/discovery meta-tools — TS sessions only
+_TOOL_SEARCH_SERVERS: FrozenSet[str] = frozenset({"_tool_search"})
 
 _CODING_SERVERS: FrozenSet[str] = frozenset({
     "filesystem",
@@ -114,14 +121,18 @@ _RESEARCH_SERVERS: FrozenSet[str] = frozenset({
     "browser",
 })
 
-# Composite group map:  profile → union of server-group prefixes
+# Composite group map:  profile → set of allowed server-name prefixes
+#
+# TS OFF modes get: _geny_tools + _custom_tools + external MCP servers
+# TS ON mode gets:  _geny_tools + _tool_search  (custom tools are discoverable via tool_search)
+#
 _PROFILE_SERVER_GROUPS: Dict[ToolProfile, FrozenSet[str]] = {
-    ToolProfile.MINIMAL:   _BUILTIN_SERVERS,
-    ToolProfile.CODING:    _BUILTIN_SERVERS | _CODING_SERVERS,
-    ToolProfile.MESSAGING: _BUILTIN_SERVERS | _MESSAGING_SERVERS,
-    ToolProfile.RESEARCH:  _BUILTIN_SERVERS | _RESEARCH_SERVERS,
-    ToolProfile.FULL:         frozenset(),  # empty ⇒ allow-all sentinel
-    ToolProfile.TOOL_SEARCH:  _BUILTIN_SERVERS,  # only built-in tools (ToolSearch tools)
+    ToolProfile.MINIMAL:      _GENY_SERVERS,
+    ToolProfile.CODING:       _GENY_SERVERS | _CUSTOM_SERVERS | _CODING_SERVERS,
+    ToolProfile.MESSAGING:    _GENY_SERVERS | _CUSTOM_SERVERS | _MESSAGING_SERVERS,
+    ToolProfile.RESEARCH:     _GENY_SERVERS | _CUSTOM_SERVERS | _RESEARCH_SERVERS,
+    ToolProfile.FULL:         frozenset(),       # empty ⇒ allow-all sentinel
+    ToolProfile.TOOL_SEARCH:  _GENY_SERVERS | _TOOL_SEARCH_SERVERS,
 }
 
 
@@ -158,6 +169,11 @@ ROLE_DEFAULT_PROFILES: Dict[str, ToolProfile] = {
     "planner":      ToolProfile.FULL,
 }
 
+# Profile → servers to DENY (blacklist overrides allow-all)
+_PROFILE_SERVER_DENY: Dict[ToolProfile, FrozenSet[str]] = {
+    ToolProfile.FULL: _TOOL_SEARCH_SERVERS,  # Full access must NOT see discovery meta-tools
+}
+
 
 # ---------------------------------------------------------------------------
 # Engine
@@ -178,9 +194,11 @@ class ToolPolicyEngine:
         profile: ToolProfile,
         allowed_server_prefixes: FrozenSet[str],
         explicit_tools: Optional[List[str]] = None,
+        denied_server_prefixes: Optional[FrozenSet[str]] = None,
     ) -> None:
         self._profile = profile
         self._server_prefixes = allowed_server_prefixes
+        self._deny_prefixes = denied_server_prefixes or frozenset()
         # When explicit_tools is set, it acts as an override whitelist for
         # individual tool names (from _builtin_tools).  If None, all tools
         # from allowed servers pass through.
@@ -211,16 +229,18 @@ class ToolPolicyEngine:
         """
         profile = override_profile or ROLE_DEFAULT_PROFILES.get(role, ToolProfile.CODING)
         prefixes = _PROFILE_SERVER_GROUPS.get(profile, frozenset())
+        deny = _PROFILE_SERVER_DENY.get(profile, frozenset())
 
         # TOOL_SEARCH profile forces explicit tool whitelist to only ToolSearch tools
         if profile == ToolProfile.TOOL_SEARCH:
             explicit_tools = list(_TOOL_SEARCH_TOOLS)
 
         logger.debug(
-            "ToolPolicyEngine: role=%s profile=%s prefixes=%s explicit_tools=%s",
+            "ToolPolicyEngine: role=%s profile=%s prefixes=%s deny=%s explicit_tools=%s",
             role,
             profile.value,
             sorted(prefixes) if prefixes else "(allow-all)",
+            sorted(deny) if deny else "(none)",
             explicit_tools,
         )
 
@@ -228,6 +248,7 @@ class ToolPolicyEngine:
             profile=profile,
             allowed_server_prefixes=prefixes,
             explicit_tools=explicit_tools,
+            denied_server_prefixes=deny,
         )
 
     # -- Properties --------------------------------------------------------
@@ -243,8 +264,18 @@ class ToolPolicyEngine:
 
     # -- Server filtering --------------------------------------------------
 
+    def _is_server_denied(self, server_name: str) -> bool:
+        """Check if a server is in the deny list."""
+        if not self._deny_prefixes:
+            return False
+        name_lower = server_name.lower()
+        return any(name_lower.startswith(prefix) for prefix in self._deny_prefixes)
+
     def is_server_allowed(self, server_name: str) -> bool:
         """Check whether an MCP server name passes the policy."""
+        # Deny list always takes precedence
+        if self._is_server_denied(server_name):
+            return False
         if self.is_unrestricted:
             return True
         name_lower = server_name.lower()
@@ -262,7 +293,8 @@ class ToolPolicyEngine:
         """
         if mcp_config is None:
             return None
-        if self.is_unrestricted:
+        # Even in unrestricted mode, we must check the deny list
+        if self.is_unrestricted and not self._deny_prefixes:
             return mcp_config
 
         # Lazy import to avoid circular dependency

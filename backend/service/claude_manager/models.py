@@ -174,12 +174,6 @@ class CreateSessionRequest(BaseModel):
         description="Human-readable name of the graph/workflow used by this session."
     )
 
-    # Tool preset settings
-    tool_preset_id: Optional[str] = Field(
-        default=None,
-        description="Tool preset ID — determines which MCP servers and tools are available"
-    )
-
     # MCP server settings
     mcp_config: Optional[MCPConfig] = Field(
         default=None,
@@ -190,12 +184,6 @@ class CreateSessionRequest(BaseModel):
     role: Optional[SessionRole] = Field(
         default=SessionRole.WORKER,
         description="Session role: 'worker', 'developer', 'researcher', or 'planner'"
-    )
-
-    # Tool search mode
-    tool_search_mode: Optional[bool] = Field(
-        default=False,
-        description="Enable tool search mode — agent receives only ToolSearch discovery tools initially and discovers other tools dynamically"
     )
 
 
@@ -261,26 +249,10 @@ class SessionInfo(BaseModel):
         description="Human-readable name of the graph/workflow used by this session"
     )
 
-    # Tool preset settings
-    tool_preset_id: Optional[str] = Field(
-        default=None,
-        description="Tool preset ID used by this session"
-    )
-    tool_preset_name: Optional[str] = Field(
-        default=None,
-        description="Human-readable name of the tool preset"
-    )
-
     # System prompt
     system_prompt: Optional[str] = Field(
         default=None,
         description="System prompt applied to every execution in this session"
-    )
-
-    # Tool search mode
-    tool_search_mode: Optional[bool] = Field(
-        default=False,
-        description="Whether tool search mode is active for this session"
     )
 
 

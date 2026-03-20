@@ -349,7 +349,6 @@ async def restore_session(
             role=SessionRole(params["role"]) if params.get("role") else SessionRole.WORKER,
             graph_name=params.get("graph_name"),
             workflow_id=params.get("workflow_id"),
-            tool_preset_id=params.get("tool_preset_id"),
         )
 
         # Reuse the SAME session_id → preserves storage_path

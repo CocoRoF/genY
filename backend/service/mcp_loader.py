@@ -106,13 +106,7 @@ class MCPLoader:
         if self.tools:
             self._register_tools_as_mcp()
 
-        # 4. Register tools in ToolRegistry (for graph-based search)
-        self._populate_tool_registry()
-
-        # 5. Initialize ToolExecutor (for tool_execute proxy)
-        self._populate_tool_executor()
-
-        # 6. Create global config
+        # 4. Create global config
         config = MCPConfig(servers=self.servers)
         set_global_mcp_config(config)
 
@@ -280,45 +274,36 @@ class MCPLoader:
         return tools
 
     def _register_tools_as_mcp(self) -> None:
-        """Register loaded tools as built-in MCP server"""
+        """Register loaded tools as a single MCP server (_builtin_tools)."""
         if not self.tools:
             return
 
-        # Create tools MCP server script path
         tools_server_script = self._create_tools_server_script()
 
         if tools_server_script:
-            # Python executable path
             python_exe = sys.executable
+            script = str(tools_server_script)
 
             self.servers["_builtin_tools"] = MCPServerStdio(
-                command=python_exe,
-                args=[str(tools_server_script)],
-                env=None
+                command=python_exe, args=[script], env=None
             )
 
-            logger.info(f"   🔧 Registered {len(self.tools)} tools as MCP server: _builtin_tools")
+            logger.info(f"   🔧 _builtin_tools: {len(self.tools)} tools registered")
 
     def _create_tools_server_script(self) -> Optional[Path]:
-        """
-        Create script to run tools as MCP server
-        """
-        # Collect tool file list
+        """Create script to run all tools as a single MCP server."""
         tool_files = list(self.tools_dir.glob("*_tool.py")) + list(self.tools_dir.glob("*_tools.py"))
-
         if not tool_files:
             return None
 
-        # Create script
         script_path = self.tools_dir / "_mcp_server.py"
 
-        imports = []
-        tool_names = []
+        imports: list[str] = []
+        extends: list[str] = []
 
         for tool_file in tool_files:
             module_name = tool_file.stem
 
-            # Collect tool names from this module
             spec = importlib.util.spec_from_file_location(module_name, tool_file)
             if spec is None or spec.loader is None:
                 continue
@@ -329,13 +314,17 @@ class MCPLoader:
             except Exception:
                 continue
 
-            if hasattr(module, 'TOOLS'):
-                imports.append(f"from tools.{module_name} import TOOLS as {module_name}_TOOLS")
-                tool_names.append(f"*{module_name}_TOOLS")
+            if not hasattr(module, 'TOOLS'):
+                continue
+
+            var = f"{module_name}_TOOLS"
+            imports.append(f"from tools.{module_name} import TOOLS as {var}")
+            extends.append(f"_tools.extend({var})")
 
         if not imports:
             return None
 
+        nl = chr(10)
         script_content = f'''#!/usr/bin/env python3
 """
 Auto-generated MCP Server for tools/
@@ -356,15 +345,13 @@ except ImportError:
     print("Error: MCP SDK not installed. Run: pip install mcp", file=sys.stderr)
     sys.exit(1)
 
-# Import tools
-{chr(10).join(imports)}
+{nl.join(imports)}
+
+_tools = []
+{nl.join(extends)}
 
 # Create MCP server
 mcp = FastMCP("builtin-tools")
-
-# Collect all tools
-all_tools = []
-{chr(10).join(f"all_tools.extend({name.replace('*', '')})" for name in tool_names)}
 
 
 def _register_tool(tool_obj, mcp_server):
@@ -381,8 +368,6 @@ def _register_tool(tool_obj, mcp_server):
         or f"Tool: {{name}}"
     )
 
-    # Always prefer run() — it has proper parameter signatures with named args.
-    # BaseTool.arun() defaults to (**kwargs) which produces empty parameter schema.
     if hasattr(tool_obj, 'run') and callable(tool_obj.run):
         source_fn = tool_obj.run
     elif callable(tool_obj):
@@ -390,9 +375,6 @@ def _register_tool(tool_obj, mcp_server):
     else:
         return
 
-    # Create an async wrapper that preserves source_fn's signature.
-    # functools.wraps copies __wrapped__ so inspect.signature() sees
-    # the original parameter names and types (without 'self').
     @functools.wraps(source_fn)
     async def async_wrapper(*args, **kwargs):
         if asyncio.iscoroutinefunction(source_fn):
@@ -401,8 +383,6 @@ def _register_tool(tool_obj, mcp_server):
 
     async_wrapper.__name__ = name
 
-    # Build composite docstring: tool description + Args section from run()
-    # so FastMCP can extract parameter descriptions from the Args block.
     source_doc = source_fn.__doc__ or ""
     args_section = ""
     if "Args:" in source_doc:
@@ -412,13 +392,10 @@ def _register_tool(tool_obj, mcp_server):
         f"{{description}}\\n\\n{{args_section}}" if args_section else description
     )
 
-    # Explicitly pass name and description to mcp.tool() — do NOT rely
-    # on FastMCP introspecting func.__name__ (which would be "run"/"arun").
     mcp_server.tool(name=name, description=description)(async_wrapper)
 
 
-# Register each tool to MCP
-for tool_obj in all_tools:
+for tool_obj in _tools:
     _register_tool(tool_obj, mcp)
 
 if __name__ == "__main__":
@@ -431,62 +408,6 @@ if __name__ == "__main__":
         logger.info(f"   📝 Generated MCP server script: {script_path}")
 
         return script_path
-
-    def _populate_tool_registry(self) -> None:
-        """Register loaded tools in the ToolRegistry for search/retrieval.
-
-        Registers built-in tools (from tools/ folder) into the registry.
-        MCP server tools are registered lazily when their tool lists become
-        available (they require the server process to be running).
-        """
-        try:
-            from service.tool_registry import get_tool_registry
-            registry = get_tool_registry()
-
-            # Register built-in tools
-            if self.tools:
-                registry.register_builtin_tools(self.tools)
-
-            registry.finalize()
-            logger.info(f"   Tool Registry: {registry.tool_count} tools indexed")
-
-        except Exception as e:
-            logger.warning(f"   Tool Registry population failed: {e}")
-
-    def _populate_tool_executor(self) -> None:
-        """Initialize the ToolExecutor with built-in tools and MCP server configs.
-
-        Built-in tools (from tools/ folder) are registered for direct Python
-        execution. MCP servers (from mcp/ folder) are registered for lazy
-        connection — actual connections are established on first tool_execute call.
-        """
-        try:
-            from service.tool_executor import get_tool_executor
-            executor = get_tool_executor()
-
-            # Register built-in tools for direct execution
-            if self.tools:
-                executor.register_builtin_tools(self.tools)
-
-            # Register MCP servers for lazy connection
-            for server_name, server_config in self.servers.items():
-                if server_name == "_builtin_tools":
-                    continue  # Built-in tools already registered above
-
-                # Only stdio transport is supported for now
-                if hasattr(server_config, 'command'):
-                    executor.register_mcp_server(
-                        server_name=server_name,
-                        command=server_config.command,
-                        args=getattr(server_config, 'args', []),
-                        env=getattr(server_config, 'env', None),
-                    )
-
-            executor.finalize()
-            logger.info(f"   Tool Executor: {len(executor.list_executable_tools())} tools ready")
-
-        except Exception as e:
-            logger.warning(f"   Tool Executor initialization failed: {e}")
 
     def get_server_count(self) -> int:
         """Return number of loaded servers"""

@@ -3,7 +3,7 @@
 import { useMessengerStore } from '@/store/useMessengerStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
-import { X, Bot, Circle, Cpu, Clock, Layers, Wrench, AlertTriangle } from 'lucide-react';
+import { X, Bot, Circle, Cpu, Clock, Layers, AlertTriangle } from 'lucide-react';
 
 const getRoleColor = (role: string) => {
   switch (role) {
@@ -58,7 +58,6 @@ export default function MemberPanel() {
   const infoItems = session ? [
     { icon: Cpu, label: t('messenger.memberPanel.model'), value: session.model },
     { icon: Layers, label: t('messenger.memberPanel.graph'), value: session.graph_name },
-    { icon: Wrench, label: t('messenger.memberPanel.toolPreset'), value: session.tool_preset_name },
     { icon: Clock, label: t('messenger.memberPanel.created'), value: session.created_at ? new Date(session.created_at).toLocaleDateString() : null },
   ].filter(item => item.value) : [];
 

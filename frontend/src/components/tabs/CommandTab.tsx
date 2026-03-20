@@ -12,7 +12,7 @@ import {
   Loader2,
   Terminal,
   Zap,
-  Wrench,
+
   Clock,
   CheckCircle2,
   XCircle,
@@ -225,11 +225,6 @@ export default function CommandTab() {
                 <span className="inline-flex items-center gap-0.5 px-1.5 py-[1px] rounded text-[0.5625rem] bg-[rgba(100,116,139,0.1)] text-[var(--text-muted)]">
                   <Zap size={8} />{session.graph_name || t('commandTab.single')}
                 </span>
-                {session.tool_preset_name && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-[1px] rounded text-[0.5625rem] bg-[rgba(100,116,139,0.1)] text-[var(--text-muted)]">
-                    <Wrench size={8} />{session.tool_preset_name}
-                  </span>
-                )}
               </div>
             </div>
           </div>

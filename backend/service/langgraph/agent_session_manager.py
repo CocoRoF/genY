@@ -48,7 +48,6 @@ from service.logging.session_logger import get_session_logger, remove_session_lo
 from service.langgraph.agent_session import AgentSession
 from service.prompt.sections import build_agent_prompt
 from service.prompt.context_loader import ContextLoader
-from service.tool_policy import ToolPolicyEngine, ToolProfile
 from service.prompt.builder import PromptMode
 
 from service.claude_manager.session_store import get_session_store
@@ -175,24 +174,11 @@ class AgentSessionManager(SessionManager):
         # Determine role
         role = request.role.value if request.role else "worker"
 
-        # Detect tool search mode
-        tool_search_mode = getattr(request, 'tool_search_mode', False) or False
-
-        # Resolve tool policy for this role
-        override_profile = ToolProfile.TOOL_SEARCH if tool_search_mode else None
-        policy = ToolPolicyEngine.for_role(
-            role=role,
-            override_profile=override_profile,
-            explicit_tools=request.allowed_tools,
-        )
-        logger.debug(f"  ToolPolicy: {policy}")
-
-        # Merge global + per-session MCP configs, then filter by policy
+        # Merge global + per-session MCP configs
         merged_mcp = merge_mcp_configs(self._global_mcp_config, request.mcp_config)
-        filtered_mcp = policy.filter_mcp_config(merged_mcp)
         mcp_servers: list[str] = []
-        if filtered_mcp and filtered_mcp.servers:
-            mcp_servers = list(filtered_mcp.servers.keys())
+        if merged_mcp and merged_mcp.servers:
+            mcp_servers = list(merged_mcp.servers.keys())
 
         # Load bootstrap context files from working directory
         context_files: dict[str, str] = {}
@@ -232,8 +218,8 @@ class AgentSessionManager(SessionManager):
             # Standalone worker → FULL
             mode = PromptMode.FULL
 
-        # Allowed tools list (filtered by policy)
-        tools = policy.filter_tool_names(request.allowed_tools)
+        # Allowed tools list
+        tools = request.allowed_tools or []
 
         # Resolve shared folder path for prompt inclusion
         shared_folder_path: str | None = None
@@ -255,7 +241,6 @@ class AgentSessionManager(SessionManager):
             context_files=context_files if context_files else None,
             extra_system_prompt=request.system_prompt,
             shared_folder_path=shared_folder_path,
-            tool_search_mode=tool_search_mode,
         )
 
         # Append memory context if available
@@ -296,76 +281,12 @@ class AgentSessionManager(SessionManager):
         logger.info(f"  working_dir: {request.working_dir}")
         logger.info(f"  model: {request.model}")
         logger.info(f"  role: {request.role.value if request.role else 'worker'}")
-        if getattr(request, 'tool_search_mode', False):
-            logger.info(f"  tool_search_mode: enabled")
 
-        # ── Tool Preset resolution ──
-        # If a tool_preset_id is specified, load the preset and use its
-        # server/tool lists to construct a filtered MCP config.
-        tool_preset_id = getattr(request, 'tool_preset_id', None)
-        tool_preset_name = None
-        preset_server_filter = None  # None = no preset filtering
-        preset_tool_filter = None
-
-        if tool_preset_id:
-            from service.tool_policy.tool_preset_store import get_tool_preset_store
-            preset_store = get_tool_preset_store()
-            preset = preset_store.load(tool_preset_id)
-            if preset:
-                tool_preset_name = preset.name
-                # "*" means allow-all (no restriction)
-                if preset.allowed_servers and preset.allowed_servers != ["*"]:
-                    preset_server_filter = set(preset.allowed_servers)
-                if preset.allowed_tools and preset.allowed_tools != ["*"]:
-                    preset_tool_filter = preset.allowed_tools
-                logger.info(
-                    f"  tool_preset: {preset.name} ({tool_preset_id}) "
-                    f"servers={preset.allowed_servers}, tools={preset.allowed_tools}"
-                )
-            else:
-                logger.warning(f"  tool_preset_id={tool_preset_id} not found, ignoring")
-
-        # Merge MCP configs and apply tool policy
-        role = request.role.value if request.role else "worker"
-        tool_search_mode = getattr(request, 'tool_search_mode', False) or False
-
-        # Auto-enable tool_search_mode when preset carries the flag
-        if tool_preset_id and preset and getattr(preset, 'tool_search_mode', False):
-            tool_search_mode = True
-            logger.info(f"  tool_search_mode auto-enabled by preset {tool_preset_id}")
-
-        # If a tool preset specifies an explicit tool list, use it as override
-        explicit_tools = request.allowed_tools
-        if preset_tool_filter is not None:
-            explicit_tools = preset_tool_filter
-
-        # In tool_search_mode, override to TOOL_SEARCH profile
-        override_profile = ToolProfile.TOOL_SEARCH if tool_search_mode else None
-        policy = ToolPolicyEngine.for_role(
-            role=role,
-            override_profile=override_profile,
-            explicit_tools=explicit_tools if not tool_search_mode else None,
-        )
+        # Merge MCP configs (global + per-session)
         merged_mcp_config = merge_mcp_configs(self._global_mcp_config, request.mcp_config)
 
-        # Apply tool preset server filtering BEFORE policy filtering
-        if preset_server_filter is not None and merged_mcp_config and merged_mcp_config.servers:
-            from copy import deepcopy
-            filtered_servers = {}
-            for name, cfg in merged_mcp_config.servers.items():
-                if name in preset_server_filter:
-                    filtered_servers[name] = deepcopy(cfg)
-            if filtered_servers:
-                merged_mcp_config = MCPConfig(servers=filtered_servers)
-            else:
-                merged_mcp_config = None
-            logger.info(f"  preset server filter applied: {list(filtered_servers.keys()) if filtered_servers else '(none)'}")
-
-        # Then apply role-based policy filtering
-        merged_mcp_config = policy.filter_mcp_config(merged_mcp_config)
-
         if merged_mcp_config and merged_mcp_config.servers:
-            logger.info(f"  mcp_servers (policy={policy.profile.value}): {list(merged_mcp_config.servers.keys())}")
+            logger.info(f"  mcp_servers: {list(merged_mcp_config.servers.keys())}")
 
         # Pre-generate session_id so it can be injected into the prompt
         if not session_id:
@@ -417,26 +338,9 @@ class AgentSessionManager(SessionManager):
             enable_checkpointing=enable_checkpointing,
             workflow_id=workflow_id,
             graph_name=graph_name,
-            tool_preset_id=tool_preset_id,
-            tool_preset_name=tool_preset_name,
-            tool_search_mode=tool_search_mode,
         )
 
         session_id = agent.session_id
-
-        # Set per-session allowed_tools for tool_execute proxy filtering
-        # In tool_search_mode, explicit_tools from preset or request restricts
-        # which tools the agent can discover and execute
-        if tool_search_mode:
-            effective_allowed_tools = explicit_tools  # from preset or request
-            agent.session_allowed_tools = effective_allowed_tools
-            if effective_allowed_tools:
-                logger.info(
-                    f"[{session_id}] tool_search_mode: allowed_tools = "
-                    f"{effective_allowed_tools[:5]}{'...' if len(effective_allowed_tools) > 5 else ''}"
-                )
-            else:
-                logger.info(f"[{session_id}] tool_search_mode: all tools allowed (no filter)")
 
         # 로컬 저장소에 등록
         self._local_agents[session_id] = agent
