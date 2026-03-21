@@ -142,7 +142,7 @@ class CreateSessionRequest(BaseModel):
         description="Claude model to use (e.g., claude-sonnet-4-20250514)"
     )
     max_turns: Optional[int] = Field(
-        default=100,
+        default=50,
         description="Maximum conversation turns per invocation"
     )
     timeout: Optional[float] = Field(
@@ -152,7 +152,7 @@ class CreateSessionRequest(BaseModel):
 
     # Graph execution settings
     max_iterations: Optional[int] = Field(
-        default=100,
+        default=50,
         description="Maximum graph iterations (prevents infinite loops)"
     )
     system_prompt: Optional[str] = Field(

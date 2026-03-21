@@ -40,9 +40,9 @@ export default function CreateSessionModal({ onClose }: Props) {
     session_name: '',
     role: 'developer',
     model: '',
-    max_turns: 200,
+    max_turns: 50,
     timeout: 1800,
-    max_iterations: 30,
+    max_iterations: 50,
     system_prompt: '',
   });
   const [selectedPrompt, setSelectedPrompt] = useState('');
@@ -50,7 +50,7 @@ export default function CreateSessionModal({ onClose }: Props) {
   const [error, setError] = useState('');
   const [availableWorkflows, setAvailableWorkflows] = useState<WorkflowDefinition[]>([]);
   const [templateWorkflows, setTemplateWorkflows] = useState<WorkflowDefinition[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState('template-autonomous');
+  const [selectedWorkflow, setSelectedWorkflow] = useState('template-optimized-autonomous');
   const [toolPresets, setToolPresets] = useState<ToolPresetDefinition[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
 
@@ -167,7 +167,7 @@ export default function CreateSessionModal({ onClose }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.maxTurns')} <InfoTooltip text={t('createSession.maxTurnsHelp')} /></label>
-              <NumberStepper value={formState.max_turns ?? 200} onChange={v => setFormState(f => ({ ...f, max_turns: v }))} min={1} max={500} step={5} />
+              <NumberStepper value={formState.max_turns ?? 50} onChange={v => setFormState(f => ({ ...f, max_turns: v }))} min={1} max={500} step={5} />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.timeout')} <InfoTooltip text={t('createSession.timeoutHelp')} /></label>
@@ -212,7 +212,7 @@ export default function CreateSessionModal({ onClose }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1.5">
                 <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.maxIterations')} <InfoTooltip text={t('createSession.maxIterationsHelp')} /></label>
-                <NumberStepper value={formState.max_iterations ?? 30} onChange={v => setFormState(f => ({ ...f, max_iterations: v }))} min={1} max={500} step={5} />
+                <NumberStepper value={formState.max_iterations ?? 50} onChange={v => setFormState(f => ({ ...f, max_iterations: v }))} min={1} max={500} step={5} />
               </div>
             </div>
           )}

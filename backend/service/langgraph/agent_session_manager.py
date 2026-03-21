@@ -398,9 +398,9 @@ class AgentSessionManager(SessionManager):
             elif graph_name and 'autonomous' in graph_name.lower():
                 workflow_id = "template-autonomous"
             else:
-                workflow_id = "template-simple"
+                workflow_id = "template-optimized-autonomous"
                 if not graph_name:
-                    graph_name = "Simple Agent"
+                    graph_name = "Optimized Autonomous"
 
         logger.info(f"  workflow_id: {workflow_id}, graph_name: {graph_name}")
 
@@ -413,9 +413,9 @@ class AgentSessionManager(SessionManager):
             system_prompt=system_prompt,
             env_vars=request.env_vars,
             mcp_config=merged_mcp_config,
-            max_turns=request.max_turns or 100,
+            max_turns=request.max_turns or 50,
             timeout=request.timeout or 1800.0,
-            max_iterations=request.max_iterations or 100,
+            max_iterations=request.max_iterations or 50,
             role=request.role or SessionRole.WORKER,
             enable_checkpointing=enable_checkpointing,
             workflow_id=workflow_id,

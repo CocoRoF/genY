@@ -23,6 +23,11 @@ export default function MessengerPage() {
     loadSessions();
     checkHealth();
     loadUserName();
+
+    // Re-establish SSE if we already have an active room (e.g. after
+    // navigating away and back — SSE was closed on unmount).
+    useMessengerStore.getState()._ensureSSE();
+
     const interval = setInterval(fetchRooms, 10000);
     return () => {
       clearInterval(interval);

@@ -433,39 +433,95 @@ export const chatApi = {
     }),
 
   /**
-   * GET /api/chat/rooms/:id/events?after=<msg_id> — reconnectable SSE stream.
-   * Streams new messages for a room. Pass `after` to resume from a known point.
-   * Returns an object with an `close()` method to stop listening.
+   * Subscribe to SSE events for a room.
+   *
+   * Connects via the same-origin Next.js Route Handler proxy first
+   * (avoids cross-origin issues in Docker dev). Falls back to direct
+   * backend on reconnect if needed. Reconnects automatically with the
+   * latest message cursor on any failure.
    */
   subscribeToRoom: (
     roomId: string,
     afterId: string | null,
     onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
+    getLatestMsgId?: () => string | null,
   ): { close: () => void } => {
-    const backendUrl = getBackendUrl();
-    const params = afterId ? `?after=${encodeURIComponent(afterId)}` : '';
-    const evtSource = new EventSource(
-      `${backendUrl}/api/chat/rooms/${roomId}/events${params}`,
-    );
+    let evtSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+    let attempt = 0;
 
-    const handleEvent = (e: MessageEvent) => {
-      try {
-        onEvent(e.type, JSON.parse(e.data));
-      } catch { /* skip malformed */ }
+    const RECONNECT_DELAY = 3_000;
+
+    const getUrl = () => {
+      const currentAfter = getLatestMsgId?.() ?? afterId;
+      const qs = currentAfter ? `?after=${encodeURIComponent(currentAfter)}` : '';
+      // First attempts use same-origin (Route Handler proxy), later
+      // fallback to direct backend in case the proxy doesn't work.
+      if (attempt <= 2) {
+        return `/api/chat/rooms/${roomId}/events${qs}`;
+      }
+      return `${getBackendUrl()}/api/chat/rooms/${roomId}/events${qs}`;
     };
 
-    evtSource.addEventListener('message', handleEvent);
-    evtSource.addEventListener('broadcast_status', handleEvent);
-    evtSource.addEventListener('broadcast_done', handleEvent);
-    evtSource.addEventListener('heartbeat', handleEvent);
+    const connect = () => {
+      if (closed) return;
+      attempt++;
 
-    evtSource.onerror = () => {
-      // EventSource auto-reconnects on error; no explicit handling needed
+      const url = getUrl();
+      evtSource = new EventSource(url);
+
+      const handleEvent = (e: MessageEvent) => {
+        try {
+          onEvent(e.type, JSON.parse(e.data));
+        } catch { /* skip malformed */ }
+      };
+
+      evtSource.addEventListener('message', handleEvent);
+      evtSource.addEventListener('broadcast_status', handleEvent);
+      evtSource.addEventListener('broadcast_done', handleEvent);
+      evtSource.addEventListener('heartbeat', handleEvent);
+
+      evtSource.onerror = () => {
+        if (closed) return;
+        evtSource?.close();
+        evtSource = null;
+        scheduleReconnect();
+      };
     };
+
+    const scheduleReconnect = () => {
+      if (closed || reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, RECONNECT_DELAY);
+    };
+
+    connect();
 
     return {
-      close: () => evtSource.close(),
+      close: () => {
+        closed = true;
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        evtSource?.close();
+        evtSource = null;
+      },
     };
+  },
+
+  /**
+   * Fetch messages directly from the backend with cache-busting.
+   * Used for polling — bypasses any proxy/rewrite caching.
+   */
+  getRoomMessagesDirect: async (roomId: string): Promise<ChatRoomMessageListResponse> => {
+    const backendUrl = getBackendUrl();
+    const res = await fetch(
+      `${backendUrl}/api/chat/rooms/${roomId}/messages?_t=${Date.now()}`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
   },
 };
 

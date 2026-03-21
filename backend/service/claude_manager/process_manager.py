@@ -71,7 +71,7 @@ class ClaudeProcess:
         self.session_id = session_id
         self.session_name = session_name
         self.model = model
-        self.max_turns = max_turns or 100
+        self.max_turns = max_turns or 50
         self.timeout = timeout or 1800.0  # Default 30 minutes
         self.env_vars = env_vars or {}
         self.mcp_config = mcp_config
