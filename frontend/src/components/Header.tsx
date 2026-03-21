@@ -6,7 +6,8 @@ import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { configApi } from '@/lib/api';
-import { Menu, Sun, Moon, Code2, User } from 'lucide-react';
+import { Menu, Sun, Moon, Code2, User, BookOpen } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Header() {
   const { healthStatus, sessions, setMobileSidebarOpen, devMode, toggleDevMode, hydrateDevMode } = useAppStore();
@@ -68,6 +69,15 @@ export default function Header() {
         >
           {devModeIcon}
         </button>
+
+        {/* ── Wiki Button ── */}
+        <Link
+          href="/wiki"
+          className="flex items-center justify-center w-8 h-8 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer transition-all duration-150 no-underline"
+          title={t('header.wiki')}
+        >
+          <BookOpen size={14} />
+        </Link>
 
         {/* ── Language Toggle ── */}
         <div className="inline-flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)]">

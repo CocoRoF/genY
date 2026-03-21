@@ -19,6 +19,7 @@ from controller.chat_controller import router as chat_router
 from controller.internal_tool_controller import router as internal_tool_router
 from controller.tool_preset_controller import router as tool_preset_router
 from controller.tool_controller import router as tool_catalog_router
+from controller.docs_controller import router as docs_router
 from service.config import get_config_manager
 from service.mcp_loader import MCPLoader, get_global_mcp_config
 import uvicorn
@@ -355,6 +356,7 @@ app.include_router(chat_router)  # Chat broadcast
 app.include_router(internal_tool_router)  # Internal tool execution (Proxy MCP)
 app.include_router(tool_preset_router)  # Tool preset management
 app.include_router(tool_catalog_router)  # Tool catalog API
+app.include_router(docs_router)  # Documentation API
 
 # Mount static files for Web UI Dashboard
 static_dir = Path(__file__).parent / "static"

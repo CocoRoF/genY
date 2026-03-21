@@ -301,3 +301,126 @@ html.light ::-webkit-scrollbar-thumb:hover {
 		transform: translateX(0);
 	}
 }
+
+/* ========================================
+   Wiki Markdown Styles
+   ======================================== */
+.wiki-markdown h1 {
+	font-size: 1.75rem;
+	font-weight: 700;
+	margin: 2rem 0 1rem;
+	padding-bottom: 0.4rem;
+	border-bottom: 1px solid var(--border-color);
+	color: var(--text-primary);
+}
+.wiki-markdown h2 {
+	font-size: 1.35rem;
+	font-weight: 600;
+	margin: 1.75rem 0 0.75rem;
+	padding-bottom: 0.3rem;
+	border-bottom: 1px solid var(--border-color);
+	color: var(--text-primary);
+}
+.wiki-markdown h3 {
+	font-size: 1.125rem;
+	font-weight: 600;
+	margin: 1.5rem 0 0.5rem;
+	color: var(--text-primary);
+}
+.wiki-markdown h4,
+.wiki-markdown h5,
+.wiki-markdown h6 {
+	font-size: 1rem;
+	font-weight: 600;
+	margin: 1.25rem 0 0.5rem;
+	color: var(--text-primary);
+}
+.wiki-markdown p {
+	margin: 0.625rem 0;
+	line-height: 1.7;
+	color: var(--text-secondary);
+}
+.wiki-markdown ul,
+.wiki-markdown ol {
+	margin: 0.5rem 0;
+	padding-left: 1.5rem;
+	color: var(--text-secondary);
+}
+.wiki-markdown li {
+	margin: 0.25rem 0;
+	line-height: 1.6;
+}
+.wiki-markdown li > ul,
+.wiki-markdown li > ol {
+	margin: 0.125rem 0;
+}
+.wiki-markdown code {
+	font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+	font-size: 0.85em;
+	padding: 0.15em 0.4em;
+	border-radius: 4px;
+	background: var(--code-bg);
+	color: var(--code-function);
+}
+.wiki-markdown pre {
+	margin: 1rem 0;
+	padding: 1rem 1.25rem;
+	border-radius: var(--border-radius-lg);
+	background: var(--code-bg);
+	border: 1px solid var(--border-color);
+	overflow-x: auto;
+}
+.wiki-markdown pre code {
+	padding: 0;
+	background: none;
+	font-size: 0.825rem;
+	color: var(--text-primary);
+}
+.wiki-markdown blockquote {
+	margin: 1rem 0;
+	padding: 0.5rem 1rem;
+	border-left: 3px solid var(--primary-color);
+	background: var(--primary-subtle);
+	border-radius: 0 var(--border-radius) var(--border-radius) 0;
+}
+.wiki-markdown blockquote p {
+	margin: 0.25rem 0;
+}
+.wiki-markdown a {
+	color: var(--primary-color);
+	text-decoration: none;
+}
+.wiki-markdown a:hover {
+	text-decoration: underline;
+}
+.wiki-markdown table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1rem 0;
+	font-size: 0.875rem;
+}
+.wiki-markdown th {
+	text-align: left;
+	padding: 0.5rem 0.75rem;
+	border-bottom: 2px solid var(--border-color);
+	font-weight: 600;
+	color: var(--text-primary);
+	background: var(--bg-tertiary);
+}
+.wiki-markdown td {
+	padding: 0.5rem 0.75rem;
+	border-bottom: 1px solid var(--border-color);
+	color: var(--text-secondary);
+}
+.wiki-markdown tr:hover td {
+	background: var(--bg-hover);
+}
+.wiki-markdown hr {
+	margin: 1.5rem 0;
+	border: none;
+	border-top: 1px solid var(--border-color);
+}
+.wiki-markdown img {
+	max-width: 100%;
+	border-radius: var(--border-radius);
+}

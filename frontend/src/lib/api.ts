@@ -468,3 +468,25 @@ export const chatApi = {
     };
   },
 };
+
+// ==================== Docs API ====================
+
+export interface DocEntry {
+  slug: string;
+  filename: string;
+  title: string;
+}
+
+export interface DocContent extends DocEntry {
+  content: string;
+}
+
+export const docsApi = {
+  /** GET /api/docs — list all documentation files */
+  list: (lang: string = 'en') =>
+    apiCall<{ docs: DocEntry[] }>(`/api/docs?lang=${encodeURIComponent(lang)}`),
+
+  /** GET /api/docs/{slug} — get single document content */
+  get: (slug: string, lang: string = 'en') =>
+    apiCall<DocContent>(`/api/docs/${encodeURIComponent(slug)}?lang=${encodeURIComponent(lang)}`),
+};

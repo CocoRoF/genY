@@ -46,7 +46,7 @@ Answer "needs_memory": false when:
 - Trivial one-shot questions needing no prior context (What is 2+2?)
 - Meta-commands about the agent itself (help, status, version)
 
-Respond with JSON only: {"needs_memory": true/false, "reasoning": "brief reason"}
+Respond with JSON only: {{"needs_memory": true/false, "reasoning": "brief reason"}}
 
 User input:
 {input}"""

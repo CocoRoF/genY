@@ -21,6 +21,16 @@ const ko: Translations = {
     disconnected: '연결 끊김',
     devMode: '개발',
     normalMode: '일반',
+    wiki: '위키',
+  },
+
+  // ─── Wiki ───
+  wiki: {
+    title: '문서',
+    selectDoc: '사이드바에서 문서를 선택하세요.',
+    loading: '로딩 중...',
+    noDocsFound: '문서를 찾을 수 없습니다.',
+    backToApp: '돌아가기',
   },
 
   // ─── Tab Navigation ───

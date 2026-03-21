@@ -21,6 +21,16 @@ const en = {
     disconnected: 'Disconnected',
     devMode: 'Dev',
     normalMode: 'Normal',
+    wiki: 'Wiki',
+  },
+
+  // ─── Wiki ───
+  wiki: {
+    title: 'Documentation',
+    selectDoc: 'Select a document from the sidebar to view.',
+    loading: 'Loading...',
+    noDocsFound: 'No documents found.',
+    backToApp: 'Back',
   },
 
   // ─── Tab Navigation ───
