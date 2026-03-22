@@ -433,12 +433,10 @@ export const chatApi = {
     }),
 
   /**
-   * Subscribe to SSE events for a room.
+   * Subscribe to SSE events for a chat room.
    *
-   * Connects via the same-origin Next.js Route Handler proxy first
-   * (avoids cross-origin issues in Docker dev). Falls back to direct
-   * backend on reconnect if needed. Reconnects automatically with the
-   * latest message cursor on any failure.
+   * Connects directly to the backend to avoid Next.js proxy buffering.
+   * Reconnects automatically with the latest message cursor on failure.
    */
   subscribeToRoom: (
     roomId: string,
@@ -449,24 +447,17 @@ export const chatApi = {
     let evtSource: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let closed = false;
-    let attempt = 0;
 
     const RECONNECT_DELAY = 3_000;
 
     const getUrl = () => {
       const currentAfter = getLatestMsgId?.() ?? afterId;
       const qs = currentAfter ? `?after=${encodeURIComponent(currentAfter)}` : '';
-      // First attempts use same-origin (Route Handler proxy), later
-      // fallback to direct backend in case the proxy doesn't work.
-      if (attempt <= 2) {
-        return `/api/chat/rooms/${roomId}/events${qs}`;
-      }
       return `${getBackendUrl()}/api/chat/rooms/${roomId}/events${qs}`;
     };
 
     const connect = () => {
       if (closed) return;
-      attempt++;
 
       const url = getUrl();
       evtSource = new EventSource(url);
@@ -508,20 +499,6 @@ export const chatApi = {
         evtSource = null;
       },
     };
-  },
-
-  /**
-   * Fetch messages directly from the backend with cache-busting.
-   * Used for polling — bypasses any proxy/rewrite caching.
-   */
-  getRoomMessagesDirect: async (roomId: string): Promise<ChatRoomMessageListResponse> => {
-    const backendUrl = getBackendUrl();
-    const res = await fetch(
-      `${backendUrl}/api/chat/rooms/${roomId}/messages?_t=${Date.now()}`,
-      { cache: 'no-store' },
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
   },
 };
 

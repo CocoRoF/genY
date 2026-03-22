@@ -28,7 +28,7 @@ export default function MessengerPage() {
     // navigating away and back — SSE was closed on unmount).
     useMessengerStore.getState()._ensureSSE();
 
-    const interval = setInterval(fetchRooms, 10000);
+    const interval = setInterval(fetchRooms, 30000);
     return () => {
       clearInterval(interval);
       // Close SSE event stream on unmount (backend continues processing)

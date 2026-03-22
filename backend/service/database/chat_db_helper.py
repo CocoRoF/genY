@@ -240,8 +240,8 @@ def db_add_message(db_manager, room_id: str,
 
         query = (
             f"INSERT INTO {MESSAGES_TABLE} "
-            f"(message_id, room_id, type, content, session_id, session_name, role, duration_ms, timestamp) "
-            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            f"(message_id, room_id, type, content, session_id, session_name, role, duration_ms, cost_usd, timestamp) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             f"ON CONFLICT (message_id) DO NOTHING "
             f"RETURNING id"
         )
@@ -254,6 +254,7 @@ def db_add_message(db_manager, room_id: str,
             message.get("session_name", ""),
             message.get("role", ""),
             message.get("duration_ms", 0) or 0,
+            message.get("cost_usd"),
             timestamp,
         ))
 
@@ -304,6 +305,7 @@ def db_get_messages(db_manager, room_id: str) -> List[Dict[str, Any]]:
                 "session_name": r.get("session_name", ""),
                 "role": r.get("role", ""),
                 "duration_ms": r.get("duration_ms", 0),
+                "cost_usd": r.get("cost_usd"),
             })
         return result
     except Exception as e:

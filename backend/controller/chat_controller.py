@@ -23,6 +23,12 @@ from starlette.responses import StreamingResponse
 
 from service.chat.conversation_store import get_chat_store
 from service.langgraph import get_agent_session_manager
+from service.execution.agent_executor import (
+    execute_command,
+    AlreadyExecutingError,
+    AgentNotFoundError,
+    AgentNotAliveError,
+)
 
 logger = getLogger(__name__)
 
@@ -110,6 +116,7 @@ class MessageResponse(BaseModel):
     session_name: Optional[str] = None
     role: Optional[str] = None
     duration_ms: Optional[int] = None
+    cost_usd: Optional[float] = None
 
 
 class MessageListResponse(BaseModel):
@@ -226,6 +233,12 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
     """
     Send a message to all sessions in a chat room.
 
+    Core philosophy: **a chat room is just multi-command.**
+    Each agent in the room receives the same message and executes it
+    through the exact same ``execute_command`` path used by the
+    command tab.  This guarantees identical session logging, cost
+    tracking, auto-revival, and double-execution prevention.
+
     Processing is fire-and-forget — agent results are persisted in the
     background regardless of whether any client is connected.  Clients
     subscribe to live updates via GET /rooms/{room_id}/events.
@@ -249,18 +262,13 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
 
     _notify_room(room_id)
 
-    # 2. Resolve alive agents
-    all_agents = agent_manager.list_agents()
-    room_session_ids = set(room["session_ids"])
-    target_agents = [
-        a for a in all_agents
-        if a.session_id in room_session_ids and a.is_alive()
-    ]
-
-    if not target_agents:
-        sys_msg = store.add_message(room_id, {
+    # 2. Resolve target session IDs and display info
+    #    Auto-revival & execution are handled by execute_command — no need here.
+    room_session_ids = list(room["session_ids"])
+    if not room_session_ids:
+        store.add_message(room_id, {
             "type": "system",
-            "content": "No active sessions in this room.",
+            "content": "No sessions in this room.",
         })
         _notify_room(room_id)
         return {
@@ -269,29 +277,42 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
             "target_count": 0,
         }
 
+    # Collect display metadata (best-effort; executor handles the real work)
+    all_agents = agent_manager.list_agents()
+    agent_info: Dict[str, Dict[str, str]] = {}
+    for a in all_agents:
+        if a.session_id in set(room_session_ids):
+            agent_info[a.session_id] = {
+                "session_name": a.session_name,
+                "role": a.role.value if hasattr(a.role, "value") else str(a.role),
+            }
+
     # 3. Create broadcast state and launch background processing
     broadcast_id = str(uuid.uuid4())
     broadcast_state = BroadcastState(
         broadcast_id=broadcast_id,
         room_id=room_id,
-        total=len(target_agents),
+        total=len(room_session_ids),
     )
     _active_broadcasts[room_id] = broadcast_state
 
     logger.info(
         "Room %s: broadcast %s → %d sessions: %s",
-        room_id, broadcast_id, len(target_agents), request.message[:80],
+        room_id, broadcast_id, len(room_session_ids), request.message[:80],
     )
 
     # Fire-and-forget background task
     asyncio.create_task(
-        _run_broadcast(room_id, broadcast_id, broadcast_state, target_agents, request.message, store)
+        _run_broadcast(
+            room_id, broadcast_id, broadcast_state,
+            room_session_ids, agent_info, request.message, store,
+        )
     )
 
     return {
         "user_message": user_msg,
         "broadcast_id": broadcast_id,
-        "target_count": len(target_agents),
+        "target_count": len(room_session_ids),
     }
 
 
@@ -299,58 +320,82 @@ async def _run_broadcast(
     room_id: str,
     broadcast_id: str,
     state: BroadcastState,
-    agents: list,
+    session_ids: List[str],
+    agent_info: Dict[str, Dict[str, str]],
     message: str,
     store,
 ):
-    """Background task — invokes all agents and persists results."""
+    """
+    Background task — runs one command per agent and persists results.
+
+    This is the concrete expression of "chat room = multi-command".
+    Each agent goes through the **exact same** ``execute_command`` path
+    as the command tab, inheriting:
+      - session logging  (log_command / log_response)
+      - cost persistence (increment_cost)
+      - auto-revival     (agent.revive)
+      - double-execution prevention
+      - timeout handling
+    """
     start_time = time.time()
 
-    async def _invoke_one(agent):
-        session_start = time.time()
-        sid = agent.session_id
-        sname = agent.session_name
-        role = agent.role.value if hasattr(agent.role, 'value') else str(agent.role)
+    async def _invoke_one(session_id: str):
+        info = agent_info.get(session_id, {})
+        sname = info.get("session_name", session_id[:8])
+        role = info.get("role", "unknown")
 
         try:
-            session_timeout = getattr(agent, 'timeout', 1800.0)
-            result = await asyncio.wait_for(
-                agent.invoke(input_text=message, is_chat_message=True),
-                timeout=session_timeout,
+            # ── THE core call — identical to command tab execution ──
+            result = await execute_command(
+                session_id=session_id,
+                prompt=message,
             )
-            result_text = result.get("output", "") if isinstance(result, dict) else str(result)
-            duration_ms = int((time.time() - session_start) * 1000)
-            has_response = bool(result_text and result_text.strip())
 
-            if has_response:
+            if result.success and result.output and result.output.strip():
                 store.add_message(room_id, {
                     "type": "agent",
-                    "content": result_text.strip(),
-                    "session_id": sid,
+                    "content": result.output.strip(),
+                    "session_id": session_id,
                     "session_name": sname,
                     "role": role,
-                    "duration_ms": duration_ms,
+                    "duration_ms": result.duration_ms,
+                    "cost_usd": result.cost_usd,
                 })
                 state.responded += 1
                 _notify_room(room_id)
+            elif not result.success:
+                # Execution failed (timeout, error, etc.) — show in room
+                store.add_message(room_id, {
+                    "type": "system",
+                    "content": f"{sname}: {result.error or 'Unknown error'}",
+                })
+                _notify_room(room_id)
             else:
-                logger.debug("Session %s skipped (no output)", sid)
+                logger.debug("Session %s skipped (no output)", session_id)
 
-        except asyncio.TimeoutError:
-            duration_ms = int((time.time() - session_start) * 1000)
-            logger.warning("Broadcast timeout for session %s (%dms)", sid, duration_ms)
+        except AlreadyExecutingError:
             store.add_message(room_id, {
                 "type": "system",
-                "content": f"{sname}: Timeout after {duration_ms / 1000:.1f}s",
+                "content": f"{sname}: Currently busy with another execution",
             })
             _notify_room(room_id)
 
-        except asyncio.CancelledError:
-            logger.warning("Broadcast cancelled for session %s", sid)
+        except AgentNotFoundError:
+            store.add_message(room_id, {
+                "type": "system",
+                "content": f"{sname}: Session not found",
+            })
+            _notify_room(room_id)
+
+        except AgentNotAliveError as e:
+            store.add_message(room_id, {
+                "type": "system",
+                "content": f"{sname}: {str(e)[:200]}",
+            })
+            _notify_room(room_id)
 
         except Exception as e:
-            duration_ms = int((time.time() - session_start) * 1000)
-            logger.error("Broadcast error for session %s: %s", sid, e)
+            logger.error("Broadcast error for session %s: %s", session_id, e)
             store.add_message(room_id, {
                 "type": "system",
                 "content": f"{sname}: Error — {str(e)[:200]}",
@@ -360,8 +405,8 @@ async def _run_broadcast(
         finally:
             state.completed += 1
 
-    # Launch all concurrently
-    tasks = [asyncio.create_task(_invoke_one(a)) for a in agents]
+    # Launch all concurrently — each is an independent command execution
+    tasks = [asyncio.create_task(_invoke_one(sid)) for sid in session_ids]
     await asyncio.gather(*tasks, return_exceptions=True)
 
     # Summary
@@ -424,6 +469,12 @@ async def room_event_stream(
             for msg in missed:
                 yield _sse_event("message", msg)
                 last_seen_id = msg["id"]
+        else:
+            # No reference point: anchor to the current latest message
+            # so that any messages added after this moment are detected.
+            all_msgs = store.get_messages(room_id)
+            if all_msgs:
+                last_seen_id = all_msgs[-1]["id"]
 
         # Send current broadcast status if active
         bstate = _active_broadcasts.get(room_id)
@@ -449,7 +500,11 @@ async def room_event_stream(
                 return
 
             # Check for new messages
-            new_msgs = _get_messages_after(store, room_id, last_seen_id)
+            if last_seen_id is not None:
+                new_msgs = _get_messages_after(store, room_id, last_seen_id)
+            else:
+                # No anchor yet (connected to empty room) — get all messages
+                new_msgs = store.get_messages(room_id)
             for msg in new_msgs:
                 yield _sse_event("message", msg)
                 last_seen_id = msg["id"]

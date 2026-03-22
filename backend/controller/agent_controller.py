@@ -33,6 +33,15 @@ from service.langgraph import (
 )
 from service.logging.session_logger import get_session_logger
 from service.claude_manager.session_store import get_session_store
+from service.execution.agent_executor import (
+    execute_command,
+    start_command_background,
+    get_execution_holder,
+    cleanup_execution,
+    AgentNotFoundError,
+    AgentNotAliveError,
+    AlreadyExecutingError,
+)
 
 logger = getLogger(__name__)
 
@@ -452,100 +461,34 @@ async def execute_agent_prompt(
     """
     Execute prompt with AgentSession via the compiled StateGraph.
 
-    The session's graph type determines the execution flow automatically.
-    If the session has been idle and the process died, invoke() will
-    auto-revive it transparently.
+    Delegates to the unified ``execute_command`` function which handles
+    auto-revival, session logging, cost tracking, and double-execution
+    prevention.
     """
-    start_time = time.time()
-
-    agent = agent_manager.get_agent(session_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
-
-    # If process is dead, try automatic revival before rejecting
-    if not agent.is_alive():
-        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before execute")
-        try:
-            revived = await agent.revive()
-            if revived:
-                logger.info(f"[{session_id}] ✅ Auto-revival successful")
-                # Update process reference in manager
-                if agent.process:
-                    agent_manager._local_processes[session_id] = agent.process
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"AgentSession is not running and revival failed (status: {agent.status})"
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"AgentSession revival failed: {e}"
-            )
-
-    # 세션 로거
-    session_logger = get_session_logger(session_id, create_if_missing=False)
-
     try:
-        # 입력 로깅
-        if session_logger:
-            session_logger.log_command(
-                prompt=request.prompt,
-                timeout=request.timeout,
-                system_prompt=request.system_prompt,
-                max_turns=request.max_turns,
-            )
-
-        # Execute through the compiled StateGraph (invoke)
-        # Routes to the appropriate graph based on graph_name
-        invoke_result = await agent.invoke(
-            input_text=request.prompt,
-        )
-        result_text = invoke_result.get("output", "") if isinstance(invoke_result, dict) else str(invoke_result)
-        result_cost = invoke_result.get("total_cost", 0.0) if isinstance(invoke_result, dict) else None
-
-        duration_ms = int((time.time() - start_time) * 1000)
-
-        # 응답 로깅
-        if session_logger:
-            session_logger.log_response(
-                success=True,
-                output=result_text,
-                error=None,
-                duration_ms=duration_ms,
-                cost_usd=result_cost,
-            )
-
-        # Persist cost to DB
-        if result_cost and result_cost > 0:
-            try:
-                store = get_session_store()
-                store.increment_cost(session_id, result_cost)
-            except Exception:
-                logger.debug(f"Cost persistence failed for {session_id}", exc_info=True)
-
-        return ExecuteResponse(
-            success=True,
+        result = await execute_command(
             session_id=session_id,
-            output=result_text,
-            error=None,
-            cost_usd=result_cost,
-            duration_ms=duration_ms,
+            prompt=request.prompt,
+            timeout=request.timeout,
+            system_prompt=request.system_prompt,
+            max_turns=request.max_turns,
         )
-
+        return ExecuteResponse(
+            success=result.success,
+            session_id=session_id,
+            output=result.output,
+            error=result.error,
+            cost_usd=result.cost_usd,
+            duration_ms=result.duration_ms,
+        )
+    except AgentNotFoundError:
+        raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
+    except AgentNotAliveError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except AlreadyExecutingError:
+        raise HTTPException(status_code=409, detail="Execution already in progress")
     except Exception as e:
-        duration_ms = int((time.time() - start_time) * 1000)
         logger.error(f"❌ Agent execute failed: {e}", exc_info=True)
-
-        if session_logger:
-            session_logger.log_response(
-                success=False,
-                error=str(e),
-                duration_ms=duration_ms,
-            )
-
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -557,8 +500,55 @@ def _sse(event_type: str, data: dict) -> str:
     return f"event: {event_type}\ndata: {payload}\n\n"
 
 
-# ── In-memory store for background executions (session_id → future/result) ──
-_active_executions: dict[str, dict] = {}
+# ── Shared SSE helpers ────────────────────────────────────────────────────────
+
+
+async def _stream_execution_sse(holder: dict, session_id: str):
+    """Yield SSE events for a running execution.
+
+    Shared by ``/execute/events`` and ``/execute/stream``.
+    Polls the session logger cache every 150ms for new log entries
+    and streams them as ``log`` events until the execution completes.
+    """
+    session_logger = get_session_logger(session_id, create_if_missing=False)
+    cache_cursor = holder.get("cache_cursor", 0)
+
+    yield _sse("status", {"status": "running", "message": "Execution started"})
+
+    try:
+        while not holder.get("done"):
+            if session_logger:
+                new_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
+                for entry in new_entries:
+                    yield _sse("log", entry.to_dict())
+            await asyncio.sleep(0.15)
+
+        # Final drain — pick up entries written during last poll cycle
+        await asyncio.sleep(0.05)
+        if session_logger:
+            final_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
+            for entry in final_entries:
+                yield _sse("log", entry.to_dict())
+
+    except Exception as e:
+        logger.error(f"SSE stream error: {e}", exc_info=True)
+        yield _sse("error", {"error": str(e)})
+
+    # Emit final result or error
+    if holder.get("error"):
+        yield _sse("status", {"status": "error", "message": holder["error"]})
+        yield _sse("result", holder.get("result", {}))
+    else:
+        yield _sse("status", {"status": "completed", "message": "Execution completed"})
+        yield _sse("result", holder.get("result", {}))
+
+    yield _sse("done", {})
+
+    # Cleanup execution holder
+    cleanup_execution(session_id)
+
+
+# ── Execution endpoints (delegating to agent_executor) ────────────────────────
 
 
 @router.post("/{session_id}/execute/start")
@@ -569,104 +559,28 @@ async def start_agent_execution(
     """
     Start prompt execution in the background.
 
-    Returns immediately with ``execution_id`` while the graph runs
-    asynchronously.  Use the ``GET /execute/events`` SSE endpoint
-    to stream real-time log events.
+    Returns immediately while the graph runs asynchronously.
+    Use the ``GET /execute/events`` SSE endpoint to stream
+    real-time log events.
+
+    All execution concerns (auto-revival, session logging, cost
+    tracking, double-execution prevention) are handled by
+    ``agent_executor.start_command_background``.
     """
-    agent = agent_manager.get_agent(session_id)
-    if not agent:
+    try:
+        await start_command_background(
+            session_id=session_id,
+            prompt=request.prompt,
+            timeout=request.timeout,
+            system_prompt=request.system_prompt,
+            max_turns=request.max_turns,
+        )
+    except AgentNotFoundError:
         raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
-
-    # If process is dead, try automatic revival
-    if not agent.is_alive():
-        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before start")
-        try:
-            revived = await agent.revive()
-            if revived:
-                logger.info(f"[{session_id}] ✅ Auto-revival successful (start)")
-                if agent.process:
-                    agent_manager._local_processes[session_id] = agent.process
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"AgentSession is not running and revival failed (status: {agent.status})",
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"AgentSession revival failed: {e}",
-            )
-
-    # Prevent double execution
-    if session_id in _active_executions and not _active_executions[session_id].get("done"):
+    except AgentNotAliveError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except AlreadyExecutingError:
         raise HTTPException(status_code=409, detail="Execution already in progress")
-
-    session_logger = get_session_logger(session_id, create_if_missing=True)
-
-    holder: dict = {
-        "done": False,
-        "result": None,
-        "error": None,
-        "start_time": time.time(),
-        "cache_cursor": session_logger.get_cache_length() if session_logger else 0,
-    }
-    _active_executions[session_id] = holder
-
-    async def _run():
-        start_time = holder["start_time"]
-        try:
-            if session_logger:
-                session_logger.log_command(
-                    prompt=request.prompt,
-                    timeout=request.timeout,
-                    system_prompt=request.system_prompt,
-                    max_turns=request.max_turns,
-                )
-            invoke_result = await agent.invoke(input_text=request.prompt)
-            result_text = invoke_result.get("output", "") if isinstance(invoke_result, dict) else str(invoke_result)
-            result_cost = invoke_result.get("total_cost", 0.0) if isinstance(invoke_result, dict) else None
-            duration_ms = int((time.time() - start_time) * 1000)
-            if session_logger:
-                session_logger.log_response(
-                    success=True, output=result_text, duration_ms=duration_ms,
-                    cost_usd=result_cost,
-                )
-            holder["result"] = {
-                "success": True,
-                "session_id": session_id,
-                "output": result_text,
-                "error": None,
-                "duration_ms": duration_ms,
-                "cost_usd": result_cost,
-            }
-            # Persist cost to DB
-            if result_cost and result_cost > 0:
-                try:
-                    store = get_session_store()
-                    store.increment_cost(session_id, result_cost)
-                except Exception:
-                    logger.debug(f"Cost persistence failed for {session_id}", exc_info=True)
-        except Exception as e:
-            duration_ms = int((time.time() - start_time) * 1000)
-            logger.error(f"❌ Agent SSE execute failed: {e}", exc_info=True)
-            if session_logger:
-                session_logger.log_response(
-                    success=False, error=str(e), duration_ms=duration_ms,
-                )
-            holder["error"] = str(e)
-            holder["result"] = {
-                "success": False,
-                "session_id": session_id,
-                "output": None,
-                "error": str(e),
-                "duration_ms": duration_ms,
-            }
-        finally:
-            holder["done"] = True
-
-    asyncio.create_task(_run())
 
     return {"session_id": session_id, "status": "started"}
 
@@ -688,53 +602,12 @@ async def stream_execution_events(
       - ``done``   : stream complete sentinel
       - ``error``  : execution error
     """
-    holder = _active_executions.get(session_id)
+    holder = get_execution_holder(session_id)
     if not holder:
         raise HTTPException(status_code=404, detail="No active execution for this session")
 
-    session_logger = get_session_logger(session_id, create_if_missing=False)
-
-    async def event_stream():
-        cache_cursor = holder.get("cache_cursor", 0)
-
-        yield _sse("status", {"status": "running", "message": "Execution started"})
-
-        try:
-            while not holder.get("done"):
-                # Drain new log entries from the session logger cache
-                if session_logger:
-                    new_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
-                    for entry in new_entries:
-                        yield _sse("log", entry.to_dict())
-
-                await asyncio.sleep(0.15)
-
-            # Final drain — pick up entries written during last poll cycle
-            await asyncio.sleep(0.05)
-            if session_logger:
-                final_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
-                for entry in final_entries:
-                    yield _sse("log", entry.to_dict())
-
-        except Exception as e:
-            logger.error(f"SSE stream error: {e}", exc_info=True)
-            yield _sse("error", {"error": str(e)})
-
-        # Emit final result or error
-        if holder.get("error"):
-            yield _sse("status", {"status": "error", "message": holder["error"]})
-            yield _sse("result", holder.get("result", {}))
-        else:
-            yield _sse("status", {"status": "completed", "message": "Execution completed"})
-            yield _sse("result", holder.get("result", {}))
-
-        yield _sse("done", {})
-
-        # Cleanup
-        _active_executions.pop(session_id, None)
-
     return StreamingResponse(
-        event_stream(),
+        _stream_execution_sse(holder, session_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -752,9 +625,8 @@ async def execute_agent_prompt_stream(
     """
     Execute prompt with real-time SSE log streaming.
 
-    Returns an SSE stream that emits log events as they are produced
-    during graph execution, then a final ``result`` event with the
-    full ExecuteResponse payload.
+    Starts execution via ``start_command_background`` and streams
+    log events in real time until completion.
 
     SSE event types:
       - log       : a new log entry (same shape as LogEntry)
@@ -763,135 +635,22 @@ async def execute_agent_prompt_stream(
       - done      : stream complete sentinel
       - error     : top-level error
     """
-    agent = agent_manager.get_agent(session_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail=f"AgentSession not found: {session_id}")
-
-    # If process is dead, try automatic revival
-    if not agent.is_alive():
-        logger.info(f"[{session_id}] Process not alive — attempting auto-revival before SSE stream")
-        try:
-            revived = await agent.revive()
-            if revived:
-                logger.info(f"[{session_id}] ✅ Auto-revival successful (SSE)")
-                if agent.process:
-                    agent_manager._local_processes[session_id] = agent.process
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"AgentSession is not running and revival failed (status: {agent.status})",
-                )
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"AgentSession revival failed: {e}",
-            )
-
     async def event_stream():
-        start_time = time.time()
-
-        # Ensure session logger exists
-        session_logger = get_session_logger(session_id, create_if_missing=True)
-
-        # Snapshot the current cache length so we only emit *new* entries
-        cache_cursor = session_logger.get_cache_length()
-
-        yield _sse("status", {"status": "running", "message": "Execution started"})
-
-        # Launch graph execution in background task
-        exec_task: asyncio.Task | None = None
-        result_holder: dict = {}
-        error_holder: dict = {}
-
-        async def _run():
-            try:
-                if session_logger:
-                    session_logger.log_command(
-                        prompt=request.prompt,
-                        timeout=request.timeout,
-                        system_prompt=request.system_prompt,
-                        max_turns=request.max_turns,
-                    )
-                invoke_result = await agent.invoke(input_text=request.prompt)
-                result_text = invoke_result.get("output", "") if isinstance(invoke_result, dict) else str(invoke_result)
-                result_cost = invoke_result.get("total_cost", 0.0) if isinstance(invoke_result, dict) else None
-                duration_ms = int((time.time() - start_time) * 1000)
-                if session_logger:
-                    session_logger.log_response(
-                        success=True,
-                        output=result_text,
-                        duration_ms=duration_ms,
-                        cost_usd=result_cost,
-                    )
-                result_holder.update({
-                    "success": True,
-                    "session_id": session_id,
-                    "output": result_text,
-                    "error": None,
-                    "duration_ms": duration_ms,
-                    "cost_usd": result_cost,
-                })
-                # Persist cost to DB
-                if result_cost and result_cost > 0:
-                    try:
-                        store = get_session_store()
-                        store.increment_cost(session_id, result_cost)
-                    except Exception:
-                        logger.debug(f"Cost persistence failed for {session_id}", exc_info=True)
-            except Exception as e:
-                duration_ms = int((time.time() - start_time) * 1000)
-                logger.error(f"❌ Agent SSE execute failed: {e}", exc_info=True)
-                if session_logger:
-                    session_logger.log_response(
-                        success=False,
-                        error=str(e),
-                        duration_ms=duration_ms,
-                    )
-                error_holder["error"] = str(e)
-                error_holder["duration_ms"] = duration_ms
-
-        exec_task = asyncio.create_task(_run())
-
-        # Poll the session logger cache and stream new entries
         try:
-            while not exec_task.done():
-                # Drain any new entries from the logger cache
-                new_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
-                for entry in new_entries:
-                    yield _sse("log", entry.to_dict())
-
-                await asyncio.sleep(0.15)
-
-            # Final drain — pick up entries written during last iteration
-            await asyncio.sleep(0.05)
-            final_entries, cache_cursor = session_logger.get_cache_entries_since(cache_cursor)
-            for entry in final_entries:
-                yield _sse("log", entry.to_dict())
-
-            # Ensure any exception in exec_task is raised
-            await exec_task
-
-        except Exception as e:
-            logger.error(f"SSE stream error: {e}", exc_info=True)
+            holder = await start_command_background(
+                session_id=session_id,
+                prompt=request.prompt,
+                timeout=request.timeout,
+                system_prompt=request.system_prompt,
+                max_turns=request.max_turns,
+            )
+        except (AgentNotFoundError, AgentNotAliveError, AlreadyExecutingError) as e:
             yield _sse("error", {"error": str(e)})
+            yield _sse("done", {})
+            return
 
-        # Emit final result
-        if error_holder:
-            yield _sse("status", {"status": "error", "message": error_holder.get("error", "Unknown error")})
-            yield _sse("result", {
-                "success": False,
-                "session_id": session_id,
-                "output": None,
-                "error": error_holder.get("error"),
-                "duration_ms": error_holder.get("duration_ms"),
-            })
-        else:
-            yield _sse("status", {"status": "completed", "message": "Execution completed"})
-            yield _sse("result", result_holder)
-
-        yield _sse("done", {})
+        async for event in _stream_execution_sse(holder, session_id):
+            yield event
 
     return StreamingResponse(
         event_stream(),

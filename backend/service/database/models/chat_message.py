@@ -20,6 +20,7 @@ class ChatMessageModel(BaseModel):
         session_name: str = "",
         role: str = "",
         duration_ms: int = 0,
+        cost_usd: float = None,
         timestamp: str = "",
         **kwargs,
     ):
@@ -32,6 +33,7 @@ class ChatMessageModel(BaseModel):
         self.session_name = session_name
         self.role = role
         self.duration_ms = duration_ms
+        self.cost_usd = cost_usd
         self.timestamp = timestamp
 
     def get_table_name(self) -> str:
@@ -47,6 +49,7 @@ class ChatMessageModel(BaseModel):
             "session_name": "VARCHAR(500) DEFAULT ''",
             "role": "VARCHAR(100) DEFAULT ''",
             "duration_ms": "INTEGER DEFAULT 0",
+            "cost_usd": "DOUBLE PRECISION DEFAULT NULL",
             "timestamp": "VARCHAR(100) DEFAULT ''",
         }
 
@@ -72,7 +75,7 @@ class ChatMessageModel(BaseModel):
     def from_dict(cls, data: Dict[str, Any]) -> "ChatMessageModel":
         known_fields = {
             "message_id", "room_id", "type", "content",
-            "session_id", "session_name", "role", "duration_ms", "timestamp",
+            "session_id", "session_name", "role", "duration_ms", "cost_usd", "timestamp",
             "id", "created_at", "updated_at",
         }
         known_data = {k: v for k, v in data.items() if k in known_fields}
