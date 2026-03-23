@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
 import { ChevronDown, ChevronRight, FolderOpen, Download, RefreshCw, FileJson, FileText, FileCode, Globe, Palette, ScrollText, Settings, File } from 'lucide-react';
 import type { StorageFile } from '@/types';
+import { FileViewer } from '@/components/file-viewer';
 
 function cn(...classes: (string | boolean | undefined | null)[]) {
   return twMerge(classes.filter(Boolean).join(' '));
@@ -184,15 +185,29 @@ export default function StorageTab() {
         </div>
 
         {/* Preview */}
-        <div className="flex-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] flex flex-col min-w-0">
-          <div className="py-2.5 px-3.5 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]" style={{ borderRadius: 'var(--border-radius) var(--border-radius) 0 0' }}>
-            <span className="text-[13px] font-medium text-[var(--text-secondary)]">{activePath || t('storageTab.noFile')}</span>
+        {activePath && !loading && previewContent ? (
+          <FileViewer
+            content={previewContent}
+            fileName={activePath}
+            className="flex-1 min-w-0"
+          />
+        ) : (
+          <div className="flex-1 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-[var(--border-radius)] flex flex-col min-w-0">
+            <div className="py-2.5 px-3.5 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]" style={{ borderRadius: 'var(--border-radius) var(--border-radius) 0 0' }}>
+              <span className="text-[13px] font-medium text-[var(--text-secondary)]">{activePath || t('storageTab.noFile')}</span>
+            </div>
+            <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-[13px] py-12">
+              {loading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-[var(--primary-color)] border-t-transparent rounded-full animate-spin" />
+                  {t('common.loading')}
+                </div>
+              ) : (
+                t('storageTab.selectFile')
+              )}
+            </div>
           </div>
-          <pre className="flex-1 p-3.5 m-0 overflow-auto text-[12px] leading-[1.6] text-[var(--text-primary)] whitespace-pre-wrap break-words"
-               style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}>
-            {loading ? t('common.loading') : previewContent || t('storageTab.selectFile')}
-          </pre>
-        </div>
+        )}
       </div>
     </div>
   );

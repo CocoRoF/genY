@@ -424,3 +424,118 @@ html.light ::-webkit-scrollbar-thumb:hover {
 	max-width: 100%;
 	border-radius: var(--border-radius);
 }
+
+/* ========================================
+   Syntax Highlighting (highlight.js)
+   Uses app CSS variables for theme parity
+   ======================================== */
+.hljs {
+	color: var(--text-primary);
+	background: transparent;
+}
+
+/* Keywords: if, for, while, return, class, def, import … */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-meta-keyword,
+.hljs-doctag,
+.hljs-built_in {
+	color: var(--code-keyword);
+}
+
+/* Strings, attributes, regex */
+.hljs-string,
+.hljs-attr,
+.hljs-regexp {
+	color: var(--code-string);
+}
+
+/* Functions, titles, section headers */
+.hljs-title,
+.hljs-title\.class_,
+.hljs-title\.function_,
+.hljs-section,
+.hljs-selector-id,
+.hljs-selector-class {
+	color: var(--code-function);
+}
+
+/* Numbers, literals, types */
+.hljs-number,
+.hljs-literal,
+.hljs-type {
+	color: var(--code-number);
+}
+
+/* Comments */
+.hljs-comment {
+	color: var(--code-comment);
+	font-style: italic;
+}
+
+/* Variables, template variables, properties */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property,
+.hljs-name {
+	color: var(--code-property);
+}
+
+/* Operators, punctuation */
+.hljs-operator,
+.hljs-punctuation {
+	color: var(--text-secondary);
+}
+
+/* HTML/XML tags */
+.hljs-tag {
+	color: var(--code-keyword);
+}
+
+/* Diff additions & deletions */
+.hljs-addition {
+	color: var(--success-color);
+	background: rgba(34, 197, 94, 0.1);
+}
+.hljs-deletion {
+	color: var(--danger-color);
+	background: rgba(239, 68, 68, 0.1);
+}
+
+/* Meta / preprocessor */
+.hljs-meta {
+	color: var(--text-muted);
+}
+
+/* Symbols, bullets (markdown list markers, etc.) */
+.hljs-symbol,
+.hljs-bullet {
+	color: var(--code-function);
+}
+
+/* Emphasis / strong */
+.hljs-emphasis {
+	font-style: italic;
+}
+.hljs-strong {
+	font-weight: 700;
+}
+
+/* Links */
+.hljs-link {
+	color: var(--primary-color);
+	text-decoration: underline;
+}
+
+/* ========================================
+   File Viewer — line gutter styling
+   ======================================== */
+.file-viewer-lines {
+	counter-reset: line;
+}
+.file-viewer-lines > div:first-child > div:first-child {
+	padding-top: 4px;
+}
+.file-viewer-lines > div:last-child > div:first-child {
+	padding-bottom: 4px;
+}
