@@ -145,6 +145,8 @@ async def create_agent_session(request: CreateAgentRequest):
         logger.info(f"✅ AgentSession created: {agent.session_id}")
         return session_info
 
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"❌ Failed to create AgentSession: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -20,10 +20,12 @@ Architecture:
   - All tool operations go through the same singletons used by REST APIs
   - Direct messages use a lightweight file-based inbox per session
   - Room broadcasts re-use the existing ChatConversationStore
+  - DMs auto-trigger the recipient session to read and respond
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from logging import getLogger
 
@@ -64,6 +66,125 @@ def _session_summary(agent) -> dict:
         "model": info.model,
         "created_at": str(info.created_at) if info.created_at else None,
     }
+
+
+def _resolve_session(name_or_id: str):
+    """Resolve a session by ID or name. Returns (agent, resolved_session_id) or (None, None)."""
+    manager = _get_agent_manager()
+    agent = manager.resolve_session(name_or_id)
+    if agent:
+        return agent, agent.session_id
+    return None, None
+
+
+# Sessions currently being triggered by a DM — prevents infinite ping-pong.
+# When session A DMs session B and triggers B, B's reply DM back to A should
+# NOT re-trigger A (since A is expecting the reply, not a new conversation).
+_dm_triggered_sessions: set[str] = set()
+
+
+def _trigger_dm_response(
+    target_session_id: str,
+    sender_session_id: str,
+    sender_name: str,
+    content: str,
+    message_id: str,
+) -> None:
+    """Fire-and-forget: trigger the recipient session to process a DM.
+
+    Launches a background asyncio task that calls ``execute_command``
+    on the target session with a prompt telling it to read and respond
+    to the incoming DM.  The response is then delivered back to the
+    sender's inbox automatically.
+
+    Includes ping-pong prevention: if the target is already being
+    triggered by a DM response cycle, skip the re-trigger.
+    """
+    from service.execution.agent_executor import (
+        execute_command,
+        AlreadyExecutingError,
+        AgentNotFoundError,
+        AgentNotAliveError,
+    )
+
+    # Prevent infinite DM ping-pong
+    if target_session_id in _dm_triggered_sessions:
+        logger.debug(
+            "DM trigger skipped (ping-pong prevention): %s is already in a DM response cycle",
+            target_session_id,
+        )
+        return
+
+    async def _deliver_and_respond():
+        # Mark BOTH sender and target to prevent ping-pong:
+        # - target: will be executing, don't re-trigger
+        # - sender: if target replies via DM, don't re-trigger sender
+        _dm_triggered_sessions.add(target_session_id)
+        if sender_session_id:
+            _dm_triggered_sessions.add(sender_session_id)
+        try:
+            # Build the prompt: system instruction on top, then the DM content
+            prompt = (
+                f"[SYSTEM] You received a direct message from {sender_name} (session: {sender_session_id}). "
+                f"Read the message below and take appropriate action — respond to questions, "
+                f"perform requested tasks, etc. "
+                f"Only reply via 'geny_send_direct_message' if a response is explicitly needed or expected. "
+                f"Do NOT reply just to acknowledge receipt — focus on completing the task if one was requested.\n\n"
+                f"[DM from {sender_name}]: {content}"
+            )
+
+            result = await execute_command(
+                session_id=target_session_id,
+                prompt=prompt,
+            )
+
+            if result.success and result.output and result.output.strip():
+                logger.info(
+                    "DM auto-response from %s completed (%dms): %s",
+                    target_session_id,
+                    result.duration_ms or 0,
+                    result.output[:100],
+                )
+            else:
+                logger.warning(
+                    "DM auto-response from %s: no output (success=%s, error=%s)",
+                    target_session_id, result.success, result.error,
+                )
+
+        except AlreadyExecutingError:
+            logger.info(
+                "DM trigger skipped — session %s is already executing. "
+                "Message %s will stay in inbox for later.",
+                target_session_id, message_id,
+            )
+        except (AgentNotFoundError, AgentNotAliveError) as e:
+            logger.warning(
+                "DM trigger failed for session %s: %s",
+                target_session_id, e,
+            )
+        except Exception as e:
+            logger.error(
+                "DM trigger unexpected error for session %s: %s",
+                target_session_id, e, exc_info=True,
+            )
+        finally:
+            _dm_triggered_sessions.discard(target_session_id)
+            if sender_session_id:
+                _dm_triggered_sessions.discard(sender_session_id)
+
+    # Schedule in the running event loop (fire-and-forget)
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_deliver_and_respond())
+        logger.info(
+            "DM trigger scheduled: %s → %s (msg=%s)",
+            sender_name, target_session_id, message_id,
+        )
+    except RuntimeError:
+        logger.warning(
+            "No running event loop — cannot trigger DM response for %s",
+            target_session_id,
+        )
 
 
 # ============================================================================
@@ -114,7 +235,7 @@ class GenySessionInfoTool(BaseTool):
 
     name = "geny_session_info"
     description = (
-        "Get detailed profile of a specific team member (agent session) by ID. "
+        "Get detailed profile of a specific team member (agent session) by name or ID. "
         "Returns their role, status, model, and creation time — like an employee profile card. "
         "Use this to check on a specific colleague's details before assigning work or inviting them."
     )
@@ -123,10 +244,9 @@ class GenySessionInfoTool(BaseTool):
         """Get a team member's profile.
 
         Args:
-            session_id: The session ID of the team member to look up.
+            session_id: The session name or ID of the team member to look up.
         """
-        manager = _get_agent_manager()
-        agent = manager.get_agent(session_id)
+        agent, _ = _resolve_session(session_id)
 
         if not agent:
             return json.dumps({"error": f"Session not found: {session_id}"})
@@ -374,20 +494,20 @@ class GenyRoomCreateTool(BaseTool):
 
         Args:
             room_name: Name for the new room (e.g. "Project Alpha", "개발팀 채널").
-            session_ids: Comma-separated list of session IDs of members to include in the room.
+            session_ids: Comma-separated list of session IDs or names of members to include.
         """
-        ids = [s.strip() for s in session_ids.split(",") if s.strip()]
-        if not ids:
-            return json.dumps({"error": "At least one session_id is required."})
+        raw_ids = [s.strip() for s in session_ids.split(",") if s.strip()]
+        if not raw_ids:
+            return json.dumps({"error": "At least one session_id or name is required."})
 
-        # Validate that sessions exist
-        manager = _get_agent_manager()
+        # Resolve each entry by name or ID
         valid_ids = []
-        for sid in ids:
-            if manager.get_agent(sid):
-                valid_ids.append(sid)
+        for entry in raw_ids:
+            agent, resolved_id = _resolve_session(entry)
+            if agent:
+                valid_ids.append(resolved_id)
             else:
-                logger.warning("geny_room_create: session %s not found, skipping", sid)
+                logger.warning("geny_room_create: session %s not found, skipping", entry)
 
         if not valid_ids:
             return json.dumps({"error": "None of the specified sessions exist."})
@@ -468,11 +588,24 @@ class GenyRoomAddMembersTool(BaseTool):
 
         Args:
             room_id: The room to add members to.
-            session_ids: Comma-separated list of session IDs of team members to invite.
+            session_ids: Comma-separated list of session IDs or names of team members to invite.
         """
-        ids_to_add = [s.strip() for s in session_ids.split(",") if s.strip()]
-        if not ids_to_add:
-            return json.dumps({"error": "At least one session_id is required."})
+        raw_ids = [s.strip() for s in session_ids.split(",") if s.strip()]
+        if not raw_ids:
+            return json.dumps({"error": "At least one session_id or name is required."})
+
+        # Resolve each entry by name or ID
+        ids_to_add = []
+        not_found = []
+        for entry in raw_ids:
+            agent, resolved_id = _resolve_session(entry)
+            if agent:
+                ids_to_add.append(resolved_id)
+            else:
+                not_found.append(entry)
+
+        if not_found:
+            return json.dumps({"error": f"Sessions not found: {', '.join(not_found)}"})
 
         store = _get_chat_store()
         room = store.get_room(room_id)
@@ -550,13 +683,16 @@ class GenySendDirectMessageTool(BaseTool):
     """Send a direct (private) message to another team member.
 
     Like sending a DM or private chat — the message goes to the target's
-    personal inbox. They can read it using their inbox.
+    personal inbox AND automatically triggers the recipient to read and
+    respond to it.
     """
 
     name = "geny_send_direct_message"
     description = (
         "Send a direct message (DM) to another team member privately. "
-        "The message is delivered to their inbox — like a private chat or email. "
+        "You can specify the recipient by session name or session ID. "
+        "The message is delivered to their inbox AND the recipient is automatically "
+        "notified so they can read and respond. "
         "Use this for 1:1 communication, sending tasks to a specific colleague, "
         "or private coordination that doesn't need to be in a group room."
     )
@@ -571,7 +707,7 @@ class GenySendDirectMessageTool(BaseTool):
         """Send a private message to another team member.
 
         Args:
-            target_session_id: The recipient team member's session ID.
+            target_session_id: The recipient's session ID or session name.
             content: The message text to send.
             sender_session_id: Your session ID (so they know who sent it).
             sender_name: Your display name.
@@ -579,26 +715,35 @@ class GenySendDirectMessageTool(BaseTool):
         if not content.strip():
             return json.dumps({"error": "Message content cannot be empty."})
 
-        # Validate target exists
-        manager = _get_agent_manager()
-        target = manager.get_agent(target_session_id)
+        # Resolve target by ID or name
+        target, resolved_id = _resolve_session(target_session_id)
         if not target:
             return json.dumps({"error": f"Target session not found: {target_session_id}"})
 
         inbox = _get_inbox_manager()
         msg = inbox.deliver(
-            target_session_id=target_session_id,
+            target_session_id=resolved_id,
             content=content.strip(),
             sender_session_id=sender_session_id,
             sender_name=sender_name,
         )
 
+        # Auto-trigger the recipient to process the DM
+        _trigger_dm_response(
+            target_session_id=resolved_id,
+            sender_session_id=sender_session_id,
+            sender_name=sender_name or sender_session_id[:8],
+            content=content.strip(),
+            message_id=msg["id"],
+        )
+
         return json.dumps({
             "success": True,
             "message_id": msg["id"],
-            "delivered_to": target_session_id,
+            "delivered_to": resolved_id,
             "delivered_to_name": target.session_name,
             "timestamp": msg["timestamp"],
+            "auto_triggered": True,
         }, indent=2, ensure_ascii=False, default=str)
 
 

@@ -303,6 +303,15 @@ class AgentSessionManager(SessionManager):
         logger.info(f"  model: {request.model}")
         logger.info(f"  role: {request.role.value if request.role else 'worker'}")
 
+        # ── Enforce unique session name ────────────────────────────────
+        if request.session_name:
+            existing = self.get_agent_by_name(request.session_name)
+            if existing:
+                raise ValueError(
+                    f"Session name '{request.session_name}' is already in use "
+                    f"by session {existing.session_id}. Names must be unique."
+                )
+
         # ── Resolve Tool Preset ────────────────────────────────────────
         # Determines which Python tools and MCP servers are available.
         preset = None
@@ -514,6 +523,39 @@ class AgentSessionManager(SessionManager):
             AgentSession 리스트
         """
         return list(self._local_agents.values())
+
+    def get_agent_by_name(self, name: str) -> Optional[AgentSession]:
+        """
+        세션 이름으로 AgentSession 조회.
+
+        Args:
+            name: 세션 이름 (case-insensitive match)
+
+        Returns:
+            일치하는 AgentSession 또는 None
+        """
+        name_lower = name.strip().lower()
+        for agent in self._local_agents.values():
+            if agent.session_name and agent.session_name.strip().lower() == name_lower:
+                return agent
+        return None
+
+    def resolve_session(self, name_or_id: str) -> Optional[AgentSession]:
+        """
+        이름 또는 ID로 세션 조회. ID를 먼저 확인, 없으면 이름으로 fallback.
+
+        Args:
+            name_or_id: 세션 ID 또는 세션 이름
+
+        Returns:
+            일치하는 AgentSession 또는 None
+        """
+        # Try exact ID match first
+        agent = self.get_agent(name_or_id)
+        if agent:
+            return agent
+        # Fallback to name match
+        return self.get_agent_by_name(name_or_id)
 
     # ========================================================================
     # Session Management (Override for AgentSession support)
