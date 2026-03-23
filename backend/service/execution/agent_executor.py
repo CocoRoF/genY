@@ -154,6 +154,7 @@ async def _execute_core(
     timeout: Optional[float] = None,
     system_prompt: Optional[str] = None,
     max_turns: Optional[int] = None,
+    **invoke_kwargs,
 ) -> ExecutionResult:
     """
     Run the full execution lifecycle once.
@@ -165,6 +166,9 @@ async def _execute_core(
 
     Caller is responsible for registering/cleaning *holder* in
     ``_active_executions``.
+
+    Extra ``invoke_kwargs`` are forwarded to ``agent.invoke()`` — e.g.
+    ``is_chat_message=True`` for broadcast context.
     """
     session_logger = _get_session_logger(session_id, create_if_missing=True)
     start_time = holder["start_time"]
@@ -182,7 +186,7 @@ async def _execute_core(
         # 2. Invoke
         effective_timeout = timeout or getattr(agent, "timeout", 1800.0)
         invoke_result = await asyncio.wait_for(
-            agent.invoke(input_text=prompt),
+            agent.invoke(input_text=prompt, **invoke_kwargs),
             timeout=effective_timeout,
         )
 
@@ -287,6 +291,7 @@ async def execute_command(
     timeout: Optional[float] = None,
     system_prompt: Optional[str] = None,
     max_turns: Optional[int] = None,
+    **invoke_kwargs,
 ) -> ExecutionResult:
     """
     Execute a command synchronously (blocking until completion).
@@ -294,6 +299,9 @@ async def execute_command(
     Used by:
       - ``POST /api/agents/{id}/execute``   (command tab, synchronous)
       - Messenger ``_run_broadcast``         (each agent in the room)
+
+    Extra ``invoke_kwargs`` are forwarded to ``agent.invoke()`` — e.g.
+    ``is_chat_message=True`` for broadcast context.
 
     Raises:
       AgentNotFoundError    – session does not exist
@@ -327,6 +335,7 @@ async def execute_command(
             timeout=timeout,
             system_prompt=system_prompt,
             max_turns=max_turns,
+            **invoke_kwargs,
         )
     finally:
         # Cleanup — holder is no longer needed for SSE streaming

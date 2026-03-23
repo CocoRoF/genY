@@ -345,10 +345,11 @@ async def _run_broadcast(
         role = info.get("role", "unknown")
 
         try:
-            # ── THE core call — identical to command tab execution ──
+            # ── THE core call — with broadcast context ──
             result = await execute_command(
                 session_id=session_id,
                 prompt=message,
+                is_chat_message=True,
             )
 
             if result.success and result.output and result.output.strip():
