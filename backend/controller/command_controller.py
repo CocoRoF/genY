@@ -387,21 +387,21 @@ async def get_session_logs(
     # Get total count for pagination
     total = count_logs_for_session(session_id, level=level_filter)
 
-    # Try to get from active session logger first (fastest — uses in-memory cache)
-    session_logger = get_session_logger(session_id, create_if_missing=False)
-    entries = []
+    # Always read from DB/file first (covers full history including pre-restore logs).
+    # Fall back to active session logger cache only when DB/file returns nothing.
+    entries = read_logs_from_file(
+        session_id, limit=limit, level=level_filter,
+        offset=offset, newest_first=True,
+    )
 
-    if session_logger:
-        entries = session_logger.get_logs(
-            limit=limit, level=level_filter,
-            offset=offset, newest_first=True,
-        )
-    else:
-        # Read from DB first, then fall back to file (for historical/deleted sessions)
-        entries = read_logs_from_file(
-            session_id, limit=limit, level=level_filter,
-            offset=offset, newest_first=True,
-        )
+    if not entries:
+        # DB/file had nothing — try active session logger's in-memory cache
+        session_logger = get_session_logger(session_id, create_if_missing=False)
+        if session_logger:
+            entries = session_logger.get_logs(
+                limit=limit, level=level_filter,
+                offset=offset, newest_first=True,
+            )
 
     # Resolve file path (informational — may be None if logs are DB-only)
     log_file_path = get_log_file_path(session_id)

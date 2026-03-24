@@ -124,7 +124,7 @@ class SessionLogger:
 
         # In-memory log cache (for quick retrieval)
         self._log_cache: List[LogEntry] = []
-        self._max_cache_size = 1000  # Keep last 1000 entries in memory
+        self._max_cache_size = 300  # Keep last 300 entries in memory
 
         # Activity tracking — monotonic timestamp of last cache write
         self._last_write_at: float = 0.0
@@ -1464,7 +1464,7 @@ def count_logs_for_session(
     """
     Count total log entries for a session (for pagination).
 
-    Tries active session logger cache first, then DB.
+    Tries DB first (full history), then falls back to active session logger cache.
 
     Args:
         session_id: Session ID
@@ -1473,12 +1473,7 @@ def count_logs_for_session(
     Returns:
         Total count of matching entries
     """
-    # If active logger exists, use cache
-    session_logger = get_session_logger(session_id, create_if_missing=False)
-    if session_logger:
-        return session_logger.count_logs(level=level, from_cache=True)
-
-    # Try DB
+    # Try DB first — it has the complete history
     global _log_db_manager
     if _log_db_manager is not None:
         try:
@@ -1498,5 +1493,10 @@ def count_logs_for_session(
                 return result
         except Exception:
             pass
+
+    # Fallback to active logger cache
+    session_logger = get_session_logger(session_id, create_if_missing=False)
+    if session_logger:
+        return session_logger.count_logs(level=level, from_cache=True)
 
     return 0

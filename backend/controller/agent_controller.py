@@ -258,6 +258,10 @@ async def update_system_prompt(
     if agent.process:
         agent.process.system_prompt = new_prompt
 
+    # Persist to session store so the change survives delete/restore
+    store = get_session_store()
+    store.update(session_id, {"system_prompt": new_prompt or ""})
+
     logger.info(
         f"[{session_id}] System prompt updated "
         f"({len(new_prompt) if new_prompt else 0} chars)"
@@ -349,6 +353,9 @@ async def restore_session(
     if not params:
         raise HTTPException(status_code=500, detail="Could not extract creation params")
 
+    # Capture stored system_prompt before create overwrites the record
+    stored_system_prompt = record.get("system_prompt")
+
     try:
         request = CreateSessionRequest(
             session_name=params.get("session_name"),
@@ -360,6 +367,7 @@ async def restore_session(
             role=SessionRole(params["role"]) if params.get("role") else SessionRole.WORKER,
             graph_name=params.get("graph_name"),
             workflow_id=params.get("workflow_id"),
+            tool_preset_id=params.get("tool_preset_id"),
         )
 
         # Reuse the SAME session_id → preserves storage_path
@@ -368,8 +376,12 @@ async def restore_session(
             session_id=session_id,
         )
 
-        # register() in create_agent_session already updates the store record
-        # with is_deleted=False and fresh session info
+        # Restore the previously stored system prompt (user customization)
+        if stored_system_prompt:
+            agent._system_prompt = stored_system_prompt
+            if agent.process:
+                agent.process.system_prompt = stored_system_prompt
+            store.update(session_id, {"system_prompt": stored_system_prompt})
 
         session_info = agent.get_session_info()
         logger.info(f"✅ Session restored: {session_id} (same ID, storage preserved)")
