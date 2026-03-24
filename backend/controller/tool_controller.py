@@ -14,7 +14,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from service.tool_loader import get_tool_loader
-from service.mcp_loader import get_global_mcp_config
+from service.mcp_loader import get_global_mcp_config, get_builtin_mcp_config, get_mcp_loader_instance
 
 logger = getLogger(__name__)
 
@@ -39,6 +39,9 @@ class MCPServerInfo(BaseModel):
     """Metadata for an external MCP server."""
     name: str
     type: str  # "stdio", "http", "sse"
+    description: str = ""
+    is_built_in: bool = False  # True for mcp/built_in/ servers (always included)
+    source: str = ""  # "built_in" or "custom"
 
 
 class ToolCatalogResponse(BaseModel):
@@ -117,15 +120,42 @@ def _tools_to_info(
 
 
 def _get_mcp_server_info() -> List[MCPServerInfo]:
-    """Get info for all external MCP servers."""
-    config = get_global_mcp_config()
-    if not config or not config.servers:
-        return []
-
+    """Get info for all MCP servers (built-in + custom)."""
     result = []
-    for name, server in config.servers.items():
-        if name.startswith("_"):
-            continue
-        server_type = type(server).__name__.replace("MCPServer", "").lower()
-        result.append(MCPServerInfo(name=name, type=server_type))
+    seen = set()
+    loader = get_mcp_loader_instance()
+    descriptions = loader.server_descriptions if loader else {}
+    builtin_names = loader.builtin_server_names if loader else set()
+
+    # 1. Built-in MCP servers (always included)
+    builtin_config = get_builtin_mcp_config()
+    if builtin_config and builtin_config.servers:
+        for name, server in builtin_config.servers.items():
+            if name.startswith("_"):
+                continue
+            server_type = type(server).__name__.replace("MCPServer", "").lower()
+            result.append(MCPServerInfo(
+                name=name,
+                type=server_type,
+                description=descriptions.get(name, ""),
+                is_built_in=True,
+                source="built_in",
+            ))
+            seen.add(name)
+
+    # 2. Custom MCP servers (user-configured, preset-filtered)
+    config = get_global_mcp_config()
+    if config and config.servers:
+        for name, server in config.servers.items():
+            if name.startswith("_") or name in seen:
+                continue
+            server_type = type(server).__name__.replace("MCPServer", "").lower()
+            result.append(MCPServerInfo(
+                name=name,
+                type=server_type,
+                description=descriptions.get(name, ""),
+                is_built_in=name in builtin_names,
+                source="custom",
+            ))
+
     return result

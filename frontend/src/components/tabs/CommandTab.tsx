@@ -272,7 +272,7 @@ export default function CommandTab() {
             // exhausted its retries, so mark as connection-lost rather than generic fail
             updateSessionData(selectedSessionId, {
               status: 'error',
-              statusText: t('commandTab.statusConnectionLost', 'Connection lost'),
+              statusText: t('commandTab.statusConnectionLost'),
             });
           } else {
             updateSessionData(selectedSessionId, {

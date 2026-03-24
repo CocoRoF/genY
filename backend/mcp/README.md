@@ -1,202 +1,64 @@
-# MCP Server Configuration Folder
+# MCP Server Configuration
 
-Add `.json` files to this folder to **automatically enable MCP servers for all Claude Code sessions**.
+This folder manages external MCP (Model Context Protocol) servers available to agent sessions.
 
-## Quick Start
+> Full documentation: [docs/MCP.md](../docs/MCP.md) | [docs/MCP_KO.md](../docs/MCP_KO.md)
 
-### 1. Create JSON File
+## Directory Structure
 
-Create a `{name}.json` file in this folder. The filename becomes the MCP server name.
+```
+mcp/
+├── built_in/          ← Always included (bypass preset filtering)
+│   └── github.json    ← GitHub API — auto-configured from Settings
+├── custom/            ← User-added servers (subject to preset filtering)
+│   └── (your JSON files here)
+├── *.json.template    ← Example templates (not loaded)
+└── README.md
+```
 
-### 2. JSON Schema
+| Folder | Preset Filtering | Env Var Skip | Use Case |
+|--------|-----------------|-------------|----------|
+| `built_in/` | **No** — always included | Yes (skipped if unresolved) | System-level servers (GitHub, etc.) |
+| `custom/` | **Yes** — filtered by Tool Sets | Yes (skipped if unresolved) | User-added servers |
+
+## JSON Schema
 
 ```json
 {
   "type": "stdio | http | sse",
-  "command": "command to run (for stdio)",
+  "command": "command (stdio only)",
   "args": ["arg1", "arg2"],
-  "env": {"ENV_VAR": "value"},
-  "url": "server URL (for http/sse)",
-  "headers": {"Header-Name": "value"},
-  "description": "Server description (optional)"
+  "env": {"KEY": "value or ${ENV_VAR}"},
+  "url": "server URL (http/sse only)",
+  "headers": {"Header": "value"},
+  "description": "Shown in Tool Sets & Session Tools UI"
 }
 ```
 
-### 3. Examples
+## Quick Examples
 
-#### GitHub MCP Server (`github.json`)
 ```json
-{
-  "type": "http",
-  "url": "https://api.githubcopilot.com/mcp/",
-  "description": "GitHub integration - Repository, PR, Issue management"
-}
-```
+// custom/notion.json
+{ "type": "http", "url": "https://mcp.notion.com/mcp", "description": "Notion integration" }
 
-#### Filesystem MCP Server (`filesystem.json`)
-```json
-{
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace", "/data"],
-  "description": "Filesystem access"
-}
-```
-
-#### PostgreSQL MCP Server (`database.json`)
-```json
-{
-  "type": "stdio",
-  "command": "npx",
-  "args": ["-y", "@bytebase/dbhub", "--dsn", "${DATABASE_URL}"],
-  "env": {
-    "DATABASE_URL": "postgresql://user:pass@localhost:5432/mydb"
-  },
-  "description": "PostgreSQL database access"
-}
-```
-
-#### Notion MCP Server (`notion.json`)
-```json
-{
-  "type": "http",
-  "url": "https://mcp.notion.com/mcp",
-  "description": "Notion pages and databases access"
-}
-```
-
-#### Sentry MCP Server (`sentry.json`)
-```json
-{
-  "type": "http",
-  "url": "https://mcp.sentry.dev/mcp",
-  "description": "Sentry error monitoring"
-}
-```
-
-#### Custom Python MCP Server (`custom.json`)
-```json
-{
-  "type": "stdio",
-  "command": "python",
-  "args": ["tools/my_custom_server.py"],
-  "env": {
-    "API_KEY": "${MY_API_KEY}"
-  },
-  "description": "Custom tool server"
-}
+// custom/filesystem.json
+{ "type": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"], "description": "Filesystem access" }
 ```
 
 ## Environment Variables
 
-Use `${VARIABLE_NAME}` syntax to reference environment variables in JSON files:
-
-```json
-{
-  "type": "http",
-  "url": "${API_BASE_URL}/mcp",
-  "headers": {
-    "Authorization": "Bearer ${API_TOKEN}"
-  }
-}
-```
-
-## Auto-Loading
-
-- All `.json` files in this folder are automatically loaded when `main.py` starts
-- Loaded MCP servers are **available in all sessions by default**
-- Additional MCP config passed during session creation will be **merged**
-
-## Default MCP Servers (`default/` folder)
-
-The `default/` subfolder contains MCP servers that are **always included in every session**, regardless of tool preset filtering.
-
-- `mcp/default/*.json` — always included (cannot be filtered out by presets)
-- `mcp/*.json` — user MCP servers (filtered by tool presets)
-
-### Built-in Defaults
-
-#### GitHub MCP (`default/github.json`)
-
-Automatically provides GitHub API tools (create repos, PRs, issues, etc.) to all sessions. Uses the **GitHub Token** from Settings (`GITHUB_TOKEN` env var).
-
-- If `GITHUB_TOKEN` is not set, the server is **skipped** (not an error)
-- When you update the token in Settings, the MCP config is **automatically reloaded**
-- No manual setup required — just enter your token in Settings
-
-### Adding Custom Defaults
-
-Create a `.json` file in `mcp/default/` with the standard schema. Environment variables are expanded via `${VAR}` syntax. If any `${VAR}` references remain unresolved, the server is skipped with a log message.
-
-## Important Notes
-
-1. **Filename = Server Name**: `github.json` → MCP server name `github`
-2. **Override Prevention**: Session-specific config takes priority if same server name exists
-3. **Validation**: Invalid JSON files will log a warning and be skipped
-4. **Security**: Store API keys in environment variables, not in JSON files
+Use `${VAR}` or `${VAR:-fallback}` syntax. Variables are expanded from `os.environ` at load time.
 
 ## Popular MCP Servers
 
-| Server | URL | Description |
-|--------|-----|-------------|
-| GitHub | `https://api.githubcopilot.com/mcp/` | GitHub integration |
-| Notion | `https://mcp.notion.com/mcp` | Notion integration |
-| Sentry | `https://mcp.sentry.dev/mcp` | Error monitoring |
-| Slack | `https://mcp.slack.com/mcp` | Slack integration |
-| Linear | `https://mcp.linear.app/mcp` | Issue tracker |
+| Server | Type | URL / Command |
+|--------|------|---------------|
+| GitHub | stdio | `npx @modelcontextprotocol/server-github` |
+| Notion | http | `https://mcp.notion.com/mcp` |
+| Sentry | http | `https://mcp.sentry.dev/mcp` |
+| Slack | http | `https://mcp.slack.com/mcp` |
+| Linear | http | `https://mcp.linear.app/mcp` |
+| Filesystem | stdio | `npx @modelcontextprotocol/server-filesystem` |
+| PostgreSQL | stdio | `npx @bytebase/dbhub --dsn ${DATABASE_URL}` |
 
-More MCP servers: https://github.com/modelcontextprotocol/servers
-
----
-
-## GitHub Automation Setup
-
-To enable Claude to automatically clone repos, create branches, and submit PRs:
-
-### Step 1: Create GitHub MCP Config
-
-Copy the template and create your config:
-
-```bash
-cp example_github.json.template github.json
-```
-
-### Step 2: Configure Git Credentials
-
-Claude Code uses system git configuration. Ensure git is configured:
-
-```bash
-# Configure git user
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-
-# For HTTPS authentication, use GitHub CLI or credential manager
-gh auth login
-
-# Or set up SSH keys for git operations
-ssh-keygen -t ed25519 -C "your.email@example.com"
-```
-
-### Step 3: Enable Autonomous Mode
-
-In `.env`, ensure:
-```
-CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS=true
-```
-
-### Step 4: Test GitHub Integration
-
-```bash
-curl -X POST http://localhost:8000/api/sessions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "session_name": "github-test"
-  }'
-
-curl -X POST http://localhost:8000/api/sessions/{session_id}/execute \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Clone https://github.com/user/repo, create a new branch called feature/test, add a README.md, commit and push, then create a PR.",
-    "timeout": 600
-  }'
-```
+More: https://github.com/modelcontextprotocol/servers

@@ -257,7 +257,8 @@ function ToolSetEditor({
   };
 
   const effectiveCustomCount = isAllCustom ? allCustomToolNames.length : selectedCustomTools.size;
-  const effectiveMcpCount = isAllMcp ? allMcpServerNames.length : selectedMcpServers.size;
+  const builtInMcpCount = catalog?.mcp_servers.filter(s => s.is_built_in).length ?? 0;
+  const effectiveMcpCount = isAllMcp ? allMcpServerNames.length : selectedMcpServers.size + builtInMcpCount;
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
@@ -480,13 +481,14 @@ function ToolSetEditor({
               {expandedGroups.mcp_root && (
                 <div className="px-4 pb-3 flex flex-col gap-0.5">
                   {filteredMcpServers.map(server => {
-                    const checked = isAllMcp || selectedMcpServers.has(server.name);
+                    const isBuiltIn = server.is_built_in ?? false;
+                    const checked = isBuiltIn || isAllMcp || selectedMcpServers.has(server.name);
                     return (
                       <label
                         key={server.name}
                         className={cn(
                           'flex items-center gap-2 py-1.5 px-2 rounded-md text-[0.8125rem] transition-colors',
-                          readOnly ? 'cursor-default' : 'cursor-pointer hover:bg-[var(--bg-hover)]',
+                          readOnly || isBuiltIn ? 'cursor-default' : 'cursor-pointer hover:bg-[var(--bg-hover)]',
                           checked && 'bg-[rgba(34,197,94,0.05)]',
                         )}
                       >
@@ -495,10 +497,18 @@ function ToolSetEditor({
                           className="accent-[var(--success-color)] w-3.5 h-3.5"
                           checked={checked}
                           onChange={() => toggleMcpServer(server.name)}
-                          disabled={readOnly || isAllMcp}
+                          disabled={readOnly || isAllMcp || isBuiltIn}
                         />
                         <code className="text-[var(--success-color)] text-[0.75rem] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded">{server.name}</code>
                         <span className="text-[0.6875rem] px-1.5 py-0.5 rounded-full bg-[var(--bg-hover)] text-[var(--text-muted)]">{server.type}</span>
+                        {server.is_built_in && (
+                          <span className="text-[10px] font-semibold py-[1px] px-1.5 rounded-md bg-[rgba(34,197,94,0.12)] text-[var(--success-color)] border border-[rgba(34,197,94,0.2)] uppercase tracking-wide shrink-0">
+                            {t('toolSetsTab.builtInMcp')}
+                          </span>
+                        )}
+                        {server.description && (
+                          <span className="text-[var(--text-muted)] text-[0.6875rem] truncate">{server.description}</span>
+                        )}
                       </label>
                     );
                   })}

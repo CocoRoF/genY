@@ -425,6 +425,9 @@ export interface ToolInfo {
 export interface MCPServerInfo {
   name: string;
   type: string;        // "stdio", "http", "sse"
+  description?: string;
+  is_built_in?: boolean; // true for mcp/built_in/ servers (always included)
+  source?: string;      // "built_in" or "custom"
 }
 
 export interface ToolCatalogResponse {

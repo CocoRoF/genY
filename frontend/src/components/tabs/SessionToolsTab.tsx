@@ -81,9 +81,12 @@ export default function SessionToolsTab() {
   const customToolCount = isAllCustom
     ? (catalog?.custom.length ?? 0)
     : enabledCustomTools.size;
+
+  // Built-in MCP servers are always included regardless of preset filter
+  const builtInMcpCount = catalog?.mcp_servers.filter(s => s.is_built_in).length ?? 0;
   const mcpServerCount = isAllMcp
     ? (catalog?.mcp_servers.length ?? 0)
-    : enabledMcpServers.size;
+    : enabledMcpServers.size + builtInMcpCount;
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[var(--bg-primary)]">
@@ -258,7 +261,7 @@ export default function SessionToolsTab() {
             {expandedGroups.mcp_root && (
               <div className="px-4 pb-2 bg-[var(--bg-primary)]">
                 {filteredMcpServers.map(server => {
-                  const enabled = isAllMcp || enabledMcpServers.has(server.name);
+                  const enabled = server.is_built_in || isAllMcp || enabledMcpServers.has(server.name);
                   return (
                     <div
                       key={server.name}
@@ -269,6 +272,14 @@ export default function SessionToolsTab() {
                         : <span className="w-[11px] h-[11px] shrink-0" />}
                       <code className="text-[var(--success-color)] text-[0.75rem] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded">{server.name}</code>
                       <span className="text-[0.6875rem] px-1.5 py-0.5 rounded-full bg-[var(--bg-hover)] text-[var(--text-muted)]">{server.type}</span>
+                      {server.is_built_in && (
+                        <span className="text-[10px] font-semibold py-[1px] px-1.5 rounded-md bg-[rgba(34,197,94,0.12)] text-[var(--success-color)] border border-[rgba(34,197,94,0.2)] uppercase tracking-wide shrink-0">
+                          {t('sessionTools.builtInMcp')}
+                        </span>
+                      )}
+                      {server.description && (
+                        <span className="text-[var(--text-muted)] text-[0.6875rem] truncate">{server.description}</span>
+                      )}
                     </div>
                   );
                 })}
