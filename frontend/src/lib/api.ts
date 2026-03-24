@@ -166,8 +166,9 @@ export const agentApi = {
           reconnectAttempts = 0;
           try { onEvent('result', JSON.parse(e.data)); } catch { /* skip */ }
         });
-        evtSource.addEventListener('heartbeat', () => {
+        evtSource.addEventListener('heartbeat', (e) => {
           reconnectAttempts = 0; // connection alive
+          try { onEvent('heartbeat', JSON.parse((e as MessageEvent).data)); } catch { /* skip */ }
         });
         evtSource.addEventListener('error', (e) => {
           // SSE error event — could be connection error or custom error event
@@ -210,7 +211,7 @@ export const agentApi = {
 
   /** GET /api/agents/{id}/execute/status — check if execution is active */
   getExecutionStatus: (id: string) =>
-    apiCall<{ active: boolean; done?: boolean; has_error?: boolean; session_id: string }>(
+    apiCall<{ active: boolean; done?: boolean; has_error?: boolean; session_id: string; elapsed_ms?: number; last_activity_ms?: number; last_event_level?: string; last_tool_name?: string }>(
       `/api/agents/${id}/execute/status`,
     ),
 
@@ -249,7 +250,10 @@ export const agentApi = {
         retries = 0;
         try { onEvent('result', JSON.parse(e.data)); } catch { /* skip */ }
       });
-      evtSource.addEventListener('heartbeat', () => { retries = 0; });
+      evtSource.addEventListener('heartbeat', (e) => {
+        retries = 0;
+        try { onEvent('heartbeat', JSON.parse((e as MessageEvent).data)); } catch { /* skip */ }
+      });
       evtSource.addEventListener('error', (e) => {
         if (e instanceof MessageEvent && e.data) {
           try { onEvent('error', JSON.parse(e.data)); } catch { /* skip */ }

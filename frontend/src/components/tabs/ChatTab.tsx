@@ -604,32 +604,57 @@ export default function ChatTab() {
             {agentProgress && agentProgress.length > 0 ? (
               agentProgress
                 .filter(a => a.status === 'pending' || a.status === 'executing')
-                .map(agent => (
-                  <div key={agent.session_id} className="flex gap-2 items-center">
-                    <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getRoleColor(agent.role)} flex items-center justify-center shrink-0 shadow-sm`}>
-                      <Bot size={14} className="text-white" />
-                    </div>
-                    <span className="text-[0.75rem] font-semibold text-[var(--text-primary)] shrink-0">{agent.session_name}</span>
-                    <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-wider shrink-0"
-                      style={{ background: getRoleBadgeStyle(agent.role).replace('background: ', '') }}
-                    >
-                      {agent.role}
-                    </span>
-                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-                      {agent.thinking_preview && (
-                        <span className="text-[0.6875rem] text-[var(--text-muted)] truncate max-w-[180px]">
-                          {agent.thinking_preview}
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0s' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }} />
+                .map(agent => {
+                  const activityAge = agent.last_activity_ms ?? agent.elapsed_ms ?? 0;
+                  const elapsedSec = Math.floor((agent.elapsed_ms ?? 0) / 1000);
+                  const elapsedStr = elapsedSec >= 3600
+                    ? `${Math.floor(elapsedSec / 3600)}:${String(Math.floor((elapsedSec % 3600) / 60)).padStart(2, '0')}:${String(elapsedSec % 60).padStart(2, '0')}`
+                    : `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, '0')}`;
+                  const inactivitySec = Math.floor(activityAge / 1000);
+                  const inactivityStr = inactivitySec < 60
+                    ? `${inactivitySec}s`
+                    : inactivitySec < 3600
+                      ? `${Math.floor(inactivitySec / 60)}m ${inactivitySec % 60}s`
+                      : `${Math.floor(inactivitySec / 3600)}h ${Math.floor((inactivitySec % 3600) / 60)}m`;
+                  return (
+                    <div key={agent.session_id} className="flex gap-2 items-center">
+                      <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getRoleColor(agent.role)} flex items-center justify-center shrink-0 shadow-sm`}>
+                        <Bot size={14} className="text-white" />
+                      </div>
+                      <span className="text-[0.75rem] font-semibold text-[var(--text-primary)] shrink-0">{agent.session_name}</span>
+                      <span
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold text-white uppercase tracking-wider shrink-0"
+                        style={{ background: getRoleBadgeStyle(agent.role).replace('background: ', '') }}
+                      >
+                        {agent.role}
+                      </span>
+                      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+                        {/* Elapsed time */}
+                        {agent.status === 'executing' && agent.elapsed_ms != null && agent.elapsed_ms > 0 && (
+                          <span className="text-[0.625rem] font-mono text-[var(--text-muted)] shrink-0">{elapsedStr}</span>
+                        )}
+                        {/* Current step timing */}
+                        {agent.status === 'executing' && activityAge > 0 && (
+                          agent.last_tool_name ? (
+                            <span className="text-[0.5625rem] font-mono text-[var(--text-muted)] shrink-0">🔧 {agent.last_tool_name} {inactivityStr}</span>
+                          ) : (
+                            <span className="text-[0.5625rem] font-mono text-[var(--text-muted)] shrink-0">{inactivityStr}</span>
+                          )
+                        )}
+                        {agent.thinking_preview && (
+                          <span className="text-[0.6875rem] text-[var(--text-muted)] truncate max-w-[180px]">
+                            {agent.thinking_preview}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0s' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
             ) : (
               /* Fallback: single indicator */
               <div className="flex gap-2 items-center">

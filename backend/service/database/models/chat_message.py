@@ -22,6 +22,7 @@ class ChatMessageModel(BaseModel):
         duration_ms: int = 0,
         cost_usd: float = None,
         timestamp: str = "",
+        file_changes: str = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -35,6 +36,7 @@ class ChatMessageModel(BaseModel):
         self.duration_ms = duration_ms
         self.cost_usd = cost_usd
         self.timestamp = timestamp
+        self.file_changes = file_changes
 
     def get_table_name(self) -> str:
         return "chat_messages"
@@ -51,6 +53,7 @@ class ChatMessageModel(BaseModel):
             "duration_ms": "INTEGER DEFAULT 0",
             "cost_usd": "DOUBLE PRECISION DEFAULT NULL",
             "timestamp": "VARCHAR(100) DEFAULT ''",
+            "file_changes": "TEXT DEFAULT NULL",
         }
 
     @classmethod
@@ -76,7 +79,7 @@ class ChatMessageModel(BaseModel):
         known_fields = {
             "message_id", "room_id", "type", "content",
             "session_id", "session_name", "role", "duration_ms", "cost_usd", "timestamp",
-            "id", "created_at", "updated_at",
+            "file_changes", "id", "created_at", "updated_at",
         }
         known_data = {k: v for k, v in data.items() if k in known_fields}
         return cls(**known_data)

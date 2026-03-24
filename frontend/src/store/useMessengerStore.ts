@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { chatApi } from '@/lib/api';
-import type { ChatRoom, ChatRoomMessage, BroadcastStatus, AgentProgressState } from '@/types';
+import type { ChatRoom, ChatRoomMessage, BroadcastStatus, AgentProgressState, FileChanges } from '@/types';
 
 interface MessengerState {
   // Rooms
@@ -29,6 +29,7 @@ interface MessengerState {
   sidebarCollapsed: boolean;
   memberPanelOpen: boolean;
   selectedMemberId: string | null;
+  fileChangeDetail: FileChanges[] | null;
 
   // Actions - Rooms
   fetchRooms: () => Promise<void>;
@@ -52,6 +53,7 @@ interface MessengerState {
   toggleSidebarCollapsed: () => void;
   setMemberPanelOpen: (open: boolean) => void;
   setSelectedMemberId: (id: string | null) => void;
+  setFileChangeDetail: (fc: FileChanges[] | null) => void;
 
   // Derived
   getActiveRoom: () => ChatRoom | undefined;
@@ -76,6 +78,7 @@ export const useMessengerStore = create<MessengerState>((set, get) => ({
   sidebarCollapsed: false,
   memberPanelOpen: false,
   selectedMemberId: null,
+  fileChangeDetail: null,
 
   fetchRooms: async () => {
     set({ loadingRooms: true });
@@ -261,6 +264,7 @@ export const useMessengerStore = create<MessengerState>((set, get) => ({
   toggleSidebarCollapsed: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setMemberPanelOpen: (open) => set({ memberPanelOpen: open, ...(!open ? { selectedMemberId: null } : {}) }),
   setSelectedMemberId: (id) => set({ selectedMemberId: id, memberPanelOpen: !!id }),
+  setFileChangeDetail: (fc) => set({ fileChangeDetail: fc }),
 
   getActiveRoom: () => {
     const { rooms, activeRoomId } = get();

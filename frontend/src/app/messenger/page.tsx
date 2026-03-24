@@ -10,11 +10,12 @@ import MessageInput from '@/components/messenger/MessageInput';
 import CreateRoomModal from '@/components/messenger/CreateRoomModal';
 import InviteMemberModal from '@/components/messenger/InviteMemberModal';
 import MemberPanel from '@/components/messenger/MemberPanel';
+import FileChangeDetailPanel from '@/components/messenger/FileChangeDetailPanel';
 import { MessageCircle } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 
 export default function MessengerPage() {
-  const { fetchRooms, activeRoomId, createModalOpen, inviteModalOpen, memberPanelOpen } = useMessengerStore();
+  const { fetchRooms, activeRoomId, createModalOpen, inviteModalOpen, memberPanelOpen, fileChangeDetail } = useMessengerStore();
   const { loadSessions, checkHealth, loadUserName } = useAppStore();
   const { t } = useI18n();
 
@@ -66,6 +67,9 @@ export default function MessengerPage() {
 
       {/* Member Info Panel */}
       {activeRoomId && memberPanelOpen && <MemberPanel />}
+
+      {/* File Change Detail Panel */}
+      {activeRoomId && fileChangeDetail && <FileChangeDetailPanel />}
 
       {/* Create Room Modal */}
       {createModalOpen && <CreateRoomModal />}

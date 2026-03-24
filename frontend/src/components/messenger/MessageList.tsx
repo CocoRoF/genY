@@ -4,8 +4,8 @@ import { useEffect, useRef } from 'react';
 import { useMessengerStore } from '@/store/useMessengerStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
-import { Bot, User, Loader2, MessageCircle } from 'lucide-react';
-import type { ChatRoomMessage } from '@/types';
+import { Bot, User, Loader2, MessageCircle, FileCode2, Plus, Minus } from 'lucide-react';
+import type { ChatRoomMessage, FileChanges } from '@/types';
 
 // ── Helpers ──
 
@@ -77,7 +77,7 @@ function UserMessage({ msg }: { msg: ChatRoomMessage }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-0.5">
           <span className="text-[0.8125rem] font-semibold text-[var(--primary-color)]">{displayName}</span>
-          <span className="text-[0.625rem] text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[0.625rem] text-[var(--text-muted)]">
             {formatTime(msg.timestamp)}
           </span>
         </div>
@@ -86,6 +86,70 @@ function UserMessage({ msg }: { msg: ChatRoomMessage }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function FileChangeSummary({ fileChanges }: { fileChanges: FileChanges[] }) {
+  const { setFileChangeDetail } = useMessengerStore();
+  const totalAdded = fileChanges.reduce((s, f) => s + f.lines_added, 0);
+  const totalRemoved = fileChanges.reduce((s, f) => s + f.lines_removed, 0);
+
+  const shortName = (fp: string) => {
+    const parts = fp.replace(/\\/g, '/').split('/');
+    return parts[parts.length - 1] || fp;
+  };
+
+  return (
+    <button
+      type="button"
+      className="mt-2 w-full text-left rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer p-0"
+      onClick={() => setFileChangeDetail(fileChanges)}
+    >
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--border-color)]">
+        <FileCode2 size={12} className="text-[var(--text-muted)] shrink-0" />
+        <span className="text-[0.6875rem] font-medium text-[var(--text-secondary)]">
+          {fileChanges.length} file{fileChanges.length > 1 ? 's' : ''} changed
+        </span>
+        <span className="ml-auto flex items-center gap-2 text-[0.625rem] font-mono">
+          {totalAdded > 0 && (
+            <span className="flex items-center gap-0.5 text-[var(--success-color,#22c55e)]">
+              <Plus size={9} />
+              {totalAdded}
+            </span>
+          )}
+          {totalRemoved > 0 && (
+            <span className="flex items-center gap-0.5 text-[var(--danger-color,#ef4444)]">
+              <Minus size={9} />
+              {totalRemoved}
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="px-3 py-1.5 space-y-0.5">
+        {fileChanges.map((fc, i) => (
+          <div key={i} className="flex items-center gap-2 text-[0.625rem]">
+            <span
+              className="px-1 py-[0.5px] rounded text-[0.5rem] font-bold uppercase tracking-wider"
+              style={{
+                backgroundColor: fc.operation === 'create' ? 'rgba(34,197,94,0.1)' :
+                  fc.operation === 'edit' || fc.operation === 'multi_edit' ? 'rgba(245,158,11,0.1)' :
+                  'rgba(59,130,246,0.1)',
+                color: fc.operation === 'create' ? 'var(--success-color)' :
+                  fc.operation === 'edit' || fc.operation === 'multi_edit' ? 'var(--warning-color)' :
+                  'var(--primary-color)',
+              }}
+            >
+              {fc.operation === 'multi_edit' ? 'edit' : fc.operation}
+            </span>
+            <span className="font-mono text-[var(--text-secondary)] truncate">{shortName(fc.file_path)}</span>
+            <span className="ml-auto flex items-center gap-1.5 font-mono shrink-0">
+              {fc.lines_added > 0 && <span className="text-[var(--success-color,#22c55e)]">+{fc.lines_added}</span>}
+              {fc.lines_removed > 0 && <span className="text-[var(--danger-color,#ef4444)]">-{fc.lines_removed}</span>}
+            </span>
+          </div>
+        ))}
+      </div>
+    </button>
   );
 }
 
@@ -115,11 +179,11 @@ function AgentMessage({ msg }: { msg: ChatRoomMessage }) {
               {msg.role}
             </span>
           )}
-          <span className="text-[0.625rem] text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-[0.625rem] text-[var(--text-muted)]">
             {formatTime(msg.timestamp)}
           </span>
-          {msg.duration_ms != null && (
-            <span className="text-[0.5625rem] text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+          {typeof msg.duration_ms === 'number' && msg.duration_ms > 0 && (
+            <span className="text-[0.5625rem] text-[var(--text-muted)]">
               ({(msg.duration_ms / 1000).toFixed(1)}s)
             </span>
           )}
@@ -127,6 +191,9 @@ function AgentMessage({ msg }: { msg: ChatRoomMessage }) {
         <div className="text-[0.8125rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words">
           {msg.content}
         </div>
+        {msg.file_changes && msg.file_changes.length > 0 && (
+          <FileChangeSummary fileChanges={msg.file_changes} />
+        )}
       </div>
     </div>
   );
@@ -154,7 +221,7 @@ function DateDivider({ date }: { date: string }) {
   );
 }
 
-function TypingIndicator({ name, role, thinkingPreview }: { name: string; role: string; thinkingPreview?: string | null }) {
+function TypingIndicator({ name, role, thinkingPreview, elapsedMs }: { name: string; role: string; thinkingPreview?: string | null; elapsedMs?: number }) {
   return (
     <div className="flex gap-3 px-4 md:px-6 py-1.5">
       <div
@@ -185,6 +252,11 @@ function TypingIndicator({ name, role, thinkingPreview }: { name: string; role: 
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.2s' }} />
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-[typingBounce_1.4s_ease-in-out_infinite]" style={{ animationDelay: '0.4s' }} />
           </div>
+          {typeof elapsedMs === 'number' && elapsedMs > 0 && (
+            <span className="text-[0.6875rem] text-[var(--text-muted)] shrink-0">
+              ({(elapsedMs / 1000).toFixed(1)}s)
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -206,6 +278,7 @@ function AgentProgressIndicator({ agents }: { agents: import('@/types').AgentPro
           name={agent.session_name}
           role={agent.role}
           thinkingPreview={agent.thinking_preview}
+          elapsedMs={agent.elapsed_ms}
         />
       ))}
     </div>

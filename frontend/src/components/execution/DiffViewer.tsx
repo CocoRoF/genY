@@ -233,7 +233,7 @@ export default function DiffViewer({ fileChanges, maxLines = 500 }: DiffViewerPr
       </div>
 
       {/* Diff content */}
-      <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+      <div className="overflow-x-auto overflow-y-auto">
         {displayLines.map((line, i) => (
           <DiffLineRow key={i} line={line} />
         ))}

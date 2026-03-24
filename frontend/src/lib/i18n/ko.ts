@@ -187,6 +187,11 @@ const ko: Translations = {
     requestFailed: '요청 실패',
     statusStopped: '중지됨',
     statusSuccess: '성공',
+    activityActive: '활성',
+    activitySlow: '지연',
+    activityStalled: '응답 없음',
+    steps: 'steps',
+    noActivity: '무응답',
   },
 
   // ─── Settings Tab ───
@@ -665,6 +670,8 @@ const ko: Translations = {
     roomName: '채팅방 이름',
     enterRoomName: '채팅방 이름을 입력하세요...',
     selectSessions: '세션 선택',
+    activityStalled: '응답 없음',
+    noActivity: '무응답',
   },
 
   // ─── Messenger Page ───
@@ -711,6 +718,10 @@ const ko: Translations = {
       created: '생성일',
       deleted: '사용 불가',
       deletedDesc: '이 세션은 삭제되었으며 더 이상 사용할 수 없습니다. 이전 메시지는 계속 표시됩니다.',
+    },
+    fileChanges: {
+      title: '파일 변경',
+      filesChanged: '파일 {count}개 변경됨',
     },
   },
 };

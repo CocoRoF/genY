@@ -229,6 +229,18 @@ class AppDatabaseManager:
                     except Exception as e:
                         self.logger.warning("Failed to create index %s for %s: %s", idx_name, table_name, e)
 
+            # Auto-add columns that might be missing in existing tables
+            for model_class in self._models_registry:
+                instance = model_class()
+                table_name = instance.get_table_name()
+                schema = instance.get_schema()
+                for col_name, col_type in schema.items():
+                    try:
+                        alter_q = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                        self.db_manager.execute_query(alter_q)
+                    except Exception:
+                        pass  # Column likely already exists or DB doesn't support IF NOT EXISTS
+
             # Add UNIQUE constraint to persistent_configs table if not present
             self._ensure_unique_constraint("persistent_configs", "config_name", "config_key")
 

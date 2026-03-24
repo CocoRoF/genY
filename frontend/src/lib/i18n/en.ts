@@ -187,6 +187,11 @@ const en = {
     requestFailed: 'Request failed',
     statusStopped: 'Stopped',
     statusSuccess: 'Success',
+    activityActive: 'Active',
+    activitySlow: 'Slow',
+    activityStalled: 'Stalled',
+    steps: 'steps',
+    noActivity: 'no activity',
   },
 
   // ─── Settings Tab ───
@@ -665,6 +670,8 @@ const en = {
     roomName: 'Room Name',
     enterRoomName: 'Enter room name...',
     selectSessions: 'Select Sessions',
+    activityStalled: 'Stalled',
+    noActivity: 'no activity',
   },
 
   // ─── Messenger Page ───
@@ -711,6 +718,10 @@ const en = {
       created: 'Created',
       deleted: 'Unavailable',
       deletedDesc: 'This session has been deleted and is no longer available. Previous messages from this member are still visible.',
+    },
+    fileChanges: {
+      title: 'File Changes',
+      filesChanged: '{count} file(s) changed',
     },
   },
 };

@@ -50,6 +50,8 @@ class AgentExecutionState:
     status: str = "pending"  # pending | executing | completed | failed
     thinking_preview: Optional[str] = None  # Latest log message (1 line)
     started_at: Optional[float] = None
+    last_activity_at: Optional[float] = None  # monotonic timestamp of last log entry
+    last_tool_name: Optional[str] = None  # tool name if last log was TOOL level
 
 
 @dataclass
@@ -131,6 +133,29 @@ def _notify_room(room_id: str):
         ev.set()
 
 
+def _build_agent_progress_data(astate: AgentExecutionState) -> dict:
+    """Build a single agent's progress dict with timing info."""
+    now = time.time()
+    now_mono = time.monotonic()
+    data = {
+        "session_id": astate.session_id,
+        "session_name": astate.session_name,
+        "role": astate.role,
+        "status": astate.status,
+        "thinking_preview": astate.thinking_preview,
+    }
+    if astate.started_at:
+        data["elapsed_ms"] = int((now - astate.started_at) * 1000)
+    if astate.last_activity_at:
+        data["last_activity_ms"] = int((now_mono - astate.last_activity_at) * 1000)
+    elif astate.started_at:
+        # No log entries yet — use full elapsed as last_activity_ms
+        data["last_activity_ms"] = int((now - astate.started_at) * 1000)
+    if astate.last_tool_name:
+        data["last_tool_name"] = astate.last_tool_name
+    return data
+
+
 def _get_room_event(room_id: str) -> asyncio.Event:
     """Get-or-create the notification event for a room."""
     if room_id not in _room_new_msg_events:
@@ -182,6 +207,7 @@ class MessageResponse(BaseModel):
     role: Optional[str] = None
     duration_ms: Optional[int] = None
     cost_usd: Optional[float] = None
+    file_changes: Optional[List[Dict[str, Any]]] = None
 
 
 class MessageListResponse(BaseModel):
@@ -437,6 +463,7 @@ async def _run_broadcast(
         # Start log-polling task to capture thinking preview
         log_poll_task: Optional[asyncio.Task] = None
         session_logger = get_session_logger(session_id, create_if_missing=False)
+        pre_exec_cursor = session_logger.get_cache_length() if session_logger else 0
 
         if session_logger and agent_state:
             async def _poll_logs():
@@ -451,7 +478,15 @@ async def _run_broadcast(
                             preview = _extract_thinking_preview(entry)
                             if preview:
                                 agent_state.thinking_preview = preview
+                                agent_state.last_activity_at = time.monotonic()
                                 _notify_room(room_id)
+                            # Track last tool name for tool execution detection
+                            level = entry.level.value if hasattr(entry.level, "value") else str(entry.level)
+                            meta = entry.metadata or {}
+                            if level in ("TOOL", "TOOL_RES"):
+                                agent_state.last_tool_name = meta.get("tool_name")
+                            elif level not in ("DEBUG", "INFO"):
+                                agent_state.last_tool_name = None
                 except asyncio.CancelledError:
                     pass
 
@@ -466,7 +501,7 @@ async def _run_broadcast(
             )
 
             if result.success and result.output and result.output.strip():
-                store.add_message(room_id, {
+                msg_data: Dict[str, Any] = {
                     "type": "agent",
                     "content": result.output.strip(),
                     "session_id": session_id,
@@ -474,7 +509,13 @@ async def _run_broadcast(
                     "role": role,
                     "duration_ms": result.duration_ms,
                     "cost_usd": result.cost_usd,
-                })
+                }
+                # Attach file changes from this execution's log entries
+                if session_logger:
+                    fc = session_logger.extract_file_changes_from_cache(pre_exec_cursor)
+                    if fc:
+                        msg_data["file_changes"] = fc
+                store.add_message(room_id, msg_data)
                 state.responded += 1
                 if agent_state:
                     agent_state.status = "completed"
@@ -623,15 +664,10 @@ async def room_event_stream(
             })
             # Send initial per-agent progress
             if bstate.agent_states:
-                agent_progress_list = []
-                for sid, astate in bstate.agent_states.items():
-                    agent_progress_list.append({
-                        "session_id": astate.session_id,
-                        "session_name": astate.session_name,
-                        "role": astate.role,
-                        "status": astate.status,
-                        "thinking_preview": astate.thinking_preview,
-                    })
+                agent_progress_list = [
+                    _build_agent_progress_data(astate)
+                    for astate in bstate.agent_states.values()
+                ]
                 yield _sse_event("agent_progress", {
                     "broadcast_id": bstate.broadcast_id,
                     "agents": agent_progress_list,
@@ -673,15 +709,10 @@ async def room_event_stream(
 
                 # Send per-agent progress if not finished
                 if not bstate.finished and bstate.agent_states:
-                    agent_progress_list = []
-                    for sid, astate in bstate.agent_states.items():
-                        agent_progress_list.append({
-                            "session_id": astate.session_id,
-                            "session_name": astate.session_name,
-                            "role": astate.role,
-                            "status": astate.status,
-                            "thinking_preview": astate.thinking_preview,
-                        })
+                    agent_progress_list = [
+                        _build_agent_progress_data(astate)
+                        for astate in bstate.agent_states.values()
+                    ]
                     yield _sse_event("agent_progress", {
                         "broadcast_id": bstate.broadcast_id,
                         "agents": agent_progress_list,

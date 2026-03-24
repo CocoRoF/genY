@@ -238,10 +238,14 @@ def db_add_message(db_manager, room_id: str,
         msg_id = message.get("id") or str(uuid.uuid4())
         timestamp = message.get("timestamp") or datetime.now(timezone.utc).isoformat()
 
+        # Serialize file_changes list to JSON string for TEXT column
+        fc_raw = message.get("file_changes")
+        fc_json = json.dumps(fc_raw, ensure_ascii=False) if fc_raw else None
+
         query = (
             f"INSERT INTO {MESSAGES_TABLE} "
-            f"(message_id, room_id, type, content, session_id, session_name, role, duration_ms, cost_usd, timestamp) "
-            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            f"(message_id, room_id, type, content, session_id, session_name, role, duration_ms, cost_usd, timestamp, file_changes) "
+            f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             f"ON CONFLICT (message_id) DO NOTHING "
             f"RETURNING id"
         )
@@ -256,6 +260,7 @@ def db_add_message(db_manager, room_id: str,
             message.get("duration_ms", 0) or 0,
             message.get("cost_usd"),
             timestamp,
+            fc_json,
         ))
 
         result = dict(message)
@@ -296,7 +301,7 @@ def db_get_messages(db_manager, room_id: str) -> List[Dict[str, Any]]:
         result = []
         for row in rows:
             r = dict(row)
-            result.append({
+            msg: Dict[str, Any] = {
                 "id": r.get("message_id", ""),
                 "type": r.get("type", "user"),
                 "content": r.get("content", ""),
@@ -306,7 +311,15 @@ def db_get_messages(db_manager, room_id: str) -> List[Dict[str, Any]]:
                 "role": r.get("role", ""),
                 "duration_ms": r.get("duration_ms", 0),
                 "cost_usd": r.get("cost_usd"),
-            })
+            }
+            # Deserialize file_changes from JSON string
+            fc_str = r.get("file_changes")
+            if fc_str:
+                try:
+                    msg["file_changes"] = json.loads(fc_str)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            result.append(msg)
         return result
     except Exception as e:
         logger.error(f"Failed to get messages for room {room_id}: {e}")

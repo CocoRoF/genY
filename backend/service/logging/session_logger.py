@@ -6,6 +6,7 @@ Each session gets its own log file in the logs/ directory.
 Supports DB-backed storage (primary) with file fallback.
 """
 import json
+import time
 from logging import getLogger
 from datetime import datetime
 from enum import Enum
@@ -125,6 +126,13 @@ class SessionLogger:
         self._log_cache: List[LogEntry] = []
         self._max_cache_size = 1000  # Keep last 1000 entries in memory
 
+        # Activity tracking — monotonic timestamp of last cache write
+        self._last_write_at: float = 0.0
+
+        # Last entry tracking — for tool execution detection
+        self._last_entry_level: Optional[str] = None
+        self._last_tool_name: Optional[str] = None
+
         # Write session start entry
         self._write_header()
 
@@ -150,6 +158,14 @@ class SessionLogger:
 
             # Add to cache
             self._log_cache.append(entry)
+            self._last_write_at = time.monotonic()
+
+            # Track last entry level + tool name
+            self._last_entry_level = entry.level.value
+            if entry.level == LogLevel.TOOL_USE:
+                self._last_tool_name = entry.metadata.get("tool_name") if entry.metadata else None
+            elif entry.level == LogLevel.TOOL_RESULT:
+                self._last_tool_name = entry.metadata.get("tool_name") if entry.metadata else None
 
             # Trim cache if too large
             if len(self._log_cache) > self._max_cache_size:
@@ -955,6 +971,44 @@ class SessionLogger:
         """Return current number of entries in the in-memory log cache."""
         with self._lock:
             return len(self._log_cache)
+
+    def get_last_write_at(self) -> float:
+        """Return monotonic timestamp of last cache write (0 if never written)."""
+        return self._last_write_at
+
+    def get_last_entry_info(self) -> dict:
+        """Return level and tool name of the most recent log entry."""
+        return {
+            "level": self._last_entry_level,
+            "tool_name": self._last_tool_name,
+        }
+
+    def extract_file_changes_from_cache(self, since_cursor: int = 0) -> list:
+        """Extract file change entries from cached TOOL logs.
+
+        Returns a list of dicts with file_path, operation, lines_added,
+        lines_removed, and the full file_changes data.
+        """
+        with self._lock:
+            entries = self._log_cache[since_cursor:]
+        result = []
+        for entry in entries:
+            if entry.level != LogLevel.TOOL_USE:
+                continue
+            meta = entry.metadata or {}
+            fc = meta.get("file_changes")
+            if not fc:
+                continue
+            result.append({
+                "file_path": fc.get("file_path", ""),
+                "operation": fc.get("operation", "write"),
+                "lines_added": fc.get("lines_added", 0),
+                "lines_removed": fc.get("lines_removed", 0),
+                "changes": fc.get("changes", []),
+                "is_content_truncated": fc.get("is_content_truncated", False),
+                "total_edits": fc.get("total_edits"),
+            })
+        return result
 
     def get_cache_entries_since(self, cursor: int) -> "tuple[list[LogEntry], int]":
         """Return new cache entries after *cursor* and the updated cursor.

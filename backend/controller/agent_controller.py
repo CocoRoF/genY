@@ -512,16 +512,34 @@ async def _stream_execution_sse(holder: dict, session_id: str):
     Polls the session logger cache every 150ms for new log entries
     and streams them as ``log`` events until the execution completes.
 
-    A heartbeat comment is sent every ~15 seconds of inactivity to
-    prevent intermediate proxies/browsers from dropping the connection.
+    A heartbeat is sent every ~15 seconds of inactivity to keep the
+    connection alive and report execution health (elapsed time, activity).
     """
     session_logger = get_session_logger(session_id, create_if_missing=False)
     cache_cursor = holder.get("cache_cursor", 0)
     heartbeat_interval = 15.0  # seconds
     last_event_time = time.monotonic()
+    start_time = holder.get("start_time", time.time())
 
     yield _sse("status", {"status": "running", "message": "Execution started"})
     last_event_time = time.monotonic()
+
+    def _build_heartbeat() -> dict:
+        """Build heartbeat payload with execution health data."""
+        now = time.time()
+        now_mono = time.monotonic()
+        elapsed_ms = int((now - start_time) * 1000)
+        last_write = session_logger.get_last_write_at() if session_logger else 0
+        last_activity_ms = int((now_mono - last_write) * 1000) if last_write > 0 else elapsed_ms
+        entry_info = session_logger.get_last_entry_info() if session_logger else {}
+        return {
+            "ts": now,
+            "elapsed_ms": elapsed_ms,
+            "last_activity_ms": last_activity_ms,
+            "log_count": cache_cursor,
+            "last_event_level": entry_info.get("level"),
+            "last_tool_name": entry_info.get("tool_name"),
+        }
 
     try:
         while not holder.get("done"):
@@ -534,7 +552,7 @@ async def _stream_execution_sse(holder: dict, session_id: str):
             if had_data:
                 last_event_time = time.monotonic()
             elif time.monotonic() - last_event_time >= heartbeat_interval:
-                yield _sse("heartbeat", {"ts": time.time()})
+                yield _sse("heartbeat", _build_heartbeat())
                 last_event_time = time.monotonic()
             await asyncio.sleep(0.15)
 
@@ -649,11 +667,28 @@ async def get_execution_status(
     holder = get_execution_holder(session_id)
     if not holder:
         return {"active": False, "session_id": session_id}
+
+    now = time.time()
+    start_time = holder.get("start_time", now)
+    elapsed_ms = int((now - start_time) * 1000)
+
+    # Compute last activity from session logger
+    session_logger = get_session_logger(session_id, create_if_missing=False)
+    now_mono = time.monotonic()
+    last_write = session_logger.get_last_write_at() if session_logger else 0
+    last_activity_ms = int((now_mono - last_write) * 1000) if last_write > 0 else elapsed_ms
+
+    entry_info = session_logger.get_last_entry_info() if session_logger else {}
+
     return {
         "active": True,
         "done": holder.get("done", False),
         "has_error": holder.get("error") is not None,
         "session_id": session_id,
+        "elapsed_ms": elapsed_ms,
+        "last_activity_ms": last_activity_ms,
+        "last_event_level": entry_info.get("level"),
+        "last_tool_name": entry_info.get("tool_name"),
     }
 
 

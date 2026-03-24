@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useEffect, useCallback, useState } from 'react';
 import type { LogEntry, LogEntryMetadata } from '@/types';
 import {
   Terminal,
@@ -120,10 +120,20 @@ interface TimelineEntryProps {
   index: number;
   isSelected: boolean;
   isLast: boolean;
+  durationMs: number | null;
   onClick: (index: number) => void;
 }
 
-function TimelineEntry({ entry, index, isSelected, isLast, onClick }: TimelineEntryProps) {
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const sec = ms / 1000;
+  if (sec < 60) return `${sec.toFixed(1)}s`;
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}m ${s}s`;
+}
+
+function TimelineEntry({ entry, index, isSelected, isLast, durationMs, onClick }: TimelineEntryProps) {
   const config = LEVEL_CONFIG[entry.level] || LEVEL_CONFIG.DEBUG;
   const Icon = config.icon;
   const meta = entry.metadata as LogEntryMetadata | undefined;
@@ -170,6 +180,11 @@ function TimelineEntry({ entry, index, isSelected, isLast, onClick }: TimelineEn
           <span className="text-[0.5rem] text-[var(--text-muted)] font-mono tabular-nums opacity-50 shrink-0">
             {formatShortTime(entry.timestamp)}
           </span>
+          {durationMs != null && durationMs > 0 && (
+            <span className="text-[0.5rem] font-mono tabular-nums text-[var(--text-muted)] opacity-70 shrink-0">
+              {formatDuration(durationMs)}
+            </span>
+          )}
           {meta?.file_changes && <FileChangeBadge meta={meta} />}
           {hasDetail && (
             <ChevronRight
@@ -219,6 +234,14 @@ export default function ExecutionTimeline({
 }: ExecutionTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  // Live timer tick — refreshes every second while executing so last entry duration updates
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!isExecuting) return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [isExecuting]);
+
   // Filter entries
   const visibleEntries = useMemo(
     () => showAllLevels ? entries : entries.filter((e) => PRIMARY_LEVELS.has(e.level)),
@@ -277,16 +300,24 @@ export default function ExecutionTimeline({
 
       {/* Timeline entries */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {visibleEntries.map((entry, i) => (
-          <TimelineEntry
-            key={i}
-            entry={entry}
-            index={i}
-            isSelected={selectedIndex === visibleToOriginalIndex[i]}
-            isLast={i === visibleEntries.length - 1 && !isExecuting}
-            onClick={handleClick}
-          />
-        ))}
+        {visibleEntries.map((entry, i) => {
+          const nextTs = i < visibleEntries.length - 1
+            ? new Date(visibleEntries[i + 1].timestamp).getTime()
+            : isExecuting ? Date.now() : null;
+          const curTs = new Date(entry.timestamp).getTime();
+          const dur = nextTs != null ? nextTs - curTs : null;
+          return (
+            <TimelineEntry
+              key={i}
+              entry={entry}
+              index={i}
+              isSelected={selectedIndex === visibleToOriginalIndex[i]}
+              isLast={i === visibleEntries.length - 1 && !isExecuting}
+              durationMs={dur}
+              onClick={handleClick}
+            />
+          );
+        })}
 
         {/* Running indicator */}
         {isExecuting && (

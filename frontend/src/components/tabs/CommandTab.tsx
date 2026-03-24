@@ -33,6 +33,14 @@ export default function CommandTab() {
   const [activeView, setActiveView] = useState<'log' | 'result'>('log');
   const prevFinishedRef = useRef(false);
 
+  // ── Execution health tracking ──
+  const executionStartRef = useRef<number>(0);
+  const lastLogReceivedRef = useRef<number>(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [lastActivityAge, setLastActivityAge] = useState(0); // ms since last activity
+  const lastToolNameRef = useRef<string | null>(null);
+  const [lastToolName, setLastToolName] = useState<string | null>(null);
+
   const session = sessions.find(s => s.session_id === selectedSessionId);
   const sessionData: SessionData | null = selectedSessionId ? getSessionData(selectedSessionId) : null;
   const isExecuting = sessionData?.status === 'running';
@@ -61,6 +69,28 @@ export default function CommandTab() {
     prevFinishedRef.current = hasFinished;
   }, [hasFinished]);
 
+  // ── Elapsed timer — ticks every second while executing ──
+  useEffect(() => {
+    if (!isExecuting) {
+      setElapsedMs(0);
+      setLastActivityAge(0);
+      setLastToolName(null);
+      lastToolNameRef.current = null;
+      return;
+    }
+    const id = setInterval(() => {
+      const now = Date.now();
+      if (executionStartRef.current > 0) {
+        setElapsedMs(now - executionStartRef.current);
+      }
+      if (lastLogReceivedRef.current > 0) {
+        setLastActivityAge(now - lastLogReceivedRef.current);
+      }
+      setLastToolName(lastToolNameRef.current);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isExecuting]);
+
   // ── Auto-reconnect to running execution on mount / visibility change ──
   const reconnectRef = useRef<{ close: () => void } | null>(null);
 
@@ -81,6 +111,15 @@ export default function CommandTab() {
         if (!status.active || status.done) return;
 
         // Active execution found — reconnect SSE
+        // Initialize timing from status response
+        const now = Date.now();
+        const statusElapsed = (status.elapsed_ms as number | undefined) ?? 0;
+        executionStartRef.current = now - statusElapsed;
+        const statusActivityAge = (status.last_activity_ms as number | undefined) ?? statusElapsed;
+        lastLogReceivedRef.current = now - statusActivityAge;
+        // Initialize last tool name from status response
+        lastToolNameRef.current = (status.last_tool_name as string | undefined) || null;
+
         updateSessionData(selectedSessionId, {
           status: 'running',
           statusText: t('commandTab.statusExecuting'),
@@ -91,11 +130,33 @@ export default function CommandTab() {
           (eventType, eventData) => {
             const cur = useAppStore.getState().sessionDataCache[selectedSessionId];
             switch (eventType) {
-              case 'log':
+              case 'log': {
+                lastLogReceivedRef.current = Date.now();
+                const logLevel = (eventData as Record<string, unknown>).level as string | undefined;
+                const logMeta = (eventData as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+                if (logLevel === 'TOOL' || logLevel === 'TOOL_RES') {
+                  lastToolNameRef.current = (logMeta?.tool_name as string) || null;
+                } else if (logLevel && logLevel !== 'DEBUG' && logLevel !== 'INFO') {
+                  lastToolNameRef.current = null;
+                }
                 updateSessionData(selectedSessionId, {
                   logEntries: [...(cur?.logEntries || []), eventData as unknown as LogEntry],
                 });
                 break;
+              }
+              case 'heartbeat': {
+                if (eventData.last_activity_ms != null) {
+                  const serverAge = eventData.last_activity_ms as number;
+                  const clientAge = Date.now() - lastLogReceivedRef.current;
+                  if (serverAge > clientAge) {
+                    lastLogReceivedRef.current = Date.now() - serverAge;
+                  }
+                }
+                if (eventData.last_tool_name !== undefined) {
+                  lastToolNameRef.current = (eventData.last_tool_name as string) || null;
+                }
+                break;
+              }
               case 'status': {
                 const s = eventData.status as string;
                 const msg = eventData.message as string;
@@ -198,6 +259,9 @@ export default function CommandTab() {
     if (!selectedSessionId || !sessionData?.input?.trim()) return;
     const prompt = sessionData.input.trim();
     setSelectedStepIndex(null);
+    const now = Date.now();
+    executionStartRef.current = now;
+    lastLogReceivedRef.current = now;
     updateSessionData(selectedSessionId, {
       status: 'running',
       statusText: t('commandTab.statusExecuting'),
@@ -215,9 +279,32 @@ export default function CommandTab() {
           const current = useAppStore.getState().sessionDataCache[selectedSessionId];
           switch (eventType) {
             case 'log': {
+              lastLogReceivedRef.current = Date.now();
+              const logLevel = (eventData as Record<string, unknown>).level as string | undefined;
+              const logMeta = (eventData as Record<string, unknown>).metadata as Record<string, unknown> | undefined;
+              if (logLevel === 'TOOL' || logLevel === 'TOOL_RES') {
+                lastToolNameRef.current = (logMeta?.tool_name as string) || null;
+              } else if (logLevel && logLevel !== 'DEBUG' && logLevel !== 'INFO') {
+                lastToolNameRef.current = null;
+              }
               updateSessionData(selectedSessionId, {
                 logEntries: [...(current?.logEntries || []), eventData as unknown as LogEntry],
               });
+              break;
+            }
+            case 'heartbeat': {
+              // Server-side activity tracking — use as fallback/correction
+              if (eventData.last_activity_ms != null) {
+                const serverAge = eventData.last_activity_ms as number;
+                const clientAge = Date.now() - lastLogReceivedRef.current;
+                // Use the larger value (more conservative)
+                if (serverAge > clientAge) {
+                  lastLogReceivedRef.current = Date.now() - serverAge;
+                }
+              }
+              if (eventData.last_tool_name !== undefined) {
+                lastToolNameRef.current = (eventData.last_tool_name as string) || null;
+              }
               break;
             }
             case 'status': {
@@ -324,6 +411,27 @@ export default function CommandTab() {
   const responseEntry = [...logEntries].reverse().find(e => e.level === 'RESPONSE');
   const hasContent = commandEntry || isExecuting || logEntries.length > 0;
 
+  // ── Format elapsed time ──
+  const formatElapsed = (ms: number): string => {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+  };
+
+  // ── Format inactivity duration ──
+  const formatInactivity = (ms: number): string => {
+    const sec = Math.floor(ms / 1000);
+    if (sec < 60) return `${sec}s`;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    if (m < 60) return s > 0 ? `${m}m ${s}s` : `${m}m`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+  };
+
   return (
     <div className="flex flex-col h-full bg-[var(--bg-primary)] relative">
       {/* ── Header ── */}
@@ -351,6 +459,25 @@ export default function CommandTab() {
           <div className="flex items-center gap-2 shrink-0">
             {session.max_turns && (
               <span className="text-[0.625rem] text-[var(--text-muted)]">{t('commandTab.maxTurns')}: {session.max_turns}</span>
+            )}
+            {/* Elapsed timer + factual activity info (while executing) */}
+            {isExecuting && elapsedMs > 0 && (
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[0.6875rem]">
+                <Clock size={11} className="text-[var(--text-muted)]" />
+                <span className="font-mono text-[var(--text-secondary)] font-medium">{formatElapsed(elapsedMs)}</span>
+                <span className="text-[var(--text-muted)]">·</span>
+                <span className="text-[var(--text-muted)]">{logEntries.length} {t('commandTab.steps')}</span>
+                {lastActivityAge >= 10_000 && (
+                  <>
+                    <span className="text-[var(--text-muted)]">·</span>
+                    {lastToolName ? (
+                      <span className="text-[var(--text-muted)] font-mono">🔧 {lastToolName} ({formatInactivity(lastActivityAge)})</span>
+                    ) : (
+                      <span className="text-[var(--text-muted)] font-mono">{t('commandTab.noActivity')} {formatInactivity(lastActivityAge)}</span>
+                    )}
+                  </>
+                )}
+              </div>
             )}
             {sessionData?.statusText && (
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[0.6875rem] font-medium ${
@@ -427,7 +554,7 @@ export default function CommandTab() {
             >
               {/* Submitted command echo */}
               {commandEntry && (
-                <div className="shrink-0 px-4 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
+                <div className="shrink-0 max-h-[120px] overflow-y-auto px-4 py-2 bg-[var(--bg-tertiary)] border-b border-[var(--border-color)]">
                   <span className="text-[0.75rem] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap break-words">
                     {commandEntry.message.replace(/^PROMPT:\s*/, '')}
                   </span>
