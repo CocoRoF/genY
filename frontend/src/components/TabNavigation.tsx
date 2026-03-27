@@ -22,7 +22,8 @@ const SESSION_TAB_DEFS = [
 
 // Tabs hidden in Normal mode
 const DEV_ONLY_GLOBAL = new Set(['workflows', 'toolSets', 'settings']);
-const DEV_ONLY_SESSION = new Set(['logs', 'graph']);
+// 'logs' is intentionally NOT in this set — it must be visible in User mode too (e.g. mobile)
+const DEV_ONLY_SESSION = new Set(['graph']);
 
 const TAB_BASE =
   'relative py-1.5 px-3.5 text-[0.8125rem] font-medium bg-transparent border-none rounded-[6px] cursor-pointer transition-all duration-150 whitespace-nowrap';
