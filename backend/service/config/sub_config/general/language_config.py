@@ -16,7 +16,7 @@ from service.config.sub_config.general.env_utils import env_sync, read_env_defau
 
 LANGUAGE_OPTIONS = [
     {"value": "en", "label": "English"},
-    {"value": "ko", "label": "한국어 (Korean)"},
+    {"value": "ko", "label": "Korean"},
 ]
 
 
@@ -60,15 +60,15 @@ class LanguageConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "언어",
-                "description": "UI 표시 언어 설정.",
+                "display_name": "Language",
+                "description": "UI display language settings.",
                 "groups": {
-                    "language": "언어 설정",
+                    "language": "Language Settings",
                 },
                 "fields": {
                     "language": {
-                        "label": "UI 언어",
-                        "description": "사용자 인터페이스에 사용할 언어",
+                        "label": "UI Language",
+                        "description": "Language to use for the user interface",
                     },
                 },
             }

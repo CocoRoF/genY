@@ -127,54 +127,54 @@ class LTMConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "장기 기억 (Vector DB)",
+                "display_name": "Long-Term Memory (Vector DB)",
                 "description": (
-                    "FAISS 벡터 데이터베이스 기반의 의미론적 장기 기억 검색 설정. "
-                    "임베딩 제공자, 청킹, 검색 파라미터를 구성합니다."
+                    "Semantic long-term memory retrieval settings based on the FAISS vector database. "
+                    "Configure embedding provider, chunking, and search parameters."
                 ),
                 "groups": {
-                    "toggle": "활성화",
-                    "embedding": "임베딩 설정",
-                    "chunking": "청킹 설정",
-                    "retrieval": "검색 설정",
+                    "toggle": "Enable",
+                    "embedding": "Embedding Settings",
+                    "chunking": "Chunking Settings",
+                    "retrieval": "Retrieval Settings",
                 },
                 "fields": {
                     "enabled": {
-                        "label": "장기 기억 벡터 검색 활성화",
-                        "description": "FAISS 벡터 DB 기반 의미론적 검색을 활성화합니다",
+                        "label": "Enable Long-Term Memory Vector Search",
+                        "description": "Enable FAISS vector DB-based semantic search",
                     },
                     "embedding_provider": {
-                        "label": "임베딩 제공자",
-                        "description": "텍스트를 벡터로 변환할 API 제공자",
+                        "label": "Embedding Provider",
+                        "description": "API provider for converting text to vectors",
                     },
                     "embedding_model": {
-                        "label": "임베딩 모델",
-                        "description": "선택한 제공자에 맞는 임베딩 모델",
+                        "label": "Embedding Model",
+                        "description": "Embedding model for the selected provider",
                     },
                     "embedding_api_key": {
-                        "label": "임베딩 API 키",
-                        "description": "선택한 임베딩 제공자의 API 키",
+                        "label": "Embedding API Key",
+                        "description": "API key for the selected embedding provider",
                         "placeholder": "sk-… / AIza… / pa-…",
                     },
                     "chunk_size": {
-                        "label": "청크 크기",
-                        "description": "메모리 텍스트를 분할하는 단위 (문자 수)",
+                        "label": "Chunk Size",
+                        "description": "Unit size (in characters) for splitting memory text",
                     },
                     "chunk_overlap": {
-                        "label": "청크 오버랩",
-                        "description": "인접 청크 간 겹치는 문자 수",
+                        "label": "Chunk Overlap",
+                        "description": "Number of overlapping characters between adjacent chunks",
                     },
                     "top_k": {
-                        "label": "검색 결과 수 (Top-K)",
-                        "description": "벡터 검색 시 반환할 최대 결과 수",
+                        "label": "Top-K Results",
+                        "description": "Maximum number of results to return per vector search",
                     },
                     "score_threshold": {
-                        "label": "유사도 임계값",
-                        "description": "이 값 미만의 결과는 제외 (0 = 필터 없음)",
+                        "label": "Similarity Threshold",
+                        "description": "Results below this value are excluded (0 = no filter)",
                     },
                     "max_inject_chars": {
-                        "label": "최대 주입 문자 수",
-                        "description": "컨텍스트에 주입할 벡터 검색 결과의 최대 문자 수",
+                        "label": "Max Inject Characters",
+                        "description": "Maximum number of characters from vector search results to inject into context",
                     },
                 },
             }

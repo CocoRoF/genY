@@ -265,7 +265,7 @@ class GenySessionCreateTool(BaseTool):
         "Only session_name is required. Role defaults to 'developer' and model uses the system default — "
         "do NOT specify role or model unless the user explicitly requests a different one. "
         "Use this when asked to: bring in someone new, hire an employee, add a developer to the team, "
-        "get a researcher, recruit a new member, 직원 데려오기, 새 멤버 추가, etc. "
+        "get a researcher, recruit a new member, bring in a staff member, add a new member, etc. "
         "The new member is immediately available and can be invited to chat rooms afterwards."
     )
 
@@ -279,7 +279,7 @@ class GenySessionCreateTool(BaseTool):
             "properties": {
                 "session_name": {
                     "type": "string",
-                    "description": "Name of the new team member (e.g. \"김민수\", \"Alice\", \"Backend Developer Park\").",
+                    "description": "Name of the new team member (e.g. \"John Smith\", \"Alice\", \"Backend Developer Park\").",
                 },
                 "role": {
                     "type": "string",
@@ -313,7 +313,7 @@ class GenySessionCreateTool(BaseTool):
         """Hire a new team member by creating an agent session.
 
         Args:
-            session_name: Name of the new team member (e.g. "김민수", "Alice", "Backend Developer Park").
+            session_name: Name of the new team member (e.g. "John Smith", "Alice", "Backend Developer Park").
             role: The member's role — "developer", "worker", "researcher", or "planner". Default: "developer".
             model: AI model to use. Default: config default. Usually no need to change.
         """
@@ -367,7 +367,7 @@ class GenySessionCreateTool(BaseTool):
         """Hire a new team member by creating an agent session (async).
 
         Args:
-            session_name: Name of the new team member (e.g. "김민수", "Alice", "Backend Developer Park").
+            session_name: Name of the new team member (e.g. "John Smith", "Alice", "Backend Developer Park").
             role: The member's role — "developer", "worker", "researcher", or "planner". Default: "developer".
             model: AI model to use. Default: config default. Usually no need to change.
         """
@@ -466,7 +466,7 @@ class GenyRoomCreateTool(BaseTool):
         """Create a new chat room and add team members.
 
         Args:
-            room_name: Name for the new room (e.g. "Project Alpha", "개발팀 채널").
+            room_name: Name for the new room (e.g. "Project Alpha", "Dev Team Channel").
             session_ids: Comma-separated list of session IDs or names of members to include.
         """
         raw_ids = [s.strip() for s in session_ids.split(",") if s.strip()]
@@ -552,7 +552,7 @@ class GenyRoomAddMembersTool(BaseTool):
         "Invite team members to an existing chat room — like adding colleagues to a group chat or meeting. "
         "Provide the room ID and comma-separated session IDs of members to add. "
         "Use this when asked to: invite someone to a room, add a member to the channel, "
-        "bring someone into the conversation, 채팅방에 초대, 멤버 추가, etc. "
+        "bring someone into the conversation, invite to a chat room, add a member, etc. "
         "Tip: use geny_session_list to find member IDs, and geny_room_list to find room IDs."
     )
 

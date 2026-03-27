@@ -1,23 +1,23 @@
 """
-LangGraph + Claude CLI 통합
+LangGraph + Claude CLI Integration
 
-기존 ClaudeProcess의 세션 관리와 실행 로직을 그대로 활용하면서
-LangGraph의 상태 관리 기능을 통합합니다.
+Integrates LangGraph's state management capabilities while fully leveraging
+the session management and execution logic of the existing ClaudeProcess.
 
-사용 예:
+Usage example:
     from service.langgraph import ClaudeCLIChatModel
 
-    # 새 세션으로 모델 생성
+    # Create model with a new session
     model = ClaudeCLIChatModel(
         working_dir="/path/to/project",
         model_name="claude-sonnet-4-20250514"
     )
-    await model.initialize()  # 세션 초기화 필수
+    await model.initialize()  # Session initialization is required
 
-    # 기존 ClaudeProcess 세션을 사용
+    # Use an existing ClaudeProcess session
     model = ClaudeCLIChatModel.from_process(existing_process)
 
-    # LangGraph Agent로 사용
+    # Use as a LangGraph Agent
     from langgraph.prebuilt import create_react_agent
     agent = create_react_agent(model, tools=[])
 """
@@ -55,34 +55,34 @@ logger = getLogger(__name__)
 
 class ClaudeCLIChatModel(BaseChatModel):
     """
-    Claude CLI를 LangChain ChatModel로 래핑.
+    Wraps Claude CLI as a LangChain ChatModel.
 
-    내부적으로 ClaudeProcess를 사용하여 CLI 세션을 관리합니다.
-    ClaudeProcess의 모든 기능(MCP 연동, 파일 관리, 세션 유지)을 그대로 활용합니다.
+    Internally uses ClaudeProcess to manage CLI sessions.
+    Leverages all ClaudeProcess features (MCP integration, file management, session persistence) as-is.
 
-    주요 특징:
-    - ClaudeProcess.execute()를 통한 CLI 호출
-    - CLI의 --resume 옵션으로 대화 컨텍스트 유지
-    - CLI의 MCP 서버 연동 (.mcp.json)
-    - CLI의 파일 시스템 접근 기능
-    - LangGraph의 상태 관리, 체크포인팅 지원
+    Key features:
+    - CLI invocation via ClaudeProcess.execute()
+    - Maintains conversation context with CLI's --resume option
+    - CLI MCP server integration (.mcp.json)
+    - CLI filesystem access
+    - LangGraph state management and checkpointing support
 
-    사용법:
+    Usage:
     ```python
-    # 새 세션 생성
+    # Create a new session
     model = ClaudeCLIChatModel(
         working_dir="/path/to/project",
         model_name="claude-sonnet-4-20250514"
     )
-    await model.initialize()  # 세션 초기화 필수
+    await model.initialize()  # Session initialization is required
 
-    # 직접 호출
+    # Direct invocation
     response = await model.ainvoke([HumanMessage(content="Hello")])
 
-    # 기존 ClaudeProcess 사용
+    # Use an existing ClaudeProcess
     model = ClaudeCLIChatModel.from_process(existing_process)
 
-    # LangGraph와 함께 사용
+    # Use with LangGraph
     from langgraph.prebuilt import create_react_agent
     agent = create_react_agent(model, tools=[])
     ```
@@ -138,13 +138,13 @@ class ClaudeCLIChatModel(BaseChatModel):
     @classmethod
     def from_process(cls, process: ClaudeProcess) -> "ClaudeCLIChatModel":
         """
-        기존 ClaudeProcess를 사용하여 모델 생성.
+        Create a model using an existing ClaudeProcess.
 
         Args:
-            process: 초기화된 ClaudeProcess 인스턴스
+            process: An initialized ClaudeProcess instance
 
         Returns:
-            ClaudeCLIChatModel 인스턴스
+            ClaudeCLIChatModel instance
         """
         model = cls(
             session_id=process.session_id,
@@ -163,12 +163,12 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     @property
     def process(self) -> Optional[ClaudeProcess]:
-        """내부 ClaudeProcess 인스턴스 반환"""
+        """Return the internal ClaudeProcess instance"""
         return self._process
 
     @property
     def is_initialized(self) -> bool:
-        """세션 초기화 여부"""
+        """Whether the session is initialized"""
         return self._initialized
 
     @property
@@ -186,13 +186,13 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     async def initialize(self) -> bool:
         """
-        세션 초기화.
+        Initialize the session.
 
-        ClaudeProcess를 생성하고 초기화합니다.
-        from_process()로 생성한 경우 이미 초기화되어 있습니다.
+        Creates and initializes a ClaudeProcess.
+        If created via from_process(), it is already initialized.
 
         Returns:
-            초기화 성공 여부
+            Whether initialization succeeded
         """
         if self._initialized and self._process:
             logger.info(f"Session already initialized: {self._process.session_id}")
@@ -200,10 +200,10 @@ class ClaudeCLIChatModel(BaseChatModel):
 
         import uuid
 
-        # 세션 ID 생성
+        # Generate session ID
         session_id = self.session_id or str(uuid.uuid4())
 
-        # ClaudeProcess 생성
+        # Create ClaudeProcess
         self._process = ClaudeProcess(
             session_id=session_id,
             session_name=self.session_name,
@@ -216,7 +216,7 @@ class ClaudeCLIChatModel(BaseChatModel):
             system_prompt=self.system_prompt,
         )
 
-        # 초기화 실행
+        # Run initialization
         success = await self._process.initialize()
 
         if success:
@@ -230,10 +230,10 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     async def cleanup(self):
         """
-        세션 정리.
+        Clean up the session.
 
-        ClaudeProcess를 정지하고 리소스를 해제합니다.
-        스토리지는 보존됩니다 (완전 삭제 시에만 제거).
+        Stops the ClaudeProcess and releases resources.
+        Storage is preserved (removed only on full deletion).
         """
         if self._process:
             await self._process.stop()
@@ -249,7 +249,7 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """
-        동기 생성 메서드 (LangChain 필수 구현).
+        Synchronous generation method (required LangChain implementation).
         """
         try:
             loop = asyncio.get_event_loop()
@@ -276,11 +276,11 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """
-        비동기 생성 메서드.
+        Asynchronous generation method.
 
-        ClaudeProcess.execute()를 호출하여 응답을 생성합니다.
+        Calls ClaudeProcess.execute() to generate a response.
         """
-        # 자동 초기화
+        # Auto-initialize
         if not self._initialized:
             success = await self.initialize()
             if not success:
@@ -293,13 +293,13 @@ class ClaudeCLIChatModel(BaseChatModel):
 
         prompt = self._messages_to_prompt(messages)
 
-        # kwargs에서 오버라이드 파라미터 추출
+        # Extract override parameters from kwargs
         system_prompt = kwargs.get("system_prompt", self.system_prompt)
         max_turns = kwargs.get("max_turns", self.max_turns)
         timeout = kwargs.get("timeout", self.timeout)
-        resume = kwargs.get("resume")  # None이면 자동 결정
+        resume = kwargs.get("resume")  # None means auto-determine
 
-        # ClaudeProcess.execute() 호출
+        # Call ClaudeProcess.execute()
         result = await self._process.execute(
             prompt=prompt,
             timeout=timeout,
@@ -339,15 +339,15 @@ class ClaudeCLIChatModel(BaseChatModel):
 
     def _messages_to_prompt(self, messages: List[BaseMessage]) -> str:
         """
-        LangChain 메시지를 프롬프트 문자열로 변환.
+        Convert LangChain messages to a prompt string.
 
-        첫 실행 또는 resume이 비활성화된 경우 전체 대화를 포함하고,
-        resume 모드에서는 마지막 HumanMessage만 전달합니다.
+        On first execution or when resume is disabled, includes the full conversation.
+        In resume mode, only the last HumanMessage is passed.
         """
         if not messages:
             return ""
 
-        # 첫 실행이면 전체 대화 포함
+        # If first execution, include the full conversation
         if self._process and self._process._execution_count == 0:
             parts = []
             for msg in messages:
@@ -361,7 +361,7 @@ class ClaudeCLIChatModel(BaseChatModel):
                     parts.append(f"[Tool Result]: {msg.content}")
             return "\n\n".join(parts)
 
-        # Resume 모드: 마지막 HumanMessage만 전달
+        # Resume mode: pass only the last HumanMessage
         for msg in reversed(messages):
             if isinstance(msg, HumanMessage):
                 return str(msg.content)
@@ -378,9 +378,9 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> AsyncIterator[ChatGenerationChunk]:
         """
-        비동기 스트리밍 생성.
+        Asynchronous streaming generation.
 
-        현재는 전체 응답을 받은 후 청크로 나누어 반환합니다.
+        Currently receives the full response and returns it split into chunks.
         """
         result = await self._agenerate(messages, stop, run_manager, **kwargs)
 
@@ -404,21 +404,21 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> Runnable:
         """
-        도구를 모델에 바인딩합니다.
+        Bind tools to the model.
 
-        Claude CLI는 자체 도구 처리 시스템(MCP)을 사용하므로,
-        이 메서드는 도구 정의를 시스템 프롬프트에 추가하여
-        CLI가 도구를 인식하도록 합니다.
+        Since Claude CLI uses its own tool processing system (MCP),
+        this method adds tool definitions to the system prompt so
+        the CLI can recognize the tools.
 
         Args:
-            tools: 바인딩할 도구 목록
-            tool_choice: 도구 선택 모드 (optional)
-            **kwargs: 추가 인자
+            tools: List of tools to bind
+            tool_choice: Tool selection mode (optional)
+            **kwargs: Additional arguments
 
         Returns:
-            도구가 바인딩된 Runnable
+            Runnable with tools bound
         """
-        # 도구 정의를 JSON 스키마로 변환
+        # Convert tool definitions to JSON schema
         tool_descriptions = []
         for tool in tools:
             try:
@@ -428,12 +428,12 @@ class ClaudeCLIChatModel(BaseChatModel):
                 logger.warning(f"Failed to convert tool: {e}")
                 continue
 
-        # 도구 설명을 시스템 프롬프트에 추가
+        # Add tool descriptions to system prompt
         tools_prompt = self._format_tools_prompt(tool_descriptions)
 
-        # 새 인스턴스 생성 with updated system_prompt
+        # Create new instance with updated system_prompt
         bound_model = ClaudeCLIChatModel(
-            session_id=None,  # 새 세션
+            session_id=None,  # New session
             session_name=self.session_name,
             working_dir=self.working_dir,
             model_name=self.model_name,
@@ -447,7 +447,7 @@ class ClaudeCLIChatModel(BaseChatModel):
         return bound_model
 
     def _format_tools_prompt(self, tool_schemas: List[Dict]) -> str:
-        """도구 스키마를 프롬프트 형식으로 변환"""
+        """Convert tool schemas to prompt format"""
         if not tool_schemas:
             return ""
 
@@ -471,7 +471,7 @@ class ClaudeCLIChatModel(BaseChatModel):
         return "\n".join(lines)
 
     def _merge_system_prompt(self, additional: str) -> str:
-        """시스템 프롬프트 병합"""
+        """Merge system prompts"""
         if not additional:
             return self.system_prompt or ""
         if not self.system_prompt:
@@ -486,19 +486,19 @@ class ClaudeCLIChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> Runnable:
         """
-        구조화된 출력을 생성하도록 모델을 구성합니다.
+        Configure the model to produce structured output.
 
-        Claude CLI의 응답을 지정된 스키마에 맞게 파싱합니다.
+        Parses the Claude CLI response to match the specified schema.
 
         Args:
-            schema: Pydantic 모델 또는 JSON 스키마
-            include_raw: 원본 응답 포함 여부
-            **kwargs: 추가 인자
+            schema: Pydantic model or JSON schema
+            include_raw: Whether to include the raw response
+            **kwargs: Additional arguments
 
         Returns:
-            구조화된 출력을 생성하는 Runnable
+            Runnable that produces structured output
         """
-        # 스키마 정보 추출
+        # Extract schema information
         if isinstance(schema, type) and issubclass(schema, BaseModel):
             schema_json = schema.model_json_schema()
             schema_name = schema.__name__
@@ -506,7 +506,7 @@ class ClaudeCLIChatModel(BaseChatModel):
             schema_json = schema
             schema_name = schema.get("title", "Response")
 
-        # 스키마를 프롬프트에 추가
+        # Add schema to prompt
         schema_prompt = f"""
 Please respond with a JSON object that matches this schema:
 ```json
@@ -514,7 +514,7 @@ Please respond with a JSON object that matches this schema:
 ```
 Only output the JSON object, no additional text."""
 
-        # 새 모델 생성 with schema prompt
+        # Create new model with schema prompt
         structured_model = ClaudeCLIChatModel(
             session_id=None,
             session_name=self.session_name,
@@ -527,10 +527,10 @@ Only output the JSON object, no additional text."""
             mcp_config=self.mcp_config,
         )
 
-        # 파싱 함수
+        # Parsing function
         def parse_output(response: AIMessage) -> Union[Dict, BaseModel]:
             content = response.content
-            # JSON 블록 추출 시도
+            # Attempt to extract JSON block
             if "```json" in content:
                 start = content.find("```json") + 7
                 end = content.find("```", start)
@@ -564,17 +564,17 @@ Only output the JSON object, no additional text."""
     # === Utility Methods ===
 
     def get_storage_path(self) -> Optional[str]:
-        """세션 스토리지 경로 반환"""
+        """Return the session storage path"""
         return self._process.storage_path if self._process else None
 
     def list_storage_files(self, subpath: str = "") -> List[Dict]:
-        """세션 스토리지의 파일 목록 반환"""
+        """Return a list of files in session storage"""
         if self._process:
             return self._process.list_storage_files(subpath)
         return []
 
     def read_storage_file(self, filepath: str) -> Optional[str]:
-        """세션 스토리지의 파일 내용 읽기"""
+        """Read the contents of a file in session storage"""
         if self._process:
             return self._process.read_storage_file(filepath)
         return None

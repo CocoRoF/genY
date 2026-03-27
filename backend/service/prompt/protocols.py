@@ -1,12 +1,12 @@
 """
-실행/완료/에러 복구 프로토콜 (opt-in 섹션)
+Execution / Completion / Error Recovery Protocols (opt-in sections)
 
-NOTE: 이 모듈의 섹션들은 기본 프롬프트 빌드에 포함되지 않습니다.
-- LangGraph 그래프가 실행 루프, 재시도, 완료 감지를 제어합니다.
-- Claude CLI가 기본 안전 가이드라인과 에러 처리를 제공합니다.
-- 모든 세션이 autonomous graph를 통해 자율 실행 기능을 갖습니다.
+NOTE: The sections in this module are NOT included in the default prompt build.
+- The LangGraph graph controls the execution loop, retries, and completion detection.
+- The Claude CLI provides default safety guidelines and error handling.
+- All sessions already have autonomous execution capability via the autonomous graph.
 
-수동으로 PromptBuilder에 추가하고 싶을 때만 사용하세요:
+Use these only when you want to manually add them to a PromptBuilder:
     builder.add_section(ExecutionProtocol.autonomous_execution())
 """
 
@@ -16,14 +16,14 @@ from service.prompt.builder import PromptMode, PromptSection
 
 
 class ExecutionProtocol:
-    """실행 프로토콜 — 자율 실행 시 행동 규약."""
+    """Execution protocol — behavioral rules during autonomous execution."""
 
     @staticmethod
     def autonomous_execution() -> PromptSection:
-        """자율 실행 프로토콜 섹션.
+        """Autonomous execution protocol section.
 
-        Autonomous graph의 실행 루프와
-        Geny Agent의 [CONTINUE] 시그널을 통합.
+        Integrates the autonomous graph's execution loop with
+        the Geny Agent's [CONTINUE] signal.
         """
         content = """## Autonomous Execution Protocol
 
@@ -81,7 +81,7 @@ This signal:
 
     @staticmethod
     def multi_turn_execution() -> PromptSection:
-        """멀티턴 실행 지침."""
+        """Multi-turn execution guidelines."""
         content = """## Multi-Turn Execution
 
 When a task requires multiple turns:
@@ -112,15 +112,15 @@ Maintain a mental model of:
 
 
 class CompletionProtocol:
-    """완료 감지 프로토콜.
+    """Completion detection protocol.
 
-    OpenClaw의 구조적 완료 신호와 Geny Agent의
-    [TASK_COMPLETE] 패턴을 통합합니다.
+    Integrates OpenClaw's structured completion signals with the
+    Geny Agent's [TASK_COMPLETE] pattern.
     """
 
     @staticmethod
     def completion_signals() -> PromptSection:
-        """완료 신호 규약 섹션."""
+        """Completion signal convention section."""
         content = """## Completion Protocol
 
 ### Completion Signal
@@ -160,15 +160,15 @@ These patterns indicate INCOMPLETE work — do NOT send [TASK_COMPLETE]:
 
 
 class ErrorRecoveryProtocol:
-    """에러 자기 복구 프로토콜.
+    """Error self-recovery protocol.
 
-    OpenClaw의 다단계 복구 전략(인증 로테이션, 컨텍스트 컴팩션 등)을
-    에이전트 수준의 프롬프트 가이드로 변환합니다.
+    Translates OpenClaw's multi-stage recovery strategies (auth rotation,
+    context compaction, etc.) into agent-level prompt guidelines.
     """
 
     @staticmethod
     def self_recovery() -> PromptSection:
-        """에러 자기 복구 프로토콜."""
+        """Error self-recovery protocol."""
         content = """## Error Self-Recovery Protocol
 
 When you encounter errors, follow this escalation ladder:

@@ -73,32 +73,32 @@ class UserConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "사용자",
-                "description": "AI 에이전트 조직 내 사용자 페르소나. 에이전트는 이 설정에 따라 사용자를 인식하고 호칭합니다.",
+                "display_name": "User",
+                "description": "User persona within the AI agent organization. Agents recognize and address the user based on these settings.",
                 "groups": {
-                    "identity": "신원 정보",
-                    "organization": "조직 정보",
+                    "identity": "Identity",
+                    "organization": "Organization",
                 },
                 "fields": {
                     "user_name": {
-                        "label": "이름",
-                        "description": "에이전트가 호칭할 이름",
-                        "placeholder": "홍길동",
+                        "label": "Name",
+                        "description": "The name agents will use to address you",
+                        "placeholder": "John Doe",
                     },
                     "user_title": {
-                        "label": "직책",
-                        "description": "조직 내 직책 또는 역할",
+                        "label": "Title / Role",
+                        "description": "Your title or role in the organization",
                         "placeholder": "CTO",
                     },
                     "department": {
-                        "label": "부서",
-                        "description": "소속 부서 또는 팀",
+                        "label": "Department",
+                        "description": "Your department or team",
                         "placeholder": "Engineering",
                     },
                     "description": {
-                        "label": "소개",
-                        "description": "에이전트에게 알려줄 추가 정보 (전문 분야, 선호하는 커뮤니케이션 스타일 등)",
-                        "placeholder": "풀스택 개발 경험이 있으며 간결한 한국어 답변을 선호합니다.",
+                        "label": "Bio",
+                        "description": "Additional context for agents (areas of expertise, preferred communication style, etc.)",
+                        "placeholder": "Full-stack developer who prefers concise answers.",
                     },
                 },
             }

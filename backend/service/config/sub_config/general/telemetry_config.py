@@ -57,23 +57,23 @@ class TelemetryConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "텔레메트리",
-                "description": "자동 업데이트, 오류 보고 및 사용 텔레메트리 제어.",
+                "display_name": "Telemetry",
+                "description": "Control auto-updates, error reporting, and usage telemetry.",
                 "groups": {
-                    "telemetry": "텔레메트리 설정",
+                    "telemetry": "Telemetry Settings",
                 },
                 "fields": {
                     "disable_autoupdater": {
-                        "label": "자동 업데이트 비활성화",
-                        "description": "자동 업데이트 방지",
+                        "label": "Disable Auto-Updater",
+                        "description": "Prevent automatic updates",
                     },
                     "disable_error_reporting": {
-                        "label": "오류 보고 비활성화",
-                        "description": "오류 보고 전송 중지",
+                        "label": "Disable Error Reporting",
+                        "description": "Stop sending error reports",
                     },
                     "disable_telemetry": {
-                        "label": "텔레메트리 비활성화",
-                        "description": "사용 텔레메트리 전송 중지",
+                        "label": "Disable Telemetry",
+                        "description": "Stop sending usage telemetry",
                     },
                 },
             }

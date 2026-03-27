@@ -1,16 +1,16 @@
 """
-모델 폴백 시스템
+Model Fallback System
 
-OpenClaw의 ModelFallbackRunner 패턴을 참고하여 구축.
-주 모델이 실패하면 대체 모델로 자동 전환합니다.
+Built with reference to OpenClaw's ModelFallbackRunner pattern.
+Automatically switches to an alternative model when the primary model fails.
 
-핵심 설계:
-- 모델 후보군을 순서대로 시도
-- Rate limit / Overloaded / Timeout 에러 자동 감지
-- 성공한 모델을 세션 내 기억 (다음 호출에서 우선 사용)
-- AbortError (사용자 취소) 등은 즉시 전파
+Core design:
+- Try candidate models in order
+- Automatically detect Rate limit / Overloaded / Timeout errors
+- Remember the last successful model within the session (prefer it on next call)
+- Immediately propagate AbortError (user cancellation) and similar errors
 
-사용법:
+Usage:
     fallback = ModelFallbackRunner(
         preferred_model="claude-sonnet-4-20250514",
         candidates=["claude-sonnet-4-20250514", "claude-haiku-4-20250414"],
@@ -33,7 +33,7 @@ T = TypeVar("T")
 
 
 class FailureReason(str, Enum):
-    """모델 실패 원인 분류."""
+    """Classification of model failure reasons."""
     RATE_LIMITED = "rate_limited"
     OVERLOADED = "overloaded"
     TIMEOUT = "timeout"
@@ -41,16 +41,16 @@ class FailureReason(str, Enum):
     AUTH_ERROR = "auth_error"
     NETWORK_ERROR = "network_error"
     UNKNOWN = "unknown"
-    ABORT = "abort"  # 사용자 취소 — 폴백 불가
+    ABORT = "abort"  # User cancellation — cannot fall back
 
 
 class AbortError(Exception):
-    """사용자 취소 또는 복구 불가 에러. 폴백하지 않고 즉시 전파."""
+    """User cancellation or unrecoverable error. Propagated immediately without fallback."""
     pass
 
 
 class ModelExhaustedError(Exception):
-    """모든 후보 모델이 실패한 경우."""
+    """Raised when all candidate models have failed."""
 
     def __init__(self, failures: List[Dict[str, Any]]):
         self.failures = failures
@@ -60,7 +60,7 @@ class ModelExhaustedError(Exception):
 
 @dataclass
 class FallbackAttempt:
-    """개별 폴백 시도 기록."""
+    """Record of an individual fallback attempt."""
     model: str
     success: bool
     failure_reason: Optional[FailureReason] = None
@@ -70,7 +70,7 @@ class FallbackAttempt:
 
 @dataclass
 class FallbackResult:
-    """폴백 실행 결과."""
+    """Result of a fallback execution."""
     result: Any = None
     model_used: str = ""
     attempts: List[FallbackAttempt] = field(default_factory=list)
@@ -85,7 +85,7 @@ class FallbackResult:
 # Error Classification
 # ============================================================================
 
-# 에러 메시지 패턴 → FailureReason 매핑
+# Error message patterns → FailureReason mapping
 _ERROR_PATTERNS: List[tuple[str, FailureReason]] = [
     (r"rate.?limit", FailureReason.RATE_LIMITED),
     (r"429", FailureReason.RATE_LIMITED),
@@ -108,7 +108,7 @@ _ERROR_PATTERNS: List[tuple[str, FailureReason]] = [
     (r"cancel", FailureReason.ABORT),
 ]
 
-# 폴백 가능한 에러 유형
+# Error types that can be recovered via fallback
 _RECOVERABLE_FAILURES = {
     FailureReason.RATE_LIMITED,
     FailureReason.OVERLOADED,
@@ -118,7 +118,7 @@ _RECOVERABLE_FAILURES = {
 
 
 def classify_error(error: Exception) -> FailureReason:
-    """에러를 FailureReason으로 분류."""
+    """Classify an error into a FailureReason."""
     if isinstance(error, AbortError):
         return FailureReason.ABORT
     if isinstance(error, asyncio.TimeoutError):
@@ -134,7 +134,7 @@ def classify_error(error: Exception) -> FailureReason:
 
 
 def classify_error_message(error_msg: str) -> FailureReason:
-    """에러 메시지 문자열을 FailureReason으로 분류."""
+    """Classify an error message string into a FailureReason."""
     error_str = error_msg.lower()
     for pattern, reason in _ERROR_PATTERNS:
         if re.search(pattern, error_str, re.IGNORECASE):
@@ -143,7 +143,7 @@ def classify_error_message(error_msg: str) -> FailureReason:
 
 
 def is_recoverable(reason: FailureReason) -> bool:
-    """폴백으로 복구 가능한 에러인지 판단."""
+    """Determine whether an error is recoverable via fallback."""
     return reason in _RECOVERABLE_FAILURES
 
 
@@ -151,14 +151,14 @@ def is_recoverable(reason: FailureReason) -> bool:
 # Model Fallback Runner
 # ============================================================================
 
-# 기본 모델 후보군 (우선순위 순)
+# Default candidate models (in priority order)
 DEFAULT_MODEL_CANDIDATES = [
     "claude-sonnet-4-6",
     "claude-sonnet-4-5-20250929",
     "claude-haiku-4-5-20251001",
 ]
 
-# 모델별 재시도 대기 시간 (초)
+# Retry wait time per model (seconds)
 _RETRY_DELAYS: Dict[FailureReason, float] = {
     FailureReason.RATE_LIMITED: 5.0,
     FailureReason.OVERLOADED: 3.0,
@@ -168,11 +168,11 @@ _RETRY_DELAYS: Dict[FailureReason, float] = {
 
 
 class ModelFallbackRunner:
-    """모델 폴백 실행기.
+    """Model fallback runner.
 
-    주 모델이 실패하면 후보군을 순차적으로 시도합니다.
+    Tries candidate models sequentially when the primary model fails.
 
-    사용법:
+    Usage:
         runner = ModelFallbackRunner(
             preferred_model="claude-sonnet-4-20250514",
         )
@@ -193,25 +193,25 @@ class ModelFallbackRunner:
     ):
         """
         Args:
-            preferred_model: 선호 모델 (첫 번째로 시도)
-            candidates: 후보 모델 목록 (preferred_model 포함)
-            max_retries_per_model: 모델당 최대 재시도 횟수
-            allowlist: 허용된 모델 목록 (None이면 모든 후보 허용)
+            preferred_model: Preferred model (tried first)
+            candidates: List of candidate models (including preferred_model)
+            max_retries_per_model: Maximum number of retries per model
+            allowlist: List of allowed models (None means all candidates are allowed)
         """
         self._preferred_model = preferred_model
         self._candidates = candidates or DEFAULT_MODEL_CANDIDATES
         self._max_retries = max_retries_per_model
         self._allowlist: Optional[set[str]] = set(allowlist) if allowlist else None
 
-        # 선호 모델이 후보군에 없으면 맨 앞에 추가
+        # If preferred model is not in candidates, prepend it
         if preferred_model not in self._candidates:
             self._candidates.insert(0, preferred_model)
 
-        # allowlist 필터링
+        # Filter by allowlist
         if self._allowlist:
             self._candidates = [m for m in self._candidates if m in self._allowlist]
 
-        # 마지막 성공 모델 기억
+        # Remember the last successful model
         self._last_successful_model: Optional[str] = None
 
     @property
@@ -223,21 +223,21 @@ class ModelFallbackRunner:
         return self._last_successful_model
 
     def _get_ordered_candidates(self) -> List[str]:
-        """시도 순서 결정: 마지막 성공 모델 → 선호 모델 → 나머지."""
+        """Determine the order to try: last successful model → preferred model → the rest."""
         ordered = []
         seen = set()
 
-        # 1. 마지막 성공 모델 우선
+        # 1. Last successful model first
         if self._last_successful_model and self._last_successful_model in self._candidates:
             ordered.append(self._last_successful_model)
             seen.add(self._last_successful_model)
 
-        # 2. 선호 모델
+        # 2. Preferred model
         if self._preferred_model not in seen and self._preferred_model in self._candidates:
             ordered.append(self._preferred_model)
             seen.add(self._preferred_model)
 
-        # 3. 나머지
+        # 3. The rest
         for model in self._candidates:
             if model not in seen:
                 ordered.append(model)
@@ -250,18 +250,18 @@ class ModelFallbackRunner:
         execute_fn: Callable[[str], Awaitable[T]],
         on_fallback: Optional[Callable[[str, str, FailureReason], Awaitable[None]]] = None,
     ) -> FallbackResult:
-        """폴백 로직을 적용하여 실행.
+        """Execute with fallback logic applied.
 
         Args:
-            execute_fn: 모델명을 받아 실행하는 비동기 함수
-            on_fallback: 폴백 발생 시 콜백 (from_model, to_model, reason)
+            execute_fn: Async function that accepts a model name and runs it
+            on_fallback: Callback when fallback occurs (from_model, to_model, reason)
 
         Returns:
-            FallbackResult (성공 결과 + 시도 기록)
+            FallbackResult (success result + attempt history)
 
         Raises:
-            AbortError: 사용자 취소
-            ModelExhaustedError: 모든 후보 실패
+            AbortError: User cancellation
+            ModelExhaustedError: All candidates failed
         """
         import time
 
@@ -284,7 +284,7 @@ class ModelFallbackRunner:
                     result.model_used = model
                     result.fallback_occurred = (idx > 0 or retry > 0)
 
-                    # 성공한 모델 기억
+                    # Remember the successful model
                     self._last_successful_model = model
 
                     if result.fallback_occurred:
@@ -296,7 +296,7 @@ class ModelFallbackRunner:
                     return result
 
                 except AbortError:
-                    # 사용자 취소 — 즉시 전파
+                    # User cancellation — propagate immediately
                     raise
 
                 except Exception as e:
@@ -315,16 +315,16 @@ class ModelFallbackRunner:
                         f"error={str(e)[:100]}"
                     )
 
-                    # 복구 불가능한 에러 → 다음 모델로
+                    # Unrecoverable error → move to next model
                     if not is_recoverable(reason):
                         break
 
-                    # 재시도 대기
+                    # Wait before retrying
                     if retry < self._max_retries:
                         delay = _RETRY_DELAYS.get(reason, 2.0)
                         await asyncio.sleep(delay)
 
-            # 현재 모델 실패 → 다음 모델로 폴백
+            # Current model failed → fall back to next model
             if idx < len(candidates) - 1:
                 next_model = candidates[idx + 1]
                 logger.info(f"Falling back: {model} → {next_model}")
@@ -334,9 +334,9 @@ class ModelFallbackRunner:
                     try:
                         await on_fallback(model, next_model, last_reason)
                     except Exception:
-                        pass  # 콜백 에러는 무시
+                        pass  # Ignore callback errors
 
-        # 모든 후보 소진
+        # All candidates exhausted
         failures = [
             {
                 "model": a.model,
@@ -357,7 +357,7 @@ def create_fallback_runner(
     model: str = "claude-sonnet-4-20250514",
     candidates: Optional[List[str]] = None,
 ) -> ModelFallbackRunner:
-    """ModelFallbackRunner 생성 편의 함수."""
+    """Convenience function to create a ModelFallbackRunner."""
     return ModelFallbackRunner(
         preferred_model=model,
         candidates=candidates,

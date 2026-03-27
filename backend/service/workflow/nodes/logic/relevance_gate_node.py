@@ -183,11 +183,9 @@ class RelevanceGateNode(BaseNode):
             )
             response_text = response.content.strip().lower()
 
-            # Check for explicit yes/no — handle both English and Korean
+            # Check for explicit yes/no
             is_relevant = (
                 "yes" in response_text
-                or "예" in response_text
-                or "네" in response_text
             ) and "no" not in response_text[:5]
 
             logger.info(

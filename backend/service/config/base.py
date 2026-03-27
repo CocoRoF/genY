@@ -171,7 +171,7 @@ class BaseConfig(ABC):
                     "display_name": "...",
                     "description": "...",
                     "groups": {
-                        "group_name": "그룹 이름",
+                        "group_name": "Group Name",
                     },
                     "fields": {
                         "field_name": {

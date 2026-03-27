@@ -1,32 +1,32 @@
 """
-AgentSessionManager - AgentSession 관리자
+AgentSessionManager - AgentSession Manager
 
-기존 SessionManager를 확장하여 AgentSession(CompiledStateGraph) 기반
-세션을 관리합니다.
+Extends the existing SessionManager to manage sessions based on
+AgentSession (CompiledStateGraph).
 
-기존 SessionManager의 모든 기능을 유지하면서
-AgentSession 전용 메서드를 추가합니다.
+Retains all functionality of the existing SessionManager while
+adding methods dedicated to AgentSession management.
 
-사용 예:
+Usage example:
     from service.langgraph import get_agent_session_manager
 
     manager = get_agent_session_manager()
 
-    # AgentSession 생성
+    # Create an AgentSession
     agent = await manager.create_agent_session(CreateSessionRequest(
         working_dir="/path/to/project",
         model="claude-sonnet-4-20250514",
     ))
 
-    # AgentSession 가져오기
+    # Retrieve an AgentSession
     agent = manager.get_agent(session_id)
 
-    # 실행
+    # Execute
     result = await agent.invoke("Hello")
 
-    # 기존 SessionManager 호환
-    process = manager.get_process(session_id)  # ClaudeProcess 반환
-    sessions = manager.list_sessions()  # SessionInfo 리스트 반환
+    # Legacy SessionManager compatibility
+    process = manager.get_process(session_id)  # Returns ClaudeProcess
+    sessions = manager.list_sessions()  # Returns list of SessionInfo
 """
 
 from logging import getLogger
@@ -59,21 +59,21 @@ logger = getLogger(__name__)
 
 class AgentSessionManager(SessionManager):
     """
-    AgentSession 관리자.
+    AgentSession manager.
 
-    SessionManager를 상속하여 기존 기능을 모두 유지하면서
-    AgentSession(CompiledStateGraph) 기반 세션 관리 기능을 추가합니다.
+    Inherits from SessionManager to retain all existing functionality while
+    adding session management capabilities based on AgentSession (CompiledStateGraph).
 
-    핵심 구조:
-    - _local_agents: AgentSession 저장소 (로컬)
-    - _local_processes: ClaudeProcess 저장소 (기존, 호환성을 위해 유지)
+    Core structure:
+    - _local_agents: AgentSession store (local)
+    - _local_processes: ClaudeProcess store (existing, retained for compatibility)
 
-    두 방식 모두 지원:
-    1. AgentSession 방식 (LangGraph 상태 관리)
+    Both approaches are supported:
+    1. AgentSession approach (LangGraph state management)
        - create_agent_session() -> AgentSession
        - get_agent() -> AgentSession
 
-    2. 기존 방식 (ClaudeProcess 직접 사용)
+    2. Legacy approach (direct ClaudeProcess usage)
        - create_session() -> SessionInfo
        - get_process() -> ClaudeProcess
     """
@@ -81,7 +81,7 @@ class AgentSessionManager(SessionManager):
     def __init__(self):
         super().__init__()
 
-        # AgentSession 저장소 (로컬)
+        # AgentSession store (local)
         self._local_agents: Dict[str, AgentSession] = {}
 
         # Persistent session metadata store (sessions.json)
@@ -283,19 +283,19 @@ class AgentSessionManager(SessionManager):
         session_id: Optional[str] = None,
     ) -> AgentSession:
         """
-        새 AgentSession 생성.
+        Create a new AgentSession.
 
-        1. ClaudeProcess 생성 (via AgentSession.create())
-        2. CompiledStateGraph 빌드
-        3. 로컬 저장소에 등록
+        1. Create ClaudeProcess (via AgentSession.create())
+        2. Build CompiledStateGraph
+        3. Register in local store
 
         Args:
-            request: 세션 생성 요청
-            enable_checkpointing: 체크포인팅 활성화 여부
-            session_id: 기존 session_id 재사용 (복원 시)
+            request: Session creation request
+            enable_checkpointing: Whether to enable checkpointing
+            session_id: Reuse an existing session_id (for restoration)
 
         Returns:
-            생성된 AgentSession 인스턴스
+            The created AgentSession instance
         """
         logger.info(f"Creating new AgentSession...")
         logger.info(f"  session_name: {request.session_name}")
@@ -379,7 +379,7 @@ class AgentSessionManager(SessionManager):
             extra_mcp=request.mcp_config,
         )
 
-        # 시스템 프롬프트 준비 — 모듈러 프롬프트 빌더 사용
+        # Prepare system prompt — using modular prompt builder
         # Extract non-internal MCP server names for the prompt
         resolved_mcp_names = []
         if merged_mcp_config and merged_mcp_config.servers:
@@ -420,7 +420,7 @@ class AgentSessionManager(SessionManager):
 
         logger.info(f"  workflow_id: {workflow_id}, graph_name: {graph_name}")
 
-        # AgentSession 생성
+        # Create AgentSession
         agent = await AgentSession.create(
             working_dir=request.working_dir,
             model_name=request.model,
@@ -441,10 +441,10 @@ class AgentSessionManager(SessionManager):
 
         session_id = agent.session_id
 
-        # 로컬 저장소에 등록
+        # Register in local store
         self._local_agents[session_id] = agent
 
-        # 기존 호환성: ClaudeProcess도 _local_processes에 등록
+        # Legacy compatibility: also register ClaudeProcess in _local_processes
         if agent.process:
             self._local_processes[session_id] = agent.process
 
@@ -467,10 +467,10 @@ class AgentSessionManager(SessionManager):
                     shared_path=self._shared_folder_manager.shared_path,
                 )
 
-        # SessionInfo 생성
+        # Create SessionInfo
         session_info = agent.get_session_info()
 
-        # 세션 로거 생성
+        # Create session logger
         session_logger = get_session_logger(session_id, request.session_name, create_if_missing=True)
         if session_logger:
             session_logger.log_session_event("created", {
@@ -493,46 +493,46 @@ class AgentSessionManager(SessionManager):
 
     def get_agent(self, session_id: str) -> Optional[AgentSession]:
         """
-        AgentSession 가져오기.
+        Retrieve an AgentSession.
 
         Args:
-            session_id: 세션 ID
+            session_id: Session ID
 
         Returns:
-            AgentSession 인스턴스 또는 None
+            AgentSession instance or None
         """
         return self._local_agents.get(session_id)
 
     def has_agent(self, session_id: str) -> bool:
         """
-        AgentSession 존재 여부 확인.
+        Check whether an AgentSession exists.
 
         Args:
-            session_id: 세션 ID
+            session_id: Session ID
 
         Returns:
-            존재 여부
+            Whether it exists
         """
         return session_id in self._local_agents
 
     def list_agents(self) -> List[AgentSession]:
         """
-        모든 AgentSession 목록 반환.
+        Return a list of all AgentSessions.
 
         Returns:
-            AgentSession 리스트
+            List of AgentSession instances
         """
         return list(self._local_agents.values())
 
     def get_agent_by_name(self, name: str) -> Optional[AgentSession]:
         """
-        세션 이름으로 AgentSession 조회.
+        Look up an AgentSession by session name.
 
         Args:
-            name: 세션 이름 (case-insensitive match)
+            name: Session name (case-insensitive match)
 
         Returns:
-            일치하는 AgentSession 또는 None
+            Matching AgentSession or None
         """
         name_lower = name.strip().lower()
         for agent in self._local_agents.values():
@@ -542,13 +542,13 @@ class AgentSessionManager(SessionManager):
 
     def resolve_session(self, name_or_id: str) -> Optional[AgentSession]:
         """
-        이름 또는 ID로 세션 조회. ID를 먼저 확인, 없으면 이름으로 fallback.
+        Look up a session by name or ID. Checks ID first, falls back to name.
 
         Args:
-            name_or_id: 세션 ID 또는 세션 이름
+            name_or_id: Session ID or session name
 
         Returns:
-            일치하는 AgentSession 또는 None
+            Matching AgentSession or None
         """
         # Try exact ID match first
         agent = self.get_agent(name_or_id)
@@ -563,29 +563,29 @@ class AgentSessionManager(SessionManager):
 
     async def delete_session(self, session_id: str, cleanup_storage: bool = False) -> bool:
         """
-        세션 삭제 (AgentSession 및 기존 방식 모두 지원).
+        Delete a session (supports both AgentSession and legacy approach).
 
         Args:
-            session_id: 세션 ID
-            cleanup_storage: 스토리지 정리 여부 (기본 False — soft-delete 시 보존)
+            session_id: Session ID
+            cleanup_storage: Whether to clean up storage (default False — preserve on soft-delete)
 
         Returns:
-            삭제 성공 여부
+            Whether deletion succeeded
         """
-        # AgentSession인 경우
+        # If it's an AgentSession
         agent = self._local_agents.get(session_id)
         if agent:
             logger.info(f"[{session_id}] Deleting AgentSession...")
 
-            # 세션 로거 이벤트
+            # Session logger event
             session_logger = get_session_logger(session_id, create_if_missing=False)
             if session_logger:
                 session_logger.log_session_event("deleted")
 
-            # AgentSession 정리 (프로세스 중지, 리소스 해제)
+            # Clean up AgentSession (stop process, release resources)
             await agent.cleanup()
 
-            # 스토리지 정리 (permanent delete 시에만)
+            # Clean up storage (only on permanent delete)
             if cleanup_storage and agent.storage_path:
                 import shutil
                 from pathlib import Path as FilePath
@@ -597,14 +597,14 @@ class AgentSessionManager(SessionManager):
                     except Exception as e:
                         logger.warning(f"[{session_id}] Failed to cleanup storage: {e}")
 
-            # 로컬 저장소에서 제거
+            # Remove from local store
             del self._local_agents[session_id]
 
-            # _local_processes에서도 제거 (호환성)
+            # Also remove from _local_processes (for compatibility)
             if session_id in self._local_processes:
                 del self._local_processes[session_id]
 
-            # 세션 로거 제거
+            # Remove session logger
             remove_session_logger(session_id)
 
             # Soft-delete in persistent store (keeps metadata for restore)
@@ -613,17 +613,17 @@ class AgentSessionManager(SessionManager):
             logger.info(f"[{session_id}] ✅ AgentSession deleted (soft)")
             return True
 
-        # 기존 방식 (ClaudeProcess 직접)
+        # Legacy approach (direct ClaudeProcess)
         return await super().delete_session(session_id, cleanup_storage)
 
     async def cleanup_dead_sessions(self):
         """
-        죽은 세션 정리 (AgentSession 및 기존 방식 모두).
+        Clean up dead sessions (both AgentSession and legacy approach).
 
         Philosophy: Try to REVIVE idle/dead agent sessions before deleting
         them.  Only sessions that fail revival are removed.
         """
-        # AgentSession 정리 — try revival first
+        # Clean up AgentSessions — try revival first
         dead_agents = [
             session_id
             for session_id, agent in self._local_agents.items()
@@ -649,7 +649,7 @@ class AgentSessionManager(SessionManager):
             logger.info(f"[{session_id}] Cleaning up unrevivable AgentSession")
             await self.delete_session(session_id)
 
-        # 기존 프로세스 정리 (AgentSession이 아닌 것만)
+        # Clean up legacy processes (only those that are not AgentSessions)
         dead_processes = [
             session_id
             for session_id, process in self._local_processes.items()
@@ -752,33 +752,33 @@ class AgentSessionManager(SessionManager):
         enable_checkpointing: bool = False,
     ) -> Optional[AgentSession]:
         """
-        기존 ClaudeProcess 세션을 AgentSession으로 업그레이드.
+        Upgrade an existing ClaudeProcess session to an AgentSession.
 
-        기존 세션의 ClaudeProcess를 유지하면서
-        AgentSession으로 래핑합니다.
+        Retains the existing session's ClaudeProcess while
+        wrapping it as an AgentSession.
 
         Args:
-            session_id: 세션 ID
-            enable_checkpointing: 체크포인팅 활성화
+            session_id: Session ID
+            enable_checkpointing: Enable checkpointing
 
         Returns:
-            AgentSession 인스턴스 또는 None
+            AgentSession instance or None
         """
-        # 이미 AgentSession인 경우
+        # Already an AgentSession
         if session_id in self._local_agents:
             logger.info(f"[{session_id}] Already an AgentSession")
             return self._local_agents[session_id]
 
-        # ClaudeProcess 가져오기
+        # Retrieve ClaudeProcess
         process = self._local_processes.get(session_id)
         if not process:
             logger.warning(f"[{session_id}] Session not found")
             return None
 
-        # AgentSession으로 변환
+        # Convert to AgentSession
         agent = AgentSession.from_process(process, enable_checkpointing=enable_checkpointing)
 
-        # 저장소에 등록
+        # Register in store
         self._local_agents[session_id] = agent
 
         logger.info(f"[{session_id}] ✅ Upgraded to AgentSession")
@@ -793,10 +793,10 @@ _agent_session_manager: Optional[AgentSessionManager] = None
 
 def get_agent_session_manager() -> AgentSessionManager:
     """
-    싱글톤 AgentSessionManager 인스턴스 반환.
+    Return the singleton AgentSessionManager instance.
 
     Returns:
-        AgentSessionManager 인스턴스
+        AgentSessionManager instance
     """
     global _agent_session_manager
     if _agent_session_manager is None:
@@ -806,7 +806,7 @@ def get_agent_session_manager() -> AgentSessionManager:
 
 def reset_agent_session_manager():
     """
-    AgentSessionManager 싱글톤 리셋 (테스트용).
+    Reset the AgentSessionManager singleton (for testing).
     """
     global _agent_session_manager
     _agent_session_manager = None

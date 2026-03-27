@@ -595,8 +595,6 @@ class AutonomousGraph:
                 response_text = raw_text.strip().lower()
                 is_relevant = (
                     "yes" in response_text
-                    or "예" in response_text
-                    or "네" in response_text
                     or '"relevant": true' in response_text
                     or '"relevant":true' in response_text
                 ) and "no" not in response_text[:5]
@@ -666,8 +664,6 @@ class AutonomousGraph:
 
             is_relevant = (
                 "yes" in response_text
-                or "예" in response_text
-                or "네" in response_text
             ) and "no" not in response_text[:5]
 
             logger.info(

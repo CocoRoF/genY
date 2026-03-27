@@ -1,29 +1,29 @@
 """
-컨텍스트 윈도우 가드 시스템
+Context Window Guard System
 
-OpenClaw의 컨텍스트 관리 패턴을 참고하여 구축.
-대화가 길어짐에 따라 컨텍스트 윈도우 초과를 방지합니다.
+Built with reference to OpenClaw's context management pattern.
+Prevents context window overflow as conversations grow longer.
 
-핵심 설계:
-- 토큰 수 추정 (정확한 토큰화 없이 문자/단어 기반 휴리스틱)
-- Warn / Block 임계값 기반 2단계 경고
-- 임계값 도달 시 컴팩션 전략 제안 또는 자동 적용
-- LangGraph 상태와 통합 가능
+Core design:
+- Token count estimation (character/word-based heuristic without exact tokenization)
+- Two-level warning based on Warn / Block thresholds
+- Suggests or automatically applies compaction strategy when threshold is reached
+- Integrable with LangGraph state
 
-사용법:
+Usage:
     guard = ContextWindowGuard(
         model="claude-sonnet-4-20250514",
         warn_ratio=0.75,
         block_ratio=0.90,
     )
 
-    # 메시지 추가 시마다 체크
+    # Check on every message addition
     status = guard.check(messages)
     if status.should_block:
-        # 실행 중단 또는 컴팩션
+        # Stop execution or compact
         messages = guard.compact(messages)
     elif status.should_warn:
-        # 경고 로그
+        # Warning log
         logger.warning(status.message)
 """
 
@@ -41,7 +41,7 @@ logger = getLogger(__name__)
 # Model Context Limits
 # ============================================================================
 
-# Claude 모델별 컨텍스트 윈도우 크기 (토큰)
+# Context window size (tokens) per Claude model
 MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     # Claude 4.6
     "claude-opus-4-6": 200_000,
@@ -63,25 +63,25 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-3-haiku-20240307": 200_000,
 }
 
-# 모델명 인식 실패 시 기본값
+# Default value when model name cannot be recognized
 DEFAULT_CONTEXT_LIMIT = 200_000
 
-# 토큰 추정 상수
-# 영어: ~4 chars/token, 한국어: ~2-3 chars/token
-# 보수적으로 3 chars/token 사용
+# Token estimation constants
+# English: ~4 chars/token, Korean: ~2-3 chars/token
+# Conservatively using 3 chars/token
 CHARS_PER_TOKEN_ESTIMATE = 3.0
 
 
 def get_context_limit(model: Optional[str]) -> int:
-    """모델의 컨텍스트 윈도우 크기를 반환."""
+    """Return the context window size for a model."""
     if not model:
         return DEFAULT_CONTEXT_LIMIT
 
-    # 정확한 이름 매치
+    # Exact name match
     if model in MODEL_CONTEXT_LIMITS:
         return MODEL_CONTEXT_LIMITS[model]
 
-    # 부분 매치 (모델명에 키워드가 포함된 경우)
+    # Partial match (when the model name contains a keyword)
     model_lower = model.lower()
     for key, limit in MODEL_CONTEXT_LIMITS.items():
         if key in model_lower or model_lower in key:
@@ -91,10 +91,10 @@ def get_context_limit(model: Optional[str]) -> int:
 
 
 def estimate_tokens(text: str) -> int:
-    """텍스트의 토큰 수를 추정.
+    """Estimate the token count of text.
 
-    정확한 토큰화 없이 문자 수 기반 휴리스틱으로 추정합니다.
-    보수적으로 추정하여 오버플로우를 방지합니다.
+    Estimates based on character count heuristic without exact tokenization.
+    Estimates conservatively to prevent overflow.
     """
     if not text:
         return 0
@@ -102,14 +102,14 @@ def estimate_tokens(text: str) -> int:
 
 
 def estimate_messages_tokens(messages: List[Dict[str, Any]]) -> int:
-    """메시지 리스트의 총 토큰 수를 추정.
+    """Estimate the total token count of a message list.
 
-    각 메시지의 role, content, tool_calls 등을 합산합니다.
-    메시지 오버헤드(role tag 등)도 포함합니다.
+    Sums role, content, tool_calls, etc. for each message.
+    Also includes message overhead (role tags, etc.).
     """
     total = 0
     for msg in messages:
-        # 메시지 오버헤드 (~4 tokens for role tag)
+        # Message overhead (~4 tokens for role tag)
         total += 4
 
         # content
@@ -117,7 +117,7 @@ def estimate_messages_tokens(messages: List[Dict[str, Any]]) -> int:
         if isinstance(content, str):
             total += estimate_tokens(content)
         elif isinstance(content, list):
-            # 멀티모달 content (text blocks)
+            # Multimodal content (text blocks)
             for block in content:
                 if isinstance(block, dict):
                     total += estimate_tokens(block.get("text", ""))
@@ -138,16 +138,16 @@ def estimate_messages_tokens(messages: List[Dict[str, Any]]) -> int:
 # ============================================================================
 
 class ContextStatus(str, Enum):
-    """컨텍스트 상태."""
-    OK = "ok"           # 정상
-    WARN = "warn"       # 경고 임계값 도달
-    BLOCK = "block"     # 차단 임계값 도달
-    OVERFLOW = "overflow"  # 이미 초과
+    """Context status."""
+    OK = "ok"           # Normal
+    WARN = "warn"       # Warning threshold reached
+    BLOCK = "block"     # Block threshold reached
+    OVERFLOW = "overflow"  # Already exceeded
 
 
 @dataclass
 class ContextCheckResult:
-    """컨텍스트 체크 결과."""
+    """Context check result."""
     status: ContextStatus
     estimated_tokens: int
     context_limit: int
@@ -172,11 +172,11 @@ class ContextCheckResult:
 # ============================================================================
 
 class CompactionStrategy(str, Enum):
-    """컨텍스트 컴팩션 전략."""
-    TRUNCATE_EARLY = "truncate_early"       # 초기 메시지 제거
-    SUMMARIZE_PREFIX = "summarize_prefix"    # 초기 부분 요약
-    KEEP_RECENT = "keep_recent"             # 최근 N개만 유지
-    REMOVE_TOOL_DETAILS = "remove_tool_details"  # 도구 호출 상세 제거
+    """Context compaction strategy."""
+    TRUNCATE_EARLY = "truncate_early"       # Remove early messages
+    SUMMARIZE_PREFIX = "summarize_prefix"    # Summarize the early portion
+    KEEP_RECENT = "keep_recent"             # Keep only the most recent N messages
+    REMOVE_TOOL_DETAILS = "remove_tool_details"  # Remove tool call details
 
 
 def compact_messages(
@@ -185,16 +185,16 @@ def compact_messages(
     keep_count: int = 10,
     keep_system: bool = True,
 ) -> List[Dict[str, Any]]:
-    """메시지를 컴팩션하여 컨텍스트를 줄임.
+    """Compact messages to reduce context.
 
     Args:
-        messages: 원본 메시지 리스트
-        strategy: 컴팩션 전략
-        keep_count: 유지할 최근 메시지 수
-        keep_system: 시스템 메시지를 항상 유지할지 여부
+        messages: Original message list
+        strategy: Compaction strategy
+        keep_count: Number of recent messages to keep
+        keep_system: Whether to always retain system messages
 
     Returns:
-        컴팩션된 메시지 리스트
+        Compacted message list
     """
     if not messages:
         return messages
@@ -206,7 +206,7 @@ def compact_messages(
     elif strategy == CompactionStrategy.REMOVE_TOOL_DETAILS:
         return _compact_remove_tool_details(messages)
     else:
-        # 기본: KEEP_RECENT
+        # Default: KEEP_RECENT
         return _compact_keep_recent(messages, keep_count, keep_system)
 
 
@@ -215,20 +215,20 @@ def _compact_keep_recent(
     keep_count: int,
     keep_system: bool,
 ) -> List[Dict[str, Any]]:
-    """최근 N개 메시지만 유지."""
+    """Keep only the most recent N messages."""
     result = []
 
-    # 시스템 메시지 추출
+    # Extract system messages
     if keep_system:
         for msg in messages:
             if msg.get("role") == "system":
                 result.append(msg)
 
-    # 최근 메시지 추가
+    # Add recent messages
     non_system = [m for m in messages if m.get("role") != "system"]
     recent = non_system[-keep_count:] if len(non_system) > keep_count else non_system
 
-    # 요약 마커 삽입
+    # Insert summary marker
     if len(non_system) > keep_count:
         removed_count = len(non_system) - keep_count
         result.append({
@@ -248,8 +248,8 @@ def _compact_truncate_early(
     keep_count: int,
     keep_system: bool,
 ) -> List[Dict[str, Any]]:
-    """초기 메시지를 잘라냄 (시스템 메시지 + 최근 N개 유지)."""
-    # KEEP_RECENT와 동일하지만 요약 마커가 다름
+    """Truncate early messages (keep system messages + most recent N)."""
+    # Same as KEEP_RECENT but with a different summary marker
     result = []
 
     if keep_system:
@@ -273,12 +273,12 @@ def _compact_truncate_early(
 def _compact_remove_tool_details(
     messages: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """도구 호출 결과의 상세 내용을 축소."""
+    """Condense the detailed content of tool call results."""
     result = []
     for msg in messages:
         msg_copy = dict(msg)
 
-        # tool result 메시지의 content를 축소
+        # Condense the content of tool result messages
         if msg_copy.get("role") == "tool":
             content = msg_copy.get("content", "")
             if isinstance(content, str) and len(content) > 500:
@@ -294,14 +294,14 @@ def _compact_remove_tool_details(
 # ============================================================================
 
 class ContextWindowGuard:
-    """컨텍스트 윈도우 가드.
+    """Context window guard.
 
-    대화 길이를 모니터링하고 오버플로우를 방지합니다.
+    Monitors conversation length and prevents overflow.
 
-    사용법:
+    Usage:
         guard = ContextWindowGuard(model="claude-sonnet-4-20250514")
 
-        # 메시지 체크
+        # Check messages
         result = guard.check(messages)
         if result.should_block:
             messages = guard.auto_compact(messages)
@@ -320,12 +320,12 @@ class ContextWindowGuard:
     ):
         """
         Args:
-            model: 모델명 (context_limit 자동 결정에 사용)
-            context_limit: 컨텍스트 윈도우 크기 (직접 지정 시)
-            warn_ratio: 경고 임계값 (0.0~1.0)
-            block_ratio: 차단 임계값 (0.0~1.0)
-            auto_compact_strategy: 자동 컴팩션 전략
-            auto_compact_keep_count: 자동 컴팩션 시 유지할 메시지 수
+            model: Model name (used for automatic context_limit determination)
+            context_limit: Context window size (when specified directly)
+            warn_ratio: Warning threshold (0.0~1.0)
+            block_ratio: Block threshold (0.0~1.0)
+            auto_compact_strategy: Auto-compaction strategy
+            auto_compact_keep_count: Number of messages to retain during auto-compaction
         """
         self._model = model
         self._context_limit = context_limit or get_context_limit(model)
@@ -334,7 +334,7 @@ class ContextWindowGuard:
         self._auto_compact_strategy = auto_compact_strategy
         self._auto_compact_keep_count = auto_compact_keep_count
 
-        # 통계
+        # Statistics
         self._check_count = 0
         self._warn_count = 0
         self._block_count = 0
@@ -366,11 +366,11 @@ class ContextWindowGuard:
         messages: List[Dict[str, Any]],
         system_prompt_tokens: int = 0,
     ) -> ContextCheckResult:
-        """메시지 리스트의 컨텍스트 사용량을 체크.
+        """Check the context usage of a message list.
 
         Args:
-            messages: 메시지 리스트 (LangChain 또는 dict 형태)
-            system_prompt_tokens: 시스템 프롬프트의 추정 토큰 수
+            messages: Message list (LangChain or dict format)
+            system_prompt_tokens: Estimated token count of the system prompt
 
         Returns:
             ContextCheckResult
@@ -419,7 +419,7 @@ class ContextWindowGuard:
         )
 
     def check_text(self, text: str) -> ContextCheckResult:
-        """단일 텍스트의 컨텍스트 사용량 체크 (편의 메서드)."""
+        """Check context usage for a single text (convenience method)."""
         estimated = estimate_tokens(text)
         ratio = estimated / self._context_limit if self._context_limit > 0 else 1.0
 
@@ -443,15 +443,15 @@ class ContextWindowGuard:
         strategy: Optional[CompactionStrategy] = None,
         keep_count: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
-        """자동 컴팩션 적용.
+        """Apply automatic compaction.
 
         Args:
-            messages: 원본 메시지 리스트
-            strategy: 컴팩션 전략 (None이면 기본값 사용)
-            keep_count: 유지할 메시지 수 (None이면 기본값 사용)
+            messages: Original message list
+            strategy: Compaction strategy (uses default if None)
+            keep_count: Number of messages to keep (uses default if None)
 
         Returns:
-            컴팩션된 메시지 리스트
+            Compacted message list
         """
         self._compact_count += 1
         used_strategy = strategy or self._auto_compact_strategy
@@ -478,22 +478,22 @@ class ContextWindowGuard:
         messages: List[Dict[str, Any]],
         system_prompt_tokens: int = 0,
     ) -> Tuple[List[Dict[str, Any]], ContextCheckResult]:
-        """체크와 컴팩션을 한번에 수행.
+        """Perform check and compaction in one step.
 
-        블록 수준이면 자동 컴팩션을 적용합니다.
+        If at block level, automatically applies compaction.
 
         Args:
-            messages: 메시지 리스트
-            system_prompt_tokens: 시스템 프롬프트 토큰 수
+            messages: Message list
+            system_prompt_tokens: System prompt token count
 
         Returns:
-            (컴팩션된 메시지, 체크 결과) 튜플
+            Tuple of (compacted messages, check result)
         """
         result = self.check(messages, system_prompt_tokens)
 
         if result.should_block:
             compacted = self.auto_compact(messages)
-            # 재체크
+            # Re-check
             result = self.check(compacted, system_prompt_tokens)
             return compacted, result
 

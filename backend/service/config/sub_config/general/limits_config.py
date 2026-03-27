@@ -60,31 +60,31 @@ class LimitsConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "제한",
-                "description": "API 비용 예산, 에이전트 턴 제한 및 Bash 명령 타임아웃.",
+                "display_name": "Limits",
+                "description": "API cost budget, agent turn limits, and bash command timeouts.",
                 "groups": {
-                    "limits": "제한 설정",
+                    "limits": "Limit Settings",
                 },
                 "fields": {
                     "max_budget_usd": {
-                        "label": "최대 예산 (USD)",
-                        "description": "세션당 최대 API 비용 제한",
+                        "label": "Max Budget (USD)",
+                        "description": "Maximum API cost limit per session",
                     },
                     "max_turns": {
-                        "label": "최대 에이전트 턴",
-                        "description": "작업당 최대 에이전트 턴 수",
+                        "label": "Max Agent Turns",
+                        "description": "Maximum number of agent turns per task",
                     },
                     "bash_default_timeout_ms": {
-                        "label": "Bash 기본 타임아웃 (ms)",
-                        "description": "Bash 명령의 기본 타임아웃",
+                        "label": "Bash Default Timeout (ms)",
+                        "description": "Default timeout for bash commands",
                     },
                     "bash_max_timeout_ms": {
-                        "label": "Bash 최대 타임아웃 (ms)",
-                        "description": "Bash 명령의 최대 허용 타임아웃",
+                        "label": "Bash Max Timeout (ms)",
+                        "description": "Maximum allowed timeout for bash commands",
                     },
                     "disallowed_tools": {
-                        "label": "비활성화 도구",
-                        "description": "Claude CLI에서 비활성화할 내장 도구 (쉼표 구분)",
+                        "label": "Disallowed Tools",
+                        "description": "Comma-separated list of Claude CLI built-in tools to disable",
                     },
                 },
             }

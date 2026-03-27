@@ -15,7 +15,7 @@ def create_all_tools_preset() -> ToolPresetDefinition:
     return ToolPresetDefinition(
         id="template-all-tools",
         name="All Tools",
-        description="모든 custom 도구와 MCP 서버 활성화.",
+        description="Activate all custom tools and MCP servers.",
         icon="🚀",
         custom_tools=["*"],
         mcp_servers=["*"],

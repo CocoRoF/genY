@@ -89,24 +89,24 @@ class SharedFolderConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "공유 폴더",
-                "description": "모든 세션이 접근 가능한 공유 폴더 — 세션 간 파일 교환 및 협업을 위한 설정.",
+                "display_name": "Shared Folder",
+                "description": "Shared folder accessible by all sessions — settings for cross-session file exchange and collaboration.",
                 "groups": {
-                    "shared_folder": "공유 폴더 설정",
+                    "shared_folder": "Shared Folder Settings",
                 },
                 "fields": {
                     "enabled": {
-                        "label": "공유 폴더 활성화",
-                        "description": "활성화하면 모든 세션에 공유 폴더 링크가 자동 생성됩니다",
+                        "label": "Enable Shared Folder",
+                        "description": "When enabled, a shared folder link is automatically created in every session",
                     },
                     "shared_folder_path": {
-                        "label": "공유 폴더 경로",
-                        "description": "공유 폴더의 절대 경로 (비어있으면 기본 경로 사용)",
-                        "placeholder": "비어있으면 기본값: {STORAGE_ROOT}/_shared",
+                        "label": "Shared Folder Path",
+                        "description": "Absolute path for the shared folder (uses default path if empty)",
+                        "placeholder": "If empty, default: {STORAGE_ROOT}/_shared",
                     },
                     "link_name": {
-                        "label": "링크 이름",
-                        "description": "각 세션 폴더 안에 생성되는 공유 폴더 링크의 이름",
+                        "label": "Link Name",
+                        "description": "Name of the shared folder link created inside each session's folder",
                         "placeholder": "_shared",
                     },
                 },

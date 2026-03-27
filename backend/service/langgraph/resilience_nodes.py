@@ -39,9 +39,9 @@ _RE_CONTINUE = re.compile(r"\[CONTINUE:\s*(.+?)\]")
 
 # Legacy fallback patterns.
 _LEGACY_COMPLETE = [
-    "작업이 완료되었습니다",
+    "the task has been completed",
     "task completed",
-    "완료되었습니다",
+    "completed",
 ]
 
 

@@ -1,14 +1,14 @@
 """
-부트스트랩 컨텍스트 파일 로더
+Bootstrap Context File Loader
 
-OpenClaw의 resolveBootstrapContextFiles() 패턴을 참고하여
-작업 디렉토리에서 프로젝트 컨텍스트 파일을 자동 탐색/로드합니다.
+Automatically discovers and loads project context files from the working
+directory, inspired by OpenClaw's resolveBootstrapContextFiles() pattern.
 
-탐색 대상:
-- AGENTS.md: 에이전트 관련 프로젝트 지침
-- CLAUDE.md: Claude 전용 지침
-- README.md: 프로젝트 설명 (선택적)
-- .cursorrules / .windsurfrules 등: AI 지침 파일
+Files searched:
+- AGENTS.md: Project guidelines for agents
+- CLAUDE.md: Claude-specific instructions
+- README.md: Project description (optional)
+- .cursorrules / .windsurfrules etc.: AI instruction files
 """
 
 from __future__ import annotations
@@ -19,9 +19,9 @@ from typing import Dict, List, Optional, Tuple
 
 logger = getLogger(__name__)
 
-# 자동 탐색할 파일 목록 (우선순위 순)
+# List of files to auto-discover (in priority order)
 DEFAULT_CONTEXT_FILES: List[Tuple[str, str, int]] = [
-    # (파일명, XML 태그, 최대 크기 bytes)
+    # (filename, XML tag, max size in bytes)
     ("AGENTS.md", "project-context", 50_000),
     ("CLAUDE.md", "ai-instructions", 50_000),
     (".claude", "ai-instructions", 50_000),
@@ -30,7 +30,7 @@ DEFAULT_CONTEXT_FILES: List[Tuple[str, str, int]] = [
     ("SOUL.md", "persona", 20_000),
 ]
 
-# README.md는 명시적 요청 시에만 포함 (크기가 클 수 있음)
+# README.md is included only on explicit request (may be large)
 OPTIONAL_CONTEXT_FILES: List[Tuple[str, str, int]] = [
     ("README.md", "project-readme", 30_000),
     ("CONTRIBUTING.md", "project-contributing", 20_000),
@@ -38,12 +38,12 @@ OPTIONAL_CONTEXT_FILES: List[Tuple[str, str, int]] = [
 
 
 class ContextLoader:
-    """프로젝트 컨텍스트 파일 로더.
+    """Project context file loader.
 
-    작업 디렉토리에서 에이전트에게 유용한 프로젝트 컨텍스트 파일을
-    자동으로 탐색하고 로드합니다.
+    Automatically discovers and loads project context files useful
+    to the agent from the working directory.
 
-    사용법:
+    Usage:
         loader = ContextLoader(working_dir="/path/to/project")
         context_files = loader.load_context_files()
         # Returns: {"AGENTS.md": "file content...", "CLAUDE.md": "..."}
@@ -58,10 +58,10 @@ class ContextLoader:
     ):
         """
         Args:
-            working_dir: 프로젝트 작업 디렉토리
-            max_total_size: 전체 컨텍스트 파일 최대 크기 (bytes)
-            include_readme: README.md를 포함할지 여부
-            custom_files: 추가로 로드할 파일 경로 목록
+            working_dir: Project working directory
+            max_total_size: Maximum total size of all context files (bytes)
+            include_readme: Whether to include README.md
+            custom_files: List of additional file paths to load
         """
         self._working_dir = Path(working_dir)
         self._max_total_size = max_total_size
@@ -69,15 +69,15 @@ class ContextLoader:
         self._custom_files = custom_files or []
 
     def load_context_files(self) -> Dict[str, str]:
-        """프로젝트 컨텍스트 파일을 자동 탐색하고 로드.
+        """Automatically discovers and loads project context files.
 
         Returns:
-            {파일명: 내용} 딕셔너리
+            Dictionary of {filename: content}
         """
         result: Dict[str, str] = {}
         total_size = 0
 
-        # 1. 기본 컨텍스트 파일 탐색
+        # 1. Discover default context files
         for filename, tag, max_size in DEFAULT_CONTEXT_FILES:
             content = self._try_load_file(filename, max_size)
             if content and (total_size + len(content)) <= self._max_total_size:
@@ -85,7 +85,7 @@ class ContextLoader:
                 total_size += len(content)
                 logger.info(f"Loaded context file: {filename} ({len(content)} chars)")
 
-        # 2. 선택적 파일 (README.md 등)
+        # 2. Optional files (README.md etc.)
         if self._include_readme:
             for filename, tag, max_size in OPTIONAL_CONTEXT_FILES:
                 content = self._try_load_file(filename, max_size)
@@ -94,7 +94,7 @@ class ContextLoader:
                     total_size += len(content)
                     logger.info(f"Loaded optional context file: {filename} ({len(content)} chars)")
 
-        # 3. 커스텀 파일
+        # 3. Custom files
         for filepath in self._custom_files:
             content = self._try_load_file(filepath, 50_000)
             if content and (total_size + len(content)) <= self._max_total_size:
@@ -110,17 +110,17 @@ class ContextLoader:
         return result
 
     def get_context_file_tags(self) -> Dict[str, str]:
-        """파일명→XML태그 매핑 반환."""
+        """Returns a mapping of filename to XML tag."""
         mapping = {}
         for filename, tag, _ in DEFAULT_CONTEXT_FILES + OPTIONAL_CONTEXT_FILES:
             mapping[filename] = tag
         return mapping
 
     def _try_load_file(self, filename: str, max_size: int) -> Optional[str]:
-        """파일을 안전하게 로드. 존재하지 않거나 크기 초과 시 None."""
+        """Safely loads a file. Returns None if it does not exist or exceeds the size limit."""
         filepath = self._working_dir / filename
 
-        # 상위 디렉토리도 탐색 (monorepo 패턴)
+        # Also search the parent directory (monorepo pattern)
         if not filepath.exists():
             parent = self._working_dir.parent / filename
             if parent.exists():
@@ -129,7 +129,7 @@ class ContextLoader:
                 return None
 
         try:
-            # 크기 확인
+            # Check file size
             file_size = filepath.stat().st_size
             if file_size > max_size:
                 logger.warning(
@@ -140,7 +140,7 @@ class ContextLoader:
             if file_size == 0:
                 return None
 
-            # 파일 읽기
+            # Read file
             content = filepath.read_text(encoding="utf-8")
             return content.strip()
 
@@ -149,7 +149,7 @@ class ContextLoader:
             return None
 
     def list_available_files(self) -> List[Dict[str, str]]:
-        """사용 가능한 컨텍스트 파일 목록 반환 (디버깅용)."""
+        """Returns a list of available context files (for debugging)."""
         available = []
 
         all_files = DEFAULT_CONTEXT_FILES + OPTIONAL_CONTEXT_FILES

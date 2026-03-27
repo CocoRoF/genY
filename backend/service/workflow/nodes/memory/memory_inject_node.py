@@ -41,8 +41,8 @@ Answer "needs_memory": true when:
 - The input contains technical terms or project-specific references
 
 Answer "needs_memory": false when:
-- Simple greetings or farewells (hi, hello, bye, 안녕하세요)
-- Short acknowledgments (ok, yes, no, thanks, 네, 감사합니다)
+- Simple greetings or farewells (hi, hello, bye, good morning)
+- Short acknowledgments (ok, yes, no, thanks, got it, thank you)
 - Trivial one-shot questions needing no prior context (What is 2+2?)
 - Meta-commands about the agent itself (help, status, version)
 

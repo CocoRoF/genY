@@ -1,17 +1,17 @@
 """
 KakaoTalk Chatbot Configuration.
 
-Enables Geny Agent integration with KakaoTalk via 카카오 i 오픈빌더 (챗봇 관리자센터).
+Enables Geny Agent integration with KakaoTalk via Kakao i OpenBuilder (Chatbot Admin Center).
 Users interact with Claude sessions through KakaoTalk channel chatbot messages.
 
 Architecture:
-    KakaoTalk User → 카카오톡 채널 → 챗봇 관리자센터 → Skill(POST) → Geny Agent → SkillResponse
+    KakaoTalk User → KakaoTalk Channel → Chatbot Admin Center → Skill(POST) → Geny Agent → SkillResponse
 
 References:
-    - 챗봇 관리자센터: https://chatbot.kakao.com
-    - 스킬 개발 가이드: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide
-    - 응답 타입별 JSON 포맷: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format
-    - 카카오 디벨로퍼스: https://developers.kakao.com
+    - Chatbot Admin Center: https://chatbot.kakao.com
+    - Skill Development Guide: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide
+    - Response Type JSON Format: https://kakaobusiness.gitbook.io/main/tool/chatbot/skill_guide/answer_json_format
+    - Kakao Developers: https://developers.kakao.com
 """
 
 from dataclasses import dataclass, field
@@ -26,45 +26,45 @@ class KakaoConfig(BaseConfig):
     """
     KakaoTalk Chatbot Configuration.
 
-    Enables Geny Agent integration with KakaoTalk via 카카오 i 오픈빌더.
+    Enables Geny Agent integration with KakaoTalk via Kakao i OpenBuilder.
     The chatbot receives user messages as Skill Payload (HTTP POST)
     and returns Claude responses as SkillResponse JSON.
     """
 
     # ── Connection settings ─────────────────────────────────────────────
     enabled: bool = False
-    rest_api_key: str = ""          # Kakao Developers > 앱 키 > REST API 키
-    admin_key: str = ""             # Kakao Developers > 앱 키 > Admin 키 (서버 전용)
-    bot_id: str = ""                # 챗봇 관리자센터 봇 ID
-    channel_public_id: str = ""     # 카카오톡 채널 프로필 ID (예: _ZeUTxl)
+    rest_api_key: str = ""          # Kakao Developers > App Keys > REST API Key
+    admin_key: str = ""             # Kakao Developers > App Keys > Admin Key (server-side only)
+    bot_id: str = ""                # Chatbot Admin Center Bot ID
+    channel_public_id: str = ""     # KakaoTalk Channel Profile ID (e.g., _ZeUTxl)
 
     # ── Skill Server settings ───────────────────────────────────────────
-    skill_endpoint_path: str = "/api/kakao/skill"   # 스킬 서버 엔드포인트 경로
-    skill_verify_header_key: str = "X-Kakao-Skill-Token"  # 스킬 요청 검증 헤더 키
-    skill_verify_token: str = ""    # 스킬 요청 검증 토큰값 (챗봇 관리자센터 > 스킬 > 헤더값 입력)
+    skill_endpoint_path: str = "/api/kakao/skill"   # Skill server endpoint path
+    skill_verify_header_key: str = "X-Kakao-Skill-Token"  # Skill request verification header key
+    skill_verify_token: str = ""    # Skill request verification token value (Chatbot Admin Center > Skill > Header value input)
 
-    # ── Callback settings (AI 챗봇 콜백) ──────────────────────────────────
-    # 스킬 응답 타임아웃은 5초. Claude 응답이 5초를 초과하면 콜백 사용 필요.
-    use_callback: bool = True       # AI 챗봇 콜백 사용 여부
-    callback_timeout_seconds: int = 60  # 콜백 응답 최대 대기 시간 (초)
+    # ── Callback settings (AI Chatbot Callback) ──────────────────────────────────
+    # Skill response timeout is 5 seconds. Use callback if Claude response exceeds 5 seconds.
+    use_callback: bool = True       # Whether to use AI chatbot callback
+    callback_timeout_seconds: int = 60  # Maximum wait time for callback response (seconds)
 
     # ── Permissions ────────────────────────────────────────────────────
-    admin_user_ids: List[str] = field(default_factory=list)     # 관리자 botUserKey 목록
-    allowed_user_ids: List[str] = field(default_factory=list)   # 허용 사용자 botUserKey (빈 값 = 전체 허용)
-    block_user_ids: List[str] = field(default_factory=list)     # 차단 사용자 botUserKey
+    admin_user_ids: List[str] = field(default_factory=list)     # Admin botUserKey list
+    allowed_user_ids: List[str] = field(default_factory=list)   # Allowed user botUserKey (empty = allow all)
+    block_user_ids: List[str] = field(default_factory=list)     # Blocked user botUserKey
 
     # ── Response settings ──────────────────────────────────────────────
-    max_message_length: int = 1000  # simpleText 최대 글자수 (카카오 제한: 1000자, 500자 초과시 전체보기)
-    response_format: str = "simpleText"  # 기본 응답 포맷: simpleText | textCard
-    show_quick_replies: bool = True      # 바로가기 응답(quickReplies) 표시
+    max_message_length: int = 1000  # simpleText max character count (Kakao limit: 1000, shows "View All" beyond 500)
+    response_format: str = "simpleText"  # Default response format: simpleText | textCard
+    show_quick_replies: bool = True      # Show quick reply (quickReplies) buttons
     quick_reply_labels: List[str] = field(default_factory=lambda: [
-        "계속", "새 대화", "도움말"
+        "Continue", "New Chat", "Help"
     ])
 
     # ── Session settings ───────────────────────────────────────────────
-    session_timeout_minutes: int = 30   # 비활성 세션 자동 종료 (분)
-    max_sessions_per_user: int = 1      # 사용자 당 최대 동시 세션 수
-    default_prompt: str = ""            # 카카오톡 세션 기본 시스템 프롬프트
+    session_timeout_minutes: int = 30   # Auto-close inactive sessions (minutes)
+    max_sessions_per_user: int = 1      # Maximum concurrent sessions per user
+    default_prompt: str = ""            # Default system prompt for KakaoTalk sessions
 
     @classmethod
     def get_config_name(cls) -> str:
@@ -77,7 +77,7 @@ class KakaoConfig(BaseConfig):
     @classmethod
     def get_description(cls) -> str:
         return (
-            "Configure KakaoTalk chatbot integration via 카카오 i 오픈빌더. "
+            "Configure KakaoTalk chatbot integration via Kakao i OpenBuilder. "
             "Users interact with Claude sessions through KakaoTalk channel messages. "
             "The chatbot calls your Skill server endpoint, which processes user input "
             "and returns Claude responses as SkillResponse JSON."
@@ -95,125 +95,125 @@ class KakaoConfig(BaseConfig):
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
-                "display_name": "카카오톡",
+                "display_name": "KakaoTalk",
                 "description": (
-                    "카카오 i 오픈빌더를 통한 카카오톡 챗봇 연동 설정. "
-                    "사용자가 카카오톡 채널 메시지를 통해 Claude 세션과 대화할 수 있습니다."
+                    "KakaoTalk chatbot integration settings via Kakao i OpenBuilder. "
+                    "Users can interact with Claude sessions through KakaoTalk channel messages."
                 ),
                 "groups": {
-                    "connection": "연결 설정",
-                    "skill_server": "스킬 서버",
-                    "callback": "콜백 설정",
-                    "permissions": "권한",
-                    "response": "응답 설정",
-                    "session": "세션 설정",
+                    "connection": "Connection Settings",
+                    "skill_server": "Skill Server",
+                    "callback": "Callback Settings",
+                    "permissions": "Permissions",
+                    "response": "Response Settings",
+                    "session": "Session Settings",
                 },
                 "fields": {
                     "enabled": {
-                        "label": "카카오톡 연동 활성화",
-                        "description": "카카오톡 챗봇 연동 활성화 또는 비활성화",
+                        "label": "Enable KakaoTalk Integration",
+                        "description": "Enable or disable KakaoTalk chatbot integration",
                     },
                     "rest_api_key": {
-                        "label": "REST API 키",
+                        "label": "REST API Key",
                         "description": (
-                            "카카오 디벨로퍼스 콘솔의 REST API 키. "
-                            "경로: 카카오 디벨로퍼스 > 내 애플리케이션 > 앱 키 > REST API 키"
+                            "REST API key from the Kakao Developers console. "
+                            "Navigate to: Kakao Developers > My Applications > App Keys > REST API Key"
                         ),
                     },
                     "admin_key": {
-                        "label": "Admin 키",
+                        "label": "Admin Key",
                         "description": (
-                            "서버 측 API 호출을 위한 Admin 키. "
-                            "경로: 카카오 디벨로퍼스 > 내 애플리케이션 > 앱 키 > Admin 키. "
-                            "경고: 서버 측에서만 사용, 클라이언트에 노출 금지."
+                            "Admin key for server-side API calls. "
+                            "Navigate to: Kakao Developers > My Applications > App Keys > Admin Key. "
+                            "Warning: Use only from the server side; never expose to the client."
                         ),
                     },
                     "bot_id": {
-                        "label": "챗봇 Bot ID",
+                        "label": "Chatbot Bot ID",
                         "description": (
-                            "챗봇 관리자센터의 Bot ID. "
-                            "경로: chatbot.kakao.com > 봇 선택 > 설정 > 봇 정보"
+                            "Bot ID from the Chatbot Admin Center. "
+                            "Navigate to: chatbot.kakao.com > Select Bot > Settings > Bot Info"
                         ),
                     },
                     "channel_public_id": {
-                        "label": "채널 프로필 ID",
+                        "label": "Channel Profile ID",
                         "description": (
-                            "카카오톡 채널 프로필 ID. "
-                            "경로: 카카오톡 채널 파트너센터 > 채널 정보 > 채널 URL"
+                            "KakaoTalk channel profile ID. "
+                            "Navigate to: KakaoTalk Channel Partner Center > Channel Info > Channel URL"
                         ),
                     },
                     "skill_endpoint_path": {
-                        "label": "스킬 엔드포인트 경로",
+                        "label": "Skill Endpoint Path",
                         "description": (
-                            "카카오 챗봇이 스킬 POST 요청을 보내는 URL 경로. "
-                            "챗봇 관리자센터 > 스킬 > 스킬 추가 > URL에 등록"
+                            "URL path where the Kakao chatbot sends Skill POST requests. "
+                            "Register this URL in Chatbot Admin Center > Skill > Add Skill > URL"
                         ),
                     },
                     "skill_verify_header_key": {
-                        "label": "스킬 검증 헤더 키",
+                        "label": "Skill Verify Header Key",
                         "description": (
-                            "수신 스킬 요청 검증에 사용되는 커스텀 HTTP 헤더 키. "
-                            "챗봇 관리자센터 > 스킬 > 헤더값 입력에 설정"
+                            "Custom HTTP header key used to verify incoming Skill requests. "
+                            "Set this in Chatbot Admin Center > Skill > Header value input"
                         ),
                     },
                     "skill_verify_token": {
-                        "label": "스킬 검증 토큰",
+                        "label": "Skill Verify Token",
                         "description": (
-                            "검증 헤더의 시크릿 토큰 값. "
-                            "챗봇 관리자센터 > 스킬 > 헤더값 입력에 설정"
+                            "Secret token value for the verification header. "
+                            "Set this in Chatbot Admin Center > Skill > Header value input"
                         ),
                     },
                     "use_callback": {
-                        "label": "AI 챗봇 콜백 사용",
+                        "label": "Use AI Chatbot Callback",
                         "description": (
-                            "비동기 응답을 위한 AI 챗봇 콜백 활성화. "
-                            "스킬 타임아웃 5초 초과 시 '처리 중...' 메시지를 먼저 보내고 "
-                            "준비되면 콜백으로 실제 응답 전달."
+                            "Enable AI Chatbot Callback for asynchronous responses. "
+                            "When the skill timeout of 5 seconds is exceeded, a 'Processing...' message is sent first "
+                            "and the actual response is delivered via callback when ready."
                         ),
                     },
                     "callback_timeout_seconds": {
-                        "label": "콜백 타임아웃 (초)",
-                        "description": "콜백으로 Claude 응답을 기다리는 최대 시간 (초). 초과 시 오류 메시지 전송.",
+                        "label": "Callback Timeout (seconds)",
+                        "description": "Maximum time in seconds to wait for a Claude response via callback. An error message is sent if the timeout is exceeded.",
                     },
                     "admin_user_ids": {
-                        "label": "관리자 사용자 ID (botUserKey)",
-                        "description": "쉼표로 구분된 관리자 botUserKey 목록. 관리자는 세션 제어 등의 관리 명령 사용 가능.",
+                        "label": "Admin User IDs (botUserKey)",
+                        "description": "Comma-separated list of admin botUserKey values. Admins can use management commands such as session control.",
                     },
                     "allowed_user_ids": {
-                        "label": "허용된 사용자 ID (선택)",
-                        "description": "쉼표로 구분된 허용 botUserKey 목록. 비워두면 모든 사용자 허용.",
+                        "label": "Allowed User IDs (Optional)",
+                        "description": "Comma-separated list of allowed botUserKey values. Leave empty to allow all users.",
                     },
                     "block_user_ids": {
-                        "label": "차단된 사용자 ID",
-                        "description": "쉼표로 구분된 차단할 botUserKey 목록.",
+                        "label": "Blocked User IDs",
+                        "description": "Comma-separated list of botUserKey values to block.",
                     },
                     "max_message_length": {
-                        "label": "최대 메시지 길이",
-                        "description": "메시지당 최대 글자 수. 카카오톡 simpleText 제한: 1000자.",
+                        "label": "Max Message Length",
+                        "description": "Maximum number of characters per message. KakaoTalk simpleText limit: 1000 characters.",
                     },
                     "response_format": {
-                        "label": "응답 포맷",
-                        "description": "챗봇 응답 출력 포맷. simpleText: 텍스트 말풍선, textCard: 버튼 포함 카드.",
+                        "label": "Response Format",
+                        "description": "Output format for chatbot responses. simpleText: text bubble, textCard: card with buttons.",
                     },
                     "show_quick_replies": {
-                        "label": "바로가기 응답 표시",
-                        "description": "각 응답 아래에 '계속', '새 대화', '도움말' 등의 바로가기 응답 버튼 표시.",
+                        "label": "Show Quick Replies",
+                        "description": "Display quick reply buttons such as 'Continue', 'New Chat', and 'Help' below each response.",
                     },
                     "quick_reply_labels": {
-                        "label": "바로가기 응답 라벨",
-                        "description": "쉼표로 구분된 바로가기 응답 버튼 라벨.",
+                        "label": "Quick Reply Labels",
+                        "description": "Comma-separated labels for quick reply buttons.",
                     },
                     "session_timeout_minutes": {
-                        "label": "세션 타임아웃 (분)",
-                        "description": "비활성 세션을 지정 시간 후 자동 종료",
+                        "label": "Session Timeout (minutes)",
+                        "description": "Auto-close inactive sessions after the specified time",
                     },
                     "max_sessions_per_user": {
-                        "label": "사용자당 최대 세션 수",
-                        "description": "사용자당 최대 동시 세션 수",
+                        "label": "Max Sessions Per User",
+                        "description": "Maximum number of concurrent sessions per user",
                     },
                     "default_prompt": {
-                        "label": "기본 시스템 프롬프트",
-                        "description": "카카오톡에서 시작된 세션의 기본 시스템 프롬프트",
+                        "label": "Default System Prompt",
+                        "description": "Default system prompt for sessions initiated from KakaoTalk",
                     },
                 },
             }
@@ -237,7 +237,7 @@ class KakaoConfig(BaseConfig):
                 label="REST API Key",
                 description=(
                     "REST API key from Kakao Developers console. "
-                    "Navigate to: 카카오 디벨로퍼스 > 내 애플리케이션 > 앱 키 > REST API 키"
+                    "Navigate to: Kakao Developers > My Applications > App Keys > REST API Key"
                 ),
                 required=True,
                 placeholder="abcdef1234567890abcdef1234567890",
@@ -250,7 +250,7 @@ class KakaoConfig(BaseConfig):
                 label="Admin Key",
                 description=(
                     "Admin key for server-side API calls (sending messages, managing customer files). "
-                    "Navigate to: 카카오 디벨로퍼스 > 내 애플리케이션 > 앱 키 > Admin 키. "
+                    "Navigate to: Kakao Developers > My Applications > App Keys > Admin Key. "
                     "WARNING: Must be used only from server-side, never exposed to client."
                 ),
                 placeholder="abcdef1234567890abcdef1234567890",
@@ -262,8 +262,8 @@ class KakaoConfig(BaseConfig):
                 field_type=FieldType.STRING,
                 label="Chatbot Bot ID",
                 description=(
-                    "Bot ID from 챗봇 관리자센터. "
-                    "Navigate to: chatbot.kakao.com > 봇 선택 > 설정 > 봇 정보에서 확인"
+                    "Bot ID from Chatbot Admin Center. "
+                    "Navigate to: chatbot.kakao.com > Select Bot > Settings > Bot Info"
                 ),
                 placeholder="64xxxxxxxxxxxxxxxxxx",
                 group="connection"
@@ -271,11 +271,11 @@ class KakaoConfig(BaseConfig):
             ConfigField(
                 name="channel_public_id",
                 field_type=FieldType.STRING,
-                label="Channel Public ID (프로필 ID)",
+                label="Channel Public ID (Profile ID)",
                 description=(
                     "KakaoTalk channel profile ID. "
-                    "Navigate to: 카카오톡 채널 파트너센터 > 채널 정보 > 채널 URL. "
-                    "Example: URL이 https://pf.kakao.com/_ZeUTxl 이면, 프로필 ID는 _ZeUTxl"
+                    "Navigate to: KakaoTalk Channel Partner Center > Channel Info > Channel URL. "
+                    "Example: If the URL is https://pf.kakao.com/_ZeUTxl, the profile ID is _ZeUTxl"
                 ),
                 required=True,
                 placeholder="_ZeUTxl",
@@ -290,7 +290,7 @@ class KakaoConfig(BaseConfig):
                 description=(
                     "URL path where Kakao chatbot sends Skill POST requests. "
                     "Register this full URL (https://your-domain:port + path) in "
-                    "챗봇 관리자센터 > 스킬 > 스킬 추가 > URL"
+                    "Chatbot Admin Center > Skill > Add Skill > URL"
                 ),
                 default="/api/kakao/skill",
                 placeholder="/api/kakao/skill",
@@ -302,7 +302,7 @@ class KakaoConfig(BaseConfig):
                 label="Skill Verify Header Key",
                 description=(
                     "Custom HTTP header key used to verify incoming Skill requests. "
-                    "Set this in 챗봇 관리자센터 > 스킬 > 헤더값 입력 as the header key."
+                    "Set this in Chatbot Admin Center > Skill > Header value input as the header key."
                 ),
                 default="X-Kakao-Skill-Token",
                 placeholder="X-Kakao-Skill-Token",
@@ -314,7 +314,7 @@ class KakaoConfig(BaseConfig):
                 label="Skill Verify Token",
                 description=(
                     "Secret token value for the verification header. "
-                    "Set this in 챗봇 관리자센터 > 스킬 > 헤더값 입력 as the header value. "
+                    "Set this in Chatbot Admin Center > Skill > Header value input as the header value. "
                     "Geny Agent will reject requests without a matching token."
                 ),
                 placeholder="your-secret-token-value",
@@ -409,8 +409,8 @@ class KakaoConfig(BaseConfig):
                 ),
                 default="simpleText",
                 options=[
-                    {"value": "simpleText", "label": "Simple Text (텍스트형)"},
-                    {"value": "textCard", "label": "Text Card (텍스트 카드형)"},
+                    {"value": "simpleText", "label": "Simple Text (Text Bubble)"},
+                    {"value": "textCard", "label": "Text Card (Card with Buttons)"},
                 ],
                 group="response"
             ),
@@ -419,7 +419,7 @@ class KakaoConfig(BaseConfig):
                 field_type=FieldType.BOOLEAN,
                 label="Show Quick Replies",
                 description=(
-                    "Display quickReplies (바로가기 응답) buttons below each response "
+                    "Display quick reply (shortcut response) buttons below each response "
                     "for common actions like 'Continue', 'New Chat', 'Help'."
                 ),
                 default=True,
@@ -433,7 +433,7 @@ class KakaoConfig(BaseConfig):
                     "Comma-separated labels for quick reply buttons. "
                     "Each label becomes a clickable button below the response."
                 ),
-                placeholder="계속, 새 대화, 도움말",
+                placeholder="Continue, New Chat, Help",
                 group="response"
             ),
 

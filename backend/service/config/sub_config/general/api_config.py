@@ -74,31 +74,31 @@ class APIConfig(BaseConfig):
         return {
             "ko": {
                 "display_name": "Claude API",
-                "description": "Anthropic API 키, 기본 모델, 사고 토큰 예산 및 권한 모드 설정.",
+                "description": "Anthropic API key, default model, thinking token budget, and permission mode settings.",
                 "groups": {
-                    "api": "API 설정",
-                    "permissions": "권한",
+                    "api": "API Settings",
+                    "permissions": "Permissions",
                 },
                 "fields": {
                     "anthropic_api_key": {
-                        "label": "Anthropic API 키",
-                        "description": "Anthropic Claude 모델용 API 키",
+                        "label": "Anthropic API Key",
+                        "description": "API key for Anthropic Claude models",
                     },
                     "anthropic_model": {
-                        "label": "기본 모델",
-                        "description": "새 세션의 기본 Claude 모델",
+                        "label": "Default Model",
+                        "description": "Default Claude model for new sessions",
                     },
                     "max_thinking_tokens": {
-                        "label": "최대 사고 토큰",
-                        "description": "확장 사고 예산 (비활성화하려면 0)",
+                        "label": "Max Thinking Tokens",
+                        "description": "Extended Thinking budget (set to 0 to disable)",
                     },
                     "skip_permissions": {
-                        "label": "권한 확인 건너뛰기",
-                        "description": "⚠️ 자율 모드 — 모든 확인 대화상자 건너뛰기",
+                        "label": "Skip Permission Prompts",
+                        "description": "⚠️ Autonomous mode — skip all confirmation dialogs",
                     },
                     "app_port": {
-                        "label": "백엔드 포트",
-                        "description": "백엔드 서버 포트 (MCP 프록시 연결용)",
+                        "label": "Backend Port",
+                        "description": "Backend server port (used for MCP proxy connections)",
                     },
                 },
             }

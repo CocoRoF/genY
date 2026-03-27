@@ -80,14 +80,14 @@ class GitHubConfig(BaseConfig):
         return {
             "ko": {
                 "display_name": "GitHub",
-                "description": "Git Push 및 PR 생성을 위한 GitHub 개인 액세스 토큰.",
+                "description": "GitHub personal access token for git push and PR creation.",
                 "groups": {
-                    "github": "GitHub 설정",
+                    "github": "GitHub Settings",
                 },
                 "fields": {
                     "github_token": {
-                        "label": "GitHub 토큰",
-                        "description": "Git Push 및 PR 생성을 위한 개인 액세스 토큰",
+                        "label": "GitHub Token",
+                        "description": "Personal access token for git push and PR creation",
                     },
                 },
             }

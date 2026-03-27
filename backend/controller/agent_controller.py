@@ -3,7 +3,7 @@ Agent Session Controller
 
 REST API endpoints for AgentSession (LangGraph + Claude CLI) management.
 
-AgentSession(CompiledStateGraph) 기반 세션을 관리합니다.
+Manages sessions based on AgentSession(CompiledStateGraph).
 
 AgentSession API:   /api/agents (primary)
 Legacy Session API: /api/sessions (deprecated, backward compatibility)
@@ -48,7 +48,7 @@ logger = getLogger(__name__)
 # Create router
 router = APIRouter(prefix="/api/agents", tags=["agents"])
 
-# AgentSessionManager 싱글톤
+# AgentSessionManager singleton
 agent_manager = get_agent_session_manager()
 
 
@@ -59,9 +59,9 @@ agent_manager = get_agent_session_manager()
 
 class CreateAgentRequest(CreateSessionRequest):
     """
-    AgentSession 생성 요청.
+    Request to create an AgentSession.
 
-    CreateSessionRequest를 상속하며 추가 옵션 제공.
+    Inherits from CreateSessionRequest and provides additional options.
     """
     enable_checkpointing: bool = Field(
         default=False,
@@ -71,9 +71,9 @@ class CreateAgentRequest(CreateSessionRequest):
 
 class AgentInvokeRequest(BaseModel):
     """
-    AgentSession invoke 요청.
+    Request to invoke an AgentSession.
 
-    LangGraph 상태 기반 실행.
+    Executes based on LangGraph state.
     """
     input_text: str = Field(
         ...,
@@ -91,7 +91,7 @@ class AgentInvokeRequest(BaseModel):
 
 class AgentInvokeResponse(BaseModel):
     """
-    AgentSession invoke 응답.
+    Response from an AgentSession invoke.
     """
     success: bool
     session_id: str
@@ -102,7 +102,7 @@ class AgentInvokeResponse(BaseModel):
 
 class AgentStateResponse(BaseModel):
     """
-    AgentSession 상태 조회 응답.
+    Response for an AgentSession state query.
     """
     session_id: str
     current_step: Optional[str] = None
@@ -114,7 +114,7 @@ class AgentStateResponse(BaseModel):
 
 class UpgradeToAgentRequest(BaseModel):
     """
-    기존 세션을 AgentSession으로 업그레이드 요청.
+    Request to upgrade an existing session to an AgentSession.
     """
     enable_checkpointing: bool = Field(
         default=False,
@@ -132,8 +132,8 @@ async def create_agent_session(request: CreateAgentRequest):
     """
     Create a new AgentSession.
 
-    AgentSession은 CompiledStateGraph 기반으로 동작하며,
-    LangGraph의 상태 관리 기능을 제공합니다.
+    AgentSession operates based on a CompiledStateGraph and
+    provides LangGraph's state management capabilities.
     """
     try:
         agent = await agent_manager.create_agent_session(
@@ -214,7 +214,7 @@ async def get_agent_session(
     """
     agent = agent_manager.get_agent(session_id)
     if not agent:
-        # 기존 세션에서 조회 시도
+        # Attempt lookup from existing sessions
         session_info = agent_manager.get_session_info(session_id)
         if session_info:
             raise HTTPException(
@@ -404,8 +404,8 @@ async def invoke_agent(
     """
     Invoke AgentSession with LangGraph state execution.
 
-    상태 기반 그래프 실행을 수행합니다.
-    체크포인팅이 활성화된 경우 thread_id로 상태를 복원/저장합니다.
+    Performs state-based graph execution.
+    If checkpointing is enabled, state is restored/saved using thread_id.
     """
     agent = agent_manager.get_agent(session_id)
     if not agent:
@@ -417,18 +417,18 @@ async def invoke_agent(
             detail=f"AgentSession is not initialized"
         )
 
-    # 세션 로거
+    # Session logger
     session_logger = get_session_logger(session_id, create_if_missing=False)
 
     try:
-        # 입력 로깅
+        # Log input
         if session_logger:
             session_logger.log_command(
                 prompt=request.input_text,
                 max_turns=request.max_iterations,
             )
 
-        # LangGraph 그래프 실행
+        # Execute the LangGraph graph
         result = await agent.invoke(
             input_text=request.input_text,
             thread_id=request.thread_id,
@@ -436,7 +436,7 @@ async def invoke_agent(
         )
         output = result.get("output", "") if isinstance(result, dict) else str(result)
 
-        # 응답 로깅
+        # Log response
         if session_logger:
             session_logger.log_response(
                 success=True,
@@ -763,7 +763,7 @@ async def get_agent_state(
     """
     Get current AgentSession state.
 
-    체크포인팅이 활성화된 경우에만 상태를 조회할 수 있습니다.
+    State can only be queried if checkpointing is enabled.
     """
     agent = agent_manager.get_agent(session_id)
     if not agent:
@@ -797,7 +797,7 @@ async def get_agent_history(
     """
     Get AgentSession execution history.
 
-    체크포인팅이 활성화된 경우에만 히스토리를 조회할 수 있습니다.
+    History can only be queried if checkpointing is enabled.
     """
     agent = agent_manager.get_agent(session_id)
     if not agent:
@@ -825,15 +825,15 @@ async def upgrade_to_agent_session(
     """
     Upgrade existing ClaudeProcess session to AgentSession.
 
-    기존 세션의 ClaudeProcess를 유지하면서 AgentSession으로 래핑합니다.
+    Wraps the existing session's ClaudeProcess into an AgentSession while preserving it.
     """
-    # 이미 AgentSession인지 확인
+    # Check if it is already an AgentSession
     if agent_manager.has_agent(session_id):
         agent = agent_manager.get_agent(session_id)
         logger.info(f"Session {session_id} is already an AgentSession")
         return agent.get_session_info()
 
-    # 업그레이드 시도
+    # Attempt upgrade
     agent = agent_manager.upgrade_to_agent(
         session_id=session_id,
         enable_checkpointing=request.enable_checkpointing,
