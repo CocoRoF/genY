@@ -446,3 +446,101 @@ export interface ToolPresetListResponse {
   presets: ToolPresetDefinition[];
   total: number;
 }
+
+// ==================== Memory Types ====================
+
+export interface MemoryFileInfo {
+  filename: string;
+  title: string;
+  category: string;
+  tags: string[];
+  importance: string;
+  created: string;
+  modified: string;
+  source: string;
+  char_count: number;
+  links_to: string[];
+  linked_from: string[];
+  summary: string | null;
+}
+
+export interface MemoryFileDetail {
+  metadata: Record<string, unknown>;
+  body: string;
+  filename: string;
+}
+
+export interface MemoryStats {
+  long_term_entries: number;
+  short_term_entries: number;
+  long_term_chars: number;
+  short_term_chars: number;
+  total_files: number;
+  last_write: string | null;
+  categories: Record<string, number>;
+  total_tags: number;
+  total_links: number;
+}
+
+export interface MemoryIndex {
+  files: Record<string, MemoryFileInfo>;
+  tag_map: Record<string, string[]>;
+  total_files: number;
+  total_chars: number;
+}
+
+export interface MemoryIndexResponse {
+  index: MemoryIndex;
+  stats: MemoryStats;
+}
+
+export interface MemorySearchEntry {
+  source: string;
+  content: string;
+  timestamp: string | null;
+  filename: string | null;
+  title: string | null;
+  category: string | null;
+  tags: string[];
+  importance: string;
+  links_to: string[];
+  linked_from: string[];
+  summary: string | null;
+  char_count: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface MemorySearchResult {
+  entry: MemorySearchEntry;
+  score: number;
+  snippet: string;
+  match_type: string;
+}
+
+export interface MemorySearchResponse {
+  query: string;
+  results: MemorySearchResult[];
+  total: number;
+}
+
+export interface MemoryGraphNode {
+  id: string;
+  label: string;
+  category: string;
+  importance: string;
+}
+
+export interface MemoryGraphEdge {
+  source: string;
+  target: string;
+}
+
+export interface MemoryGraphResponse {
+  nodes: MemoryGraphNode[];
+  edges: MemoryGraphEdge[];
+}
+
+export interface MemoryFileListResponse {
+  files: MemoryFileDetail[];
+  total: number;
+}

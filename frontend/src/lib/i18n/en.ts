@@ -49,6 +49,7 @@ const en = {
     logs: 'Logs',
     sharedFolder: 'Shared',
     chat: 'Chat',
+    memory: 'Memory',
   },
 
   // ─── Sidebar ───

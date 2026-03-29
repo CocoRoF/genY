@@ -27,6 +27,16 @@ from service.workflow.nodes.i18n import MEMORY_INJECT_I18N
 logger = getLogger(__name__)
 
 
+# ── Importance boost factors for structured notes ─────────────────────
+
+IMPORTANCE_BOOST = {
+    "critical": 2.0,
+    "high": 1.5,
+    "medium": 1.0,
+    "low": 0.5,
+}
+
+
 # ── LLM gate prompt ──────────────────────────────────────────────────
 
 _MEMORY_GATE_PROMPT = """\
@@ -192,6 +202,50 @@ class MemoryInjectNode(BaseNode):
 
     # ── Main execution ────────────────────────────────────────────────
 
+    @staticmethod
+    def _add_linked_context(
+        refs: List[MemoryRef],
+        memory_manager,
+        budget_chars: int,
+    ) -> str:
+        """Load notes linked from already-selected files (backlinks).
+
+        Stays within *budget_chars*.  Returns formatted XML block or "".
+        """
+        already_loaded = {r.get("filename", "") for r in refs}
+        linked_parts: List[str] = []
+        total = 0
+
+        for ref in refs:
+            fn = ref.get("filename", "")
+            if not fn:
+                continue
+            note = memory_manager.read_note(fn)
+            if note is None:
+                continue
+            meta = note.get("metadata") or {}
+            for linked_fn in meta.get("links_to", []):
+                if linked_fn in already_loaded:
+                    continue
+                already_loaded.add(linked_fn)
+                linked_note = memory_manager.read_note(linked_fn)
+                if linked_note is None:
+                    continue
+                body = (linked_note.get("body") or "")[:800]
+                chunk = (
+                    f'<linked-context from="{fn}" to="{linked_fn}">\n'
+                    f"{body}\n"
+                    f"</linked-context>"
+                )
+                if (total + len(chunk)) > budget_chars:
+                    break
+                linked_parts.append(chunk)
+                total += len(chunk)
+            if total >= budget_chars:
+                break
+
+        return "\n\n".join(linked_parts) if linked_parts else ""
+
     async def execute(
         self,
         state: Dict[str, Any],
@@ -309,11 +363,25 @@ class MemoryInjectNode(BaseNode):
                             f"vector search failed: {ve}"
                         )
 
-            # 4. Keyword-based memory recall (complementary)
+            # 4. Keyword-based memory recall (complementary) — with
+            #    importance weighting and tag matching for structured notes
             remaining = budget - total_chars
             if remaining > 200:
                 try:
                     kw_results = mgr.search(query, max_results=max_results)
+                    # Apply importance boost and tag scoring
+                    query_words = set(query.lower().split())
+                    for r in kw_results:
+                        imp = getattr(r.entry, "importance", "medium") or "medium"
+                        r.score *= IMPORTANCE_BOOST.get(imp, 1.0)
+                        tags = getattr(r.entry, "tags", None) or []
+                        if tags and query_words:
+                            tag_words = {t.lower() for t in tags}
+                            overlap = len(query_words & tag_words)
+                            r.score *= 1.0 + 0.3 * overlap
+                    # Re-sort by boosted score
+                    kw_results.sort(key=lambda r: r.score, reverse=True)
+
                     for r in kw_results:
                         chunk = (
                             f'<memory-recall source="{r.entry.filename}" '
@@ -331,6 +399,19 @@ class MemoryInjectNode(BaseNode):
                             "char_count": r.entry.char_count,
                             "injected_at_turn": 0,
                         })
+                except Exception:
+                    pass
+
+            # 5. Backlink context — include notes linked from selected files
+            remaining = budget - total_chars
+            if remaining > 200 and refs:
+                try:
+                    linked_text = self._add_linked_context(
+                        refs, mgr, remaining,
+                    )
+                    if linked_text:
+                        parts.append(linked_text)
+                        total_chars += len(linked_text)
                 except Exception:
                     pass
 

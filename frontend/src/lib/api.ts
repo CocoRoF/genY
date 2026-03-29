@@ -638,3 +638,172 @@ export const docsApi = {
   get: (slug: string, lang: string = 'en') =>
     apiCall<DocContent>(`/api/docs/${encodeURIComponent(slug)}?lang=${encodeURIComponent(lang)}`),
 };
+
+// ==================== Memory API ====================
+
+export const memoryApi = {
+  /** GET /api/agents/{sid}/memory — get index + stats */
+  getIndex: (sessionId: string) =>
+    apiCall<import('@/types').MemoryIndexResponse>(`/api/agents/${sessionId}/memory`),
+
+  /** GET /api/agents/{sid}/memory/stats */
+  getStats: (sessionId: string) =>
+    apiCall<import('@/types').MemoryStats>(`/api/agents/${sessionId}/memory/stats`),
+
+  /** GET /api/agents/{sid}/memory/tags */
+  getTags: (sessionId: string) =>
+    apiCall<{ tags: Record<string, number> }>(`/api/agents/${sessionId}/memory/tags`),
+
+  /** GET /api/agents/{sid}/memory/graph */
+  getGraph: (sessionId: string) =>
+    apiCall<import('@/types').MemoryGraphResponse>(`/api/agents/${sessionId}/memory/graph`),
+
+  /** GET /api/agents/{sid}/memory/files — list files */
+  listFiles: (sessionId: string, params?: { category?: string; tag?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.tag) qs.set('tag', params.tag);
+    const q = qs.toString();
+    return apiCall<import('@/types').MemoryFileListResponse>(
+      `/api/agents/${sessionId}/memory/files${q ? `?${q}` : ''}`
+    );
+  },
+
+  /** GET /api/agents/{sid}/memory/files/{filename} — read a file */
+  readFile: (sessionId: string, filename: string) =>
+    apiCall<import('@/types').MemoryFileDetail>(`/api/agents/${sessionId}/memory/files/${filename}`),
+
+  /** POST /api/agents/{sid}/memory/files — create a note */
+  createFile: (sessionId: string, data: {
+    title: string;
+    content: string;
+    category?: string;
+    tags?: string[];
+    importance?: string;
+    source?: string;
+    links_to?: string[];
+  }) =>
+    apiCall<{ filename: string; message: string }>(`/api/agents/${sessionId}/memory/files`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** PUT /api/agents/{sid}/memory/files/{filename} — update a note */
+  updateFile: (sessionId: string, filename: string, data: {
+    content?: string;
+    tags?: string[];
+    importance?: string;
+    links_to?: string[];
+  }) =>
+    apiCall<{ filename: string; message: string }>(
+      `/api/agents/${sessionId}/memory/files/${filename}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+
+  /** DELETE /api/agents/{sid}/memory/files/{filename} */
+  deleteFile: (sessionId: string, filename: string) =>
+    apiCall<{ message: string }>(
+      `/api/agents/${sessionId}/memory/files/${filename}`,
+      { method: 'DELETE' },
+    ),
+
+  /** GET /api/agents/{sid}/memory/search?q=... */
+  search: (sessionId: string, query: string, params?: { max_results?: number; category?: string; tag?: string }) => {
+    const qs = new URLSearchParams({ q: query });
+    if (params?.max_results) qs.set('max_results', String(params.max_results));
+    if (params?.category) qs.set('category', params.category);
+    if (params?.tag) qs.set('tag', params.tag);
+    return apiCall<import('@/types').MemorySearchResponse>(
+      `/api/agents/${sessionId}/memory/search?${qs.toString()}`
+    );
+  },
+
+  /** POST /api/agents/{sid}/memory/links — create link */
+  createLink: (sessionId: string, sourceFilename: string, targetFilename: string) =>
+    apiCall<{ message: string }>(`/api/agents/${sessionId}/memory/links`, {
+      method: 'POST',
+      body: JSON.stringify({ source_filename: sourceFilename, target_filename: targetFilename }),
+    }),
+
+  /** POST /api/agents/{sid}/memory/reindex */
+  reindex: (sessionId: string) =>
+    apiCall<{ message: string; total_files: number }>(`/api/agents/${sessionId}/memory/reindex`, {
+      method: 'POST',
+    }),
+
+  /** POST /api/agents/{sid}/memory/migrate */
+  migrate: (sessionId: string) =>
+    apiCall<{ message: string; summary: string }>(`/api/agents/${sessionId}/memory/migrate`, {
+      method: 'POST',
+    }),
+
+  /** POST /api/agents/{sid}/memory/promote — promote to global */
+  promote: (sessionId: string, filename: string) =>
+    apiCall<{ message: string; global_filename: string }>(`/api/agents/${sessionId}/memory/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ filename }),
+    }),
+};
+
+// ==================== Global Memory API ====================
+
+export const globalMemoryApi = {
+  /** GET /api/memory/global */
+  getIndex: () =>
+    apiCall<import('@/types').MemoryIndexResponse>('/api/memory/global'),
+
+  /** GET /api/memory/global/files */
+  listFiles: (params?: { category?: string; tag?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.tag) qs.set('tag', params.tag);
+    const q = qs.toString();
+    return apiCall<import('@/types').MemoryFileListResponse>(
+      `/api/memory/global/files${q ? `?${q}` : ''}`
+    );
+  },
+
+  /** GET /api/memory/global/files/{filename} */
+  readFile: (filename: string) =>
+    apiCall<import('@/types').MemoryFileDetail>(`/api/memory/global/files/${filename}`),
+
+  /** POST /api/memory/global/files */
+  createFile: (data: {
+    title: string;
+    content: string;
+    category?: string;
+    tags?: string[];
+    importance?: string;
+  }) =>
+    apiCall<{ filename: string; message: string }>('/api/memory/global/files', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** PUT /api/memory/global/files/{filename} */
+  updateFile: (filename: string, data: {
+    content?: string;
+    tags?: string[];
+    importance?: string;
+  }) =>
+    apiCall<{ filename: string; message: string }>(
+      `/api/memory/global/files/${filename}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+
+  /** DELETE /api/memory/global/files/{filename} */
+  deleteFile: (filename: string) =>
+    apiCall<{ message: string }>(
+      `/api/memory/global/files/${filename}`,
+      { method: 'DELETE' },
+    ),
+
+  /** GET /api/memory/global/search?q=... */
+  search: (query: string, maxResults?: number) => {
+    const qs = new URLSearchParams({ q: query });
+    if (maxResults) qs.set('max_results', String(maxResults));
+    return apiCall<import('@/types').MemorySearchResponse>(
+      `/api/memory/global/search?${qs.toString()}`
+    );
+  },
+};

@@ -54,6 +54,7 @@ from service.workflow.nodes.task import final_synthesis_node      # noqa: F401
 # ── Memory nodes ─────────────────────────────────────────────
 from service.workflow.nodes.memory import memory_inject_node        # noqa: F401
 from service.workflow.nodes.memory import transcript_record_node    # noqa: F401
+from service.workflow.nodes.memory import memory_reflect_node       # noqa: F401
 
 
 def register_all_nodes() -> None:

@@ -26,6 +26,15 @@ class SessionMemoryEntryModel(BaseModel):
         event_name: str = "",            # for STM events: tool_call, state_change, etc.
         metadata_json: str = "{}",       # extra metadata stored as JSON text
         entry_timestamp: str = "",       # when the entry was created (ISO format)
+        # Structured memory fields
+        category: str = "",              # daily | topics | entities | projects | insights | root
+        tags_json: str = "[]",           # JSON array of tag strings
+        importance: str = "medium",      # critical | high | medium | low
+        links_to_json: str = "[]",       # JSON array of linked filenames (outgoing)
+        linked_from_json: str = "[]",    # JSON array of backlinks (incoming)
+        source_type: str = "system",     # system | agent | user | execution
+        summary: str = "",               # brief summary for search/display
+        is_global: bool = False,         # True if promoted to global memory
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -41,6 +50,14 @@ class SessionMemoryEntryModel(BaseModel):
         self.event_name = event_name
         self.metadata_json = metadata_json
         self.entry_timestamp = entry_timestamp
+        self.category = category
+        self.tags_json = tags_json
+        self.importance = importance
+        self.links_to_json = links_to_json
+        self.linked_from_json = linked_from_json
+        self.source_type = source_type
+        self.summary = summary
+        self.is_global = is_global
 
     def get_table_name(self) -> str:
         return "session_memory_entries"
@@ -59,6 +76,14 @@ class SessionMemoryEntryModel(BaseModel):
             "event_name": "VARCHAR(100) DEFAULT ''",
             "metadata_json": "TEXT DEFAULT '{}'",
             "entry_timestamp": "VARCHAR(100) DEFAULT ''",
+            "category": "VARCHAR(50) DEFAULT ''",
+            "tags_json": "TEXT DEFAULT '[]'",
+            "importance": "VARCHAR(20) DEFAULT 'medium'",
+            "links_to_json": "TEXT DEFAULT '[]'",
+            "linked_from_json": "TEXT DEFAULT '[]'",
+            "source_type": "VARCHAR(30) DEFAULT 'system'",
+            "summary": "TEXT DEFAULT ''",
+            "is_global": "BOOLEAN DEFAULT FALSE",
         }
 
     @classmethod
@@ -79,4 +104,8 @@ class SessionMemoryEntryModel(BaseModel):
             ("idx_mem_entry_session_source", "session_id, source"),
             ("idx_mem_entry_role", "role"),
             ("idx_mem_entry_ts", "entry_timestamp"),
+            ("idx_mem_entry_category", "category"),
+            ("idx_mem_entry_importance", "importance"),
+            ("idx_mem_entry_source_type", "source_type"),
+            ("idx_mem_entry_is_global", "is_global"),
         ]

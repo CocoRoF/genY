@@ -20,6 +20,8 @@ from controller.internal_tool_controller import router as internal_tool_router
 from controller.tool_preset_controller import router as tool_preset_router
 from controller.tool_controller import router as tool_catalog_router
 from controller.docs_controller import router as docs_router
+from controller.memory_controller import router as memory_router
+from controller.memory_controller import global_router as global_memory_router
 from service.config import get_config_manager
 from service.mcp_loader import MCPLoader, get_global_mcp_config
 import uvicorn
@@ -403,6 +405,8 @@ app.include_router(internal_tool_router)  # Internal tool execution (Proxy MCP)
 app.include_router(tool_preset_router)  # Tool preset management
 app.include_router(tool_catalog_router)  # Tool catalog API
 app.include_router(docs_router)  # Documentation API
+app.include_router(memory_router)  # Memory management API
+app.include_router(global_memory_router)  # Global memory API
 
 # Mount static files for Web UI Dashboard
 static_dir = Path(__file__).parent / "static"

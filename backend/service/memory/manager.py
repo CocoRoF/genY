@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Optional
 from service.memory.long_term import LongTermMemory
 from service.memory.short_term import ShortTermMemory
 from service.memory.vector_memory import VectorMemoryManager
+from service.memory.structured_writer import StructuredMemoryWriter
+from service.memory.index import MemoryIndexManager
 from service.memory.types import (
     MemoryEntry,
     MemorySearchResult,
@@ -84,6 +86,10 @@ class SessionMemoryManager:
         self._stm = ShortTermMemory(storage_path)
         self._vmm = VectorMemoryManager(storage_path)
 
+        # Structured memory layer (Obsidian-like)
+        self._index_manager: Optional[MemoryIndexManager] = None
+        self._structured_writer: Optional[StructuredMemoryWriter] = None
+
         self._initialized = False
         self._db_manager = None
         self._session_id: Optional[str] = None
@@ -99,6 +105,9 @@ class SessionMemoryManager:
         self._session_id = session_id
         self._ltm.set_database(db_manager, session_id)
         self._stm.set_database(db_manager, session_id)
+        # Propagate DB to structured writer if already initialized
+        if self._structured_writer is not None:
+            self._structured_writer.set_database(db_manager, session_id)
         logger.info("SessionMemoryManager: DB backend enabled for session %s", session_id)
 
     @property
@@ -114,6 +123,14 @@ class SessionMemoryManager:
         return self._vmm
 
     @property
+    def index_manager(self) -> Optional[MemoryIndexManager]:
+        return self._index_manager
+
+    @property
+    def structured_writer(self) -> Optional[StructuredMemoryWriter]:
+        return self._structured_writer
+
+    @property
     def storage_path(self) -> str:
         return self._storage_path
 
@@ -125,6 +142,30 @@ class SessionMemoryManager:
         """Set up directory structure for both memory stores."""
         self._ltm.ensure_directory()
         self._stm.ensure_directory()
+
+        # Initialize structured memory layer
+        memory_dir = self._ltm.memory_dir
+        self._index_manager = MemoryIndexManager(str(memory_dir))
+        self._structured_writer = StructuredMemoryWriter(
+            str(memory_dir), self._index_manager
+        )
+        # Propagate DB if already set
+        if self._db_manager is not None and self._session_id is not None:
+            self._structured_writer.set_database(self._db_manager, self._session_id)
+
+        # Run migration for legacy files (idempotent)
+        try:
+            from service.memory.migrator import MemoryMigrator
+            migrator = MemoryMigrator(str(memory_dir), self._session_id or "")
+            if migrator.needs_migration():
+                report = migrator.migrate()
+                logger.info(
+                    "Memory migration: %s",
+                    report.summary if report else "no changes",
+                )
+        except Exception:
+            logger.debug("Memory migration failed (non-critical)", exc_info=True)
+
         self._initialized = True
         logger.info("SessionMemoryManager initialized at %s", self._storage_path)
 
@@ -192,6 +233,167 @@ class SessionMemoryManager:
         """Write knowledge to a topic-specific long-term memory file."""
         self._ltm.write_topic(topic, text)
 
+    # ------------------------------------------------------------------
+    # Structured memory operations (Obsidian-like)
+    # ------------------------------------------------------------------
+
+    def write_note(
+        self,
+        title: str,
+        content: str,
+        *,
+        category: str = "topics",
+        tags: Optional[List[str]] = None,
+        importance: str = "medium",
+        source: str = "system",
+        links_to: Optional[List[str]] = None,
+    ) -> Optional[str]:
+        """Write a structured memory note with frontmatter.
+
+        Returns the filename of the created note, or None on failure.
+        """
+        if self._structured_writer is None:
+            # Fallback to legacy write
+            self._ltm.write_topic(title, content)
+            return None
+        return self._structured_writer.write_note(
+            title=title,
+            content=content,
+            category=category,
+            tags=tags,
+            importance=importance,
+            source=source,
+            links=links_to,
+        )
+
+    def update_note(
+        self,
+        filename: str,
+        *,
+        body: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+        importance: Optional[str] = None,
+    ) -> bool:
+        """Update an existing structured memory note.
+
+        Returns True if updated successfully.
+        """
+        if self._structured_writer is None:
+            return False
+        return self._structured_writer.update_note(
+            filename, content=body, tags=tags, importance=importance,
+        )
+
+    def delete_note(self, filename: str) -> bool:
+        """Delete a structured memory note.
+
+        Returns True if deleted successfully.
+        """
+        if self._structured_writer is None:
+            return False
+        return self._structured_writer.delete_note(filename)
+
+    def read_note(self, filename: str) -> Optional[Dict[str, Any]]:
+        """Read a structured memory note and return its metadata + body.
+
+        Returns dict with keys: metadata, body, filename. None if not found.
+        """
+        if self._structured_writer is None:
+            return None
+        return self._structured_writer.read_note(filename)
+
+    def list_notes(
+        self,
+        *,
+        category: Optional[str] = None,
+        tag: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List memory notes with optional category/tag filters.
+
+        Returns list of note info dicts.
+        """
+        if self._structured_writer is None:
+            return []
+        notes = self._structured_writer.list_notes(category=category, tag=tag)
+        return [self._file_info_to_dict(n) for n in notes]
+
+    def link_notes(self, source_filename: str, target_filename: str) -> bool:
+        """Create a wikilink between two notes.
+
+        Returns True if link was created successfully.
+        """
+        if self._structured_writer is None:
+            return False
+        return self._structured_writer.link_notes(source_filename, target_filename)
+
+    def get_memory_index(self) -> Optional[Dict[str, Any]]:
+        """Get the full memory index for API responses."""
+        if self._index_manager is None:
+            return None
+        idx = self._index_manager.index
+        return {
+            "files": {k: self._file_info_to_dict(v) for k, v in idx.files.items()},
+            "tag_map": idx.tag_map,
+            "total_files": idx.total_files,
+            "total_chars": idx.total_chars,
+        }
+
+    def get_memory_tags(self) -> Dict[str, int]:
+        """Get tag counts from the index."""
+        if self._index_manager is None:
+            return {}
+        idx = self._index_manager.index
+        tag_counts: Dict[str, int] = {}
+        for tag, filenames in idx.tag_map.items():
+            tag_counts[tag] = len(filenames)
+        return tag_counts
+
+    def get_memory_graph(self) -> Dict[str, Any]:
+        """Get link graph data for visualization."""
+        if self._index_manager is None:
+            return {"nodes": [], "edges": []}
+        idx = self._index_manager.index
+        nodes = []
+        edges = []
+        for fn, info in idx.files.items():
+            nodes.append({
+                "id": fn,
+                "label": info.title or fn.replace(".md", ""),
+                "category": info.category,
+                "importance": info.importance,
+            })
+            for target in info.links_to:
+                edges.append({"source": fn, "target": target})
+        return {"nodes": nodes, "edges": edges}
+
+    def reindex_memory(self) -> int:
+        """Force a full rebuild of the memory index.
+
+        Returns total number of indexed files.
+        """
+        if self._index_manager is None:
+            return 0
+        self._index_manager.rebuild()
+        return self._index_manager.index.total_files
+
+    @staticmethod
+    def _file_info_to_dict(info) -> Dict[str, Any]:
+        """Convert MemoryFileInfo to dict."""
+        return {
+            "filename": info.filename,
+            "title": info.title,
+            "category": info.category,
+            "tags": info.tags,
+            "importance": info.importance,
+            "created": info.created,
+            "modified": info.modified,
+            "source": info.source,
+            "char_count": info.char_count,
+            "links_to": info.links_to,
+            "linked_from": info.linked_from,
+            "summary": info.summary,
+        }
+
     async def record_execution(
         self,
         *,
@@ -243,6 +445,33 @@ class SessionMemoryManager:
                 "record_execution: #%d (%d chars) → long-term memory",
                 execution_number, len(entry),
             )
+
+            # ── Structured note (dual-write) ─────────────────────────
+            if self._structured_writer is not None:
+                try:
+                    auto_tags = self._extract_execution_tags(
+                        input_text, result_state,
+                    )
+                    status_tag = "success" if success else "failure"
+                    all_tags = ["execution", status_tag] + auto_tags
+                    imp = "medium" if success else "high"
+                    title = (
+                        f"Execution #{execution_number} — "
+                        f"{input_text[:60].strip()}"
+                    )
+                    self._structured_writer.write_note(
+                        title=title,
+                        content=entry,
+                        category="daily",
+                        tags=all_tags,
+                        importance=imp,
+                        source="execution",
+                    )
+                except Exception:
+                    logger.debug(
+                        "record_execution: structured write failed (non-critical)",
+                        exc_info=True,
+                    )
 
             # Index into vector DB (awaited to avoid race with auto_flush/save)
             if self._vmm.enabled:
@@ -413,6 +642,39 @@ class SessionMemoryManager:
             lines.append("")
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _extract_execution_tags(
+        input_text: str,
+        result_state: Dict[str, Any],
+    ) -> List[str]:
+        """Extract auto-tags from execution input and state."""
+        tags: List[str] = []
+        difficulty = result_state.get("difficulty")
+        if difficulty:
+            tags.append(difficulty)
+        if result_state.get("todos"):
+            tags.append("todos")
+        if result_state.get("review_result"):
+            tags.append("reviewed")
+        # Extract simple keyword tags from input
+        text = input_text.lower()
+        keyword_tags = {
+            "debug": "debug",
+            "fix": "fix",
+            "error": "error",
+            "test": "test",
+            "deploy": "deploy",
+            "build": "build",
+            "refactor": "refactor",
+            "design": "design",
+            "analyze": "analysis",
+            "review": "review",
+        }
+        for keyword, tag in keyword_tags.items():
+            if keyword in text and tag not in tags:
+                tags.append(tag)
+        return tags[:10]  # cap at 10
 
     # ------------------------------------------------------------------
     # Search
@@ -779,6 +1041,21 @@ class SessionMemoryManager:
                             last_write = datetime.fromisoformat(ts_str)
                         except (ValueError, TypeError):
                             pass
+
+                    # Add structured stats from index
+                    categories: Dict[str, int] = {}
+                    total_tags = 0
+                    total_links = 0
+                    if self._index_manager is not None:
+                        idx = self._index_manager.index
+                        for info in idx.files.values():
+                            cat = info.category or "root"
+                            categories[cat] = categories.get(cat, 0) + 1
+                        total_tags = len(idx.tag_map)
+                        total_links = sum(
+                            len(info.links_to) for info in idx.files.values()
+                        )
+
                     return MemoryStats(
                         long_term_entries=db_stats.get("long_term_entries", 0),
                         short_term_entries=db_stats.get("short_term_entries", 0),
@@ -786,6 +1063,9 @@ class SessionMemoryManager:
                         short_term_chars=db_stats.get("short_term_chars", 0),
                         total_files=db_stats.get("total_files", 0),
                         last_write=last_write,
+                        categories=categories,
+                        total_tags=total_tags,
+                        total_links=total_links,
                     )
             except Exception:
                 pass
@@ -803,6 +1083,18 @@ class SessionMemoryManager:
         ]
         last_write = max(all_timestamps) if all_timestamps else None
 
+        # Structured stats from index
+        categories: Dict[str, int] = {}
+        total_tags = 0
+        total_links = 0
+        if self._index_manager is not None:
+            idx = self._index_manager.index
+            for info in idx.files.values():
+                cat = info.category or "root"
+                categories[cat] = categories.get(cat, 0) + 1
+            total_tags = len(idx.tag_map)
+            total_links = sum(len(info.links_to) for info in idx.files.values())
+
         return MemoryStats(
             long_term_entries=len(ltm_entries),
             short_term_entries=len(stm_entries),
@@ -810,4 +1102,7 @@ class SessionMemoryManager:
             short_term_chars=stm_chars,
             total_files=len(ltm_entries),
             last_write=last_write,
+            categories=categories,
+            total_tags=total_tags,
+            total_links=total_links,
         )

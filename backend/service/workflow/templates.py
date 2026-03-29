@@ -120,6 +120,7 @@ def create_autonomous_template() -> WorkflowDefinition:
          {"position_label": "final_answer"})
     _add("final_answer",  "fin_ans",    "Final Answer",         576, 1904)
     _add("post_model",    "post_fa",    "Post Final Answer",    576, 2000)
+    _add("memory_reflect", "mem_reflect", "Memory Reflect",      576, 2064)
 
     _edge("guard_todo", "mk_todos")
     _edge("mk_todos", "post_todos")
@@ -129,7 +130,7 @@ def create_autonomous_template() -> WorkflowDefinition:
     _edge("post_exec", "chk_prog")
 
     # ── END NODE ──
-    _add("end", "end", "End", 64, 2144)
+    _add("end", "end", "End", 64, 2208)
 
     # ── Conditional routing: classify → branches (direct routing) ──
     _edge("classify", "guard_dir", port="easy", lbl="Easy")
@@ -163,7 +164,8 @@ def create_autonomous_template() -> WorkflowDefinition:
     _edge("post_fr", "guard_fa")
     _edge("guard_fa", "fin_ans")
     _edge("fin_ans", "post_fa")
-    _edge("post_fa", "end")
+    _edge("post_fa", "mem_reflect")
+    _edge("mem_reflect", "end")
 
     return WorkflowDefinition(
         id="template-autonomous",
@@ -249,15 +251,15 @@ def create_optimized_autonomous_template() -> WorkflowDefinition:
 
                 • easy: one short answer
                 • not_easy: compact memory injection → capped TODO planning
-                    → batch execution in one model call
+                    → batch execution → memory reflection
 
-        Topology (8 nodes)::
+        Topology (9 nodes)::
 
                 START → relevance_gate
                     ├─ skip → END
                     └─ continue → adaptive_classify
                             ├─ easy     → easy_answer → END
-                            ├─ not_easy → mem_inject → mk_todos → batch_exec → END
+                            ├─ not_easy → mem_inject → mk_todos → batch_exec → mem_reflect → END
                             └─ end      → END
     """
     nodes: List[WorkflowNodeInstance] = []
@@ -314,12 +316,19 @@ def create_optimized_autonomous_template() -> WorkflowDefinition:
         "set_complete": True,
     })
 
+    _add("memory_reflect", "mem_reflect", "Memory Reflect", 200, 1100, {
+        "input_field": "input",
+        "output_field": "final_answer",
+        "max_insights": 3,
+    })
+
     _edge("mem_inject", "mk_todos")
     _edge("mk_todos", "batch_exec")
-    _edge("batch_exec", "end")
+    _edge("batch_exec", "mem_reflect")
+    _edge("mem_reflect", "end")
 
     # ── END NODE ──
-    _add("end", "end", "End", 0, 1200)
+    _add("end", "end", "End", 0, 1350)
 
     # ── Conditional routing: adaptive_classify → 2 branches ──
     _edge("classify", "easy_answer", port="easy",     lbl="Easy")
@@ -334,7 +343,7 @@ def create_optimized_autonomous_template() -> WorkflowDefinition:
             "Binary routing only: easy or not_easy. "
             "Easy returns a very short direct answer. "
             "Not-easy work uses compact memory injection, capped TODO planning, "
-            "and single-pass batch execution. "
+            "single-pass batch execution, and post-execution memory reflection. "
             "Removes medium/hard/extreme loops to minimize token burn."
         ),
         nodes=nodes,

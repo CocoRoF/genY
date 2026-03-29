@@ -49,6 +49,7 @@ const ko: Translations = {
     logs: '로그',
     sharedFolder: '공유 폴더',
     chat: '채팅',
+    memory: '메모리',
   },
 
   // ─── Sidebar ───

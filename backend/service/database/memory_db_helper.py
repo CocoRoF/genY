@@ -692,3 +692,412 @@ def db_session_has_memory(db_manager, session_id: str) -> bool:
         return result is not None
     except Exception:
         return False
+
+
+# ======================================================================
+#  Structured Memory — Write
+# ======================================================================
+
+def db_structured_write(
+    db_manager,
+    session_id: str,
+    *,
+    content: str,
+    filename: str,
+    title: str = "",
+    category: str = "topics",
+    tags: Optional[List[str]] = None,
+    importance: str = "medium",
+    links_to: Optional[List[str]] = None,
+    linked_from: Optional[List[str]] = None,
+    source_type: str = "system",
+    summary: str = "",
+    entry_type: str = "text",
+    heading: str = "",
+    topic: str = "",
+) -> bool:
+    """Write a structured memory entry with full metadata.
+
+    Returns True if successful.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return False
+
+    try:
+        entry_id = str(uuid.uuid4())
+        now = datetime.now(KST).isoformat()
+        tags_str = json.dumps(tags or [], ensure_ascii=False)
+        links_to_str = json.dumps(links_to or [], ensure_ascii=False)
+        linked_from_str = json.dumps(linked_from or [], ensure_ascii=False)
+
+        query = (
+            f"INSERT INTO {TABLE} "
+            f"(entry_id, session_id, source, entry_type, content, filename, heading, topic, "
+            f"entry_timestamp, category, tags_json, importance, links_to_json, "
+            f"linked_from_json, source_type, summary) "
+            f"VALUES (%s, %s, 'long_term', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            f"RETURNING id"
+        )
+        mgr.execute_insert(query, (
+            entry_id, session_id, entry_type, content, filename, heading, topic,
+            now, category, tags_str, importance, links_to_str,
+            linked_from_str, source_type, summary,
+        ))
+        return True
+    except Exception as e:
+        logger.debug(f"Failed to insert structured memory for {session_id}: {e}")
+        return False
+
+
+def db_structured_update(
+    db_manager,
+    session_id: str,
+    filename: str,
+    *,
+    content: Optional[str] = None,
+    title: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    importance: Optional[str] = None,
+    links_to: Optional[List[str]] = None,
+    linked_from: Optional[List[str]] = None,
+    summary: Optional[str] = None,
+) -> bool:
+    """Update fields of an existing structured memory entry by filename.
+
+    Only non-None fields are updated.
+
+    Returns True if at least one row was updated.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return False
+
+    sets: List[str] = []
+    params: list = []
+
+    if content is not None:
+        sets.append("content = %s")
+        params.append(content)
+    if title is not None:
+        sets.append("heading = %s")
+        params.append(title)
+    if tags is not None:
+        sets.append("tags_json = %s")
+        params.append(json.dumps(tags, ensure_ascii=False))
+    if importance is not None:
+        sets.append("importance = %s")
+        params.append(importance)
+    if links_to is not None:
+        sets.append("links_to_json = %s")
+        params.append(json.dumps(links_to, ensure_ascii=False))
+    if linked_from is not None:
+        sets.append("linked_from_json = %s")
+        params.append(json.dumps(linked_from, ensure_ascii=False))
+    if summary is not None:
+        sets.append("summary = %s")
+        params.append(summary)
+
+    if not sets:
+        return False
+
+    sets.append("updated_at = CURRENT_TIMESTAMP")
+    set_clause = ", ".join(sets)
+    params.extend([session_id, filename])
+
+    try:
+        query = (
+            f"UPDATE {TABLE} SET {set_clause} "
+            f"WHERE session_id = %s AND filename = %s AND source = 'long_term'"
+        )
+        mgr.execute_update_delete(query, tuple(params))
+        return True
+    except Exception as e:
+        logger.debug(f"Failed to update structured memory for {session_id}/{filename}: {e}")
+        return False
+
+
+def db_structured_delete(
+    db_manager,
+    session_id: str,
+    filename: str,
+) -> bool:
+    """Delete a structured memory entry by filename.
+
+    Returns True if successful.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return False
+
+    try:
+        query = (
+            f"DELETE FROM {TABLE} "
+            f"WHERE session_id = %s AND filename = %s AND source = 'long_term'"
+        )
+        mgr.execute_update_delete(query, (session_id, filename))
+        return True
+    except Exception as e:
+        logger.debug(f"Failed to delete structured memory for {session_id}/{filename}: {e}")
+        return False
+
+
+def db_structured_read(
+    db_manager,
+    session_id: str,
+    filename: str,
+) -> Optional[Dict[str, Any]]:
+    """Read a single structured memory entry by filename.
+
+    Returns entry dict or None.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    try:
+        query = (
+            f"SELECT entry_id, content, filename, entry_type, heading, topic, "
+            f"entry_timestamp, category, tags_json, importance, links_to_json, "
+            f"linked_from_json, source_type, summary "
+            f"FROM {TABLE} "
+            f"WHERE session_id = %s AND filename = %s AND source = 'long_term' "
+            f"ORDER BY id DESC LIMIT 1"
+        )
+        row = mgr.execute_query_one(query, (session_id, filename))
+        if row is None:
+            return None
+        return _parse_structured_row(row)
+    except Exception as e:
+        logger.debug(f"Failed to read structured memory for {session_id}/{filename}: {e}")
+        return None
+
+
+def db_structured_list(
+    db_manager,
+    session_id: str,
+    *,
+    category: Optional[str] = None,
+    tag: Optional[str] = None,
+    importance: Optional[str] = None,
+    limit: int = 100,
+) -> Optional[List[Dict[str, Any]]]:
+    """List structured memory entries with optional filters.
+
+    Returns list of entry dicts or None on failure.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    try:
+        conditions = ["session_id = %s", "source = 'long_term'"]
+        params: list = [session_id]
+
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+        if importance:
+            conditions.append("importance = %s")
+            params.append(importance)
+        if tag:
+            conditions.append("tags_json ILIKE %s")
+            params.append(f'%"{tag}"%')
+
+        params.append(limit)
+        where = " AND ".join(conditions)
+        query = (
+            f"SELECT entry_id, content, filename, entry_type, heading, topic, "
+            f"entry_timestamp, category, tags_json, importance, links_to_json, "
+            f"linked_from_json, source_type, summary "
+            f"FROM {TABLE} "
+            f"WHERE {where} "
+            f"ORDER BY id DESC LIMIT %s"
+        )
+        rows = mgr.execute_query(query, tuple(params))
+        if rows is None:
+            return None
+        return [_parse_structured_row(r) for r in rows]
+    except Exception as e:
+        logger.debug(f"Failed to list structured memory for {session_id}: {e}")
+        return None
+
+
+def db_structured_search(
+    db_manager,
+    session_id: str,
+    query_text: str,
+    *,
+    max_results: int = 10,
+    category: Optional[str] = None,
+    tag: Optional[str] = None,
+) -> Optional[List[Dict[str, Any]]]:
+    """Full-text search over structured memory entries.
+
+    Returns list of entry dicts or None on failure.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    keywords = [w for w in query_text.lower().split() if len(w) >= 2]
+    if not keywords:
+        return None
+
+    try:
+        conditions = ["session_id = %s", "source = 'long_term'"]
+        params: list = [session_id]
+
+        # Content keyword search (OR for broader matching)
+        kw_conds = " OR ".join(
+            ["(content ILIKE %s OR heading ILIKE %s OR summary ILIKE %s)"] * len(keywords)
+        )
+        for kw in keywords:
+            pat = f"%{kw}%"
+            params.extend([pat, pat, pat])
+        conditions.append(f"({kw_conds})")
+
+        if category:
+            conditions.append("category = %s")
+            params.append(category)
+        if tag:
+            conditions.append("tags_json ILIKE %s")
+            params.append(f'%"{tag}"%')
+
+        params.append(max_results)
+        where = " AND ".join(conditions)
+        query = (
+            f"SELECT entry_id, content, filename, entry_type, heading, topic, "
+            f"entry_timestamp, category, tags_json, importance, links_to_json, "
+            f"linked_from_json, source_type, summary "
+            f"FROM {TABLE} "
+            f"WHERE {where} "
+            f"ORDER BY id DESC LIMIT %s"
+        )
+        rows = mgr.execute_query(query, tuple(params))
+        if rows is None:
+            return None
+        return [_parse_structured_row(r) for r in rows]
+    except Exception as e:
+        logger.debug(f"Failed to search structured memory for {session_id}: {e}")
+        return None
+
+
+def db_structured_tags(
+    db_manager,
+    session_id: str,
+) -> Optional[Dict[str, int]]:
+    """Get all tags and their counts for a session.
+
+    Returns dict of {tag: count} or None on failure.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    try:
+        query = (
+            f"SELECT tags_json FROM {TABLE} "
+            f"WHERE session_id = %s AND source = 'long_term' AND tags_json != '[]'"
+        )
+        rows = mgr.execute_query(query, (session_id,))
+        if rows is None:
+            return None
+
+        tag_counts: Dict[str, int] = {}
+        for row in rows:
+            try:
+                tags = json.loads(row.get("tags_json", "[]"))
+                for t in tags:
+                    if isinstance(t, str) and t:
+                        tag_counts[t] = tag_counts.get(t, 0) + 1
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return tag_counts
+    except Exception as e:
+        logger.debug(f"Failed to get tags for {session_id}: {e}")
+        return None
+
+
+def db_structured_graph(
+    db_manager,
+    session_id: str,
+) -> Optional[Dict[str, Any]]:
+    """Build link graph data for a session.
+
+    Returns dict with 'nodes' and 'edges' lists for graph visualization.
+    """
+    mgr = _get_db_manager(db_manager)
+    if not _is_db_available(db_manager):
+        return None
+
+    try:
+        query = (
+            f"SELECT filename, heading, category, importance, links_to_json, linked_from_json "
+            f"FROM {TABLE} "
+            f"WHERE session_id = %s AND source = 'long_term'"
+        )
+        rows = mgr.execute_query(query, (session_id,))
+        if rows is None:
+            return None
+
+        nodes = []
+        edges = []
+        for row in rows:
+            fn = row.get("filename", "")
+            if not fn:
+                continue
+            nodes.append({
+                "id": fn,
+                "label": row.get("heading", "") or fn.split("/")[-1].replace(".md", ""),
+                "category": row.get("category", ""),
+                "importance": row.get("importance", "medium"),
+            })
+            try:
+                links = json.loads(row.get("links_to_json", "[]"))
+                for target in links:
+                    if target:
+                        edges.append({"source": fn, "target": target})
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        return {"nodes": nodes, "edges": edges}
+    except Exception as e:
+        logger.debug(f"Failed to build graph for {session_id}: {e}")
+        return None
+
+
+def _parse_structured_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse a DB row into a structured memory dict."""
+    tags = []
+    links_to = []
+    linked_from = []
+    try:
+        tags = json.loads(row.get("tags_json", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        links_to = json.loads(row.get("links_to_json", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        linked_from = json.loads(row.get("linked_from_json", "[]"))
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    return {
+        "entry_id": row.get("entry_id", ""),
+        "content": row.get("content", ""),
+        "filename": row.get("filename", ""),
+        "entry_type": row.get("entry_type", "text"),
+        "heading": row.get("heading", ""),
+        "topic": row.get("topic", ""),
+        "entry_timestamp": row.get("entry_timestamp", ""),
+        "category": row.get("category", ""),
+        "tags": tags,
+        "importance": row.get("importance", "medium"),
+        "links_to": links_to,
+        "linked_from": linked_from,
+        "source_type": row.get("source_type", "system"),
+        "summary": row.get("summary", ""),
+    }

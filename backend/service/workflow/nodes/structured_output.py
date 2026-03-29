@@ -64,6 +64,38 @@ class MemoryGateOutput(BaseModel):
     """Brief reasoning for the decision."""
 
 
+class MemoryReflectLearnedItem(BaseModel):
+    """A single learned insight extracted by MemoryReflectNode."""
+
+    title: str
+    """Concise title for the learned insight."""
+
+    content: str
+    """Markdown explanation of what was learned."""
+
+    category: str = "insights"
+    """Category: topics, insights, entities, projects."""
+
+    tags: List[str] = []
+    """Relevant tags for this insight."""
+
+    importance: str = "medium"
+    """Importance: low, medium, high."""
+
+    related_to: List[str] = []
+    """Filenames of existing notes this insight relates to."""
+
+
+class MemoryReflectOutput(BaseModel):
+    """Structured output for MemoryReflectNode."""
+
+    learned: List[MemoryReflectLearnedItem] = []
+    """List of insights extracted from the execution."""
+
+    should_save: bool = True
+    """Whether the extracted insights are worth saving."""
+
+
 class ClassifyOutput(BaseModel):
     """Structured output for the ClassifyNode."""
 

@@ -15,6 +15,7 @@ const GLOBAL_TAB_IDS = ['main', 'playground', 'workflows', 'toolSets', 'sharedFo
 const SESSION_TAB_DEFS = [
   { id: 'command', accent: true },
   { id: 'graph' },
+  { id: 'memory' },
   { id: 'storage' },
   { id: 'sessionTools' },
   { id: 'logs' },
