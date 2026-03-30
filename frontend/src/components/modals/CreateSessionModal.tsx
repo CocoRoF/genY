@@ -10,6 +10,7 @@ import NumberStepper from '@/components/ui/NumberStepper';
 import InfoTooltip from '@/components/ui/InfoTooltip';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
+import { useVTuberStore } from '@/store/useVTuberStore';
 import type { CreateAgentRequest, SessionInfo, ToolPresetDefinition } from '@/types';
 import type { WorkflowDefinition } from '@/types/workflow';
 
@@ -54,8 +55,17 @@ export default function CreateSessionModal({ onClose }: Props) {
   const [selectedWorkflow, setSelectedWorkflow] = useState('template-optimized-autonomous');
   const [toolPresets, setToolPresets] = useState<ToolPresetDefinition[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState('');
+  const { models: avatarModels, modelsLoaded: avatarsLoaded, fetchModels: fetchAvatarModels, assignModel: assignAvatar } = useVTuberStore();
 
   useEffect(() => { loadPrompts(); }, [loadPrompts]);
+
+  // Load avatar models when VTuber role is selected
+  useEffect(() => {
+    if (formState.role === 'vtuber' && !avatarsLoaded) {
+      fetchAvatarModels();
+    }
+  }, [formState.role, avatarsLoaded, fetchAvatarModels]);
 
   // Load default prompt template content on mount
   useEffect(() => {
@@ -94,6 +104,14 @@ export default function CreateSessionModal({ onClose }: Props) {
 
   const handleRoleChange = (role: string) => {
     setFormState(f => ({ ...f, role }));
+    // Auto-select VTuber defaults
+    if (role === 'vtuber') {
+      setSelectedWorkflow('template-vtuber');
+      handlePromptChange('vtuber');
+      if (!avatarsLoaded) fetchAvatarModels();
+    } else {
+      setSelectedAvatar('');
+    }
   };
 
   const handleSubmit = async () => {
@@ -110,7 +128,16 @@ export default function CreateSessionModal({ onClose }: Props) {
       if (selectedPreset) {
         payload.tool_preset_id = selectedPreset;
       }
-      await createSession(payload);
+      const session = await createSession(payload);
+      // Auto-assign avatar if selected for VTuber sessions
+      if (selectedAvatar && session?.session_id && formState.role === 'vtuber') {
+        try {
+          await assignAvatar(session.session_id, selectedAvatar);
+        } catch {
+          // Non-blocking: session created successfully, avatar assignment can be done later
+          console.warn('Avatar assignment failed, can be assigned manually later');
+        }
+      }
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t('createSession.failedToCreate'));
@@ -150,6 +177,7 @@ export default function CreateSessionModal({ onClose }: Props) {
                 <option value="worker">{t('createSession.roleWorker')}</option>
                 <option value="researcher">{t('createSession.roleResearcher')}</option>
                 <option value="planner">{t('createSession.rolePlanner')}</option>
+                <option value="vtuber">{t('createSession.roleVTuber')}</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -161,6 +189,19 @@ export default function CreateSessionModal({ onClose }: Props) {
               </select>
             </div>
           </div>
+
+          {/* Avatar (VTuber only) */}
+          {formState.role === 'vtuber' && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.avatar')} <InfoTooltip text={t('createSession.avatarHelp')} /></label>
+              <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedAvatar} onChange={e => setSelectedAvatar(e.target.value)}>
+                <option value="">{avatarsLoaded ? t('createSession.avatarNone') : t('createSession.avatarLoading')}</option>
+                {avatarModels.map(m => (
+                  <option key={m.name} value={m.name}>{m.display_name || m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Prompt Template */}
           <div className="flex flex-col gap-1.5">

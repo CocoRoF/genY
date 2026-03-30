@@ -5,7 +5,9 @@ export interface SessionInfo {
   session_name: string | null;
   status: 'running' | 'stopped' | 'error' | 'idle' | string;
   model: string | null;
-  role: 'worker' | 'developer' | 'researcher' | 'planner';
+  role: 'worker' | 'developer' | 'researcher' | 'planner' | 'vtuber';
+  linked_session_id?: string | null;
+  session_type?: string | null;
   max_turns: number | null;
   timeout: number | null;
   max_iterations: number | null;

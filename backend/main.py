@@ -267,6 +267,12 @@ async def lifespan(app: FastAPI):
     from service.execution.agent_executor import set_app_state
     set_app_state(app.state)
 
+    # ── VTuber Thinking Trigger Service ────────────────────────────────
+    from service.vtuber.thinking_trigger import get_thinking_trigger_service
+    thinking_trigger = get_thinking_trigger_service()
+    thinking_trigger.start()
+    app.state.thinking_trigger = thinking_trigger
+
     # ── Tool Runtime Health Check ──────────────────────────────────────
     # Verify tools actually execute (not just registered) by invoking a
     # read-only tool directly and checking the response.
@@ -320,6 +326,10 @@ async def lifespan(app: FastAPI):
 
     print_step_banner("SHUTDOWN", "GENY AGENT SHUTDOWN", "Cleaning up sessions...")
     logger.info("Shutting down Geny Agent")
+
+    # Stop thinking trigger service
+    if hasattr(app.state, 'thinking_trigger'):
+        app.state.thinking_trigger.stop()
 
     # Stop idle monitor
     await agent_manager.stop_idle_monitor()

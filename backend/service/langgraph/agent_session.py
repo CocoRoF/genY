@@ -174,6 +174,10 @@ class AgentSession:
         # Process revival flag (set by _auto_revive when process is dead)
         self._needs_process_restart = False
 
+        # Dual-agent pairing (VTuber ↔ CLI)
+        self._linked_session_id: Optional[str] = None
+        self._session_type: Optional[str] = None  # "vtuber" | "cli" | None
+
         # Initial status
         self._status = SessionStatus.STARTING
 
@@ -416,6 +420,16 @@ class AgentSession:
     def memory_manager(self) -> Optional["SessionMemoryManager"]:
         """Session memory manager (available after initialization)."""
         return self._memory_manager
+
+    @property
+    def linked_session_id(self) -> Optional[str]:
+        """ID of the paired session (VTuber ↔ CLI)."""
+        return self._linked_session_id
+
+    @property
+    def session_type(self) -> Optional[str]:
+        """Session type: 'vtuber', 'cli', or None."""
+        return self._session_type
 
     def _get_logger(self) -> Optional[SessionLogger]:
         """Get session logger (lazy)."""
@@ -1363,6 +1377,8 @@ class AgentSession:
             tool_preset_id=self._tool_preset_id,
             system_prompt=self._system_prompt,
             total_cost=_total_cost,
+            linked_session_id=self._linked_session_id,
+            session_type=self._session_type,
         )
 
     # ========================================================================

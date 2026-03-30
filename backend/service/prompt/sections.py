@@ -128,6 +128,7 @@ class SectionLibrary:
             "developer": "Execute implementation tasks with precision. Read existing code before changing it, follow project conventions, handle edge cases, and test your changes.",
             "researcher": "Discover cutting-edge information, explore emerging technologies, and generate actionable product ideas. Explore diverse sources broadly, try things hands-on, and synthesize findings into concise idea summaries.",
             "planner": "Evaluate ideas critically and transform promising ones into comprehensive, production-ready plans. Produce detailed specifications, architecture designs, and implementation guides that developers can build from directly.",
+            "vtuber": "You are a conversational VTuber persona. Respond naturally and expressively. Handle simple requests directly. Delegate complex coding/tool tasks to your paired CLI agent via geny_send_direct_message.",
         }
 
         content = protocols.get(role, "")

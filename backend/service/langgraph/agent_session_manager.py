@@ -235,6 +235,8 @@ class AgentSessionManager(SessionManager):
         # Determine prompt mode
         if role in ("developer", "researcher", "planner"):
             mode = PromptMode.FULL
+        elif role == "vtuber":
+            mode = PromptMode.FULL
         else:
             # Standalone worker → FULL
             mode = PromptMode.FULL
@@ -267,6 +269,16 @@ class AgentSessionManager(SessionManager):
         # Append memory context if available
         if memory_context:
             prompt = prompt + "\n\n" + memory_context
+
+        # Append VTuber-specific context (linked CLI session info)
+        if role == "vtuber" and request.linked_session_id:
+            vtuber_ctx = (
+                f"\n\n## Linked CLI Agent\n"
+                f"Your paired CLI worker session ID: `{request.linked_session_id}`\n"
+                f"Delegate complex tasks to this agent via `geny_send_direct_message`.\n"
+                f"You will receive results back when the CLI agent completes work."
+            )
+            prompt = prompt + vtuber_ctx
 
         logger.debug(f"  PromptBuilder: mode={mode.value}, role={role}, length={len(prompt)} chars")
 
@@ -409,7 +421,12 @@ class AgentSessionManager(SessionManager):
 
         # Map built-in graph_name choices to template workflow_ids
         if not workflow_id:
-            if graph_name and 'optimized' in graph_name.lower() and 'autonomous' in graph_name.lower():
+            role_val = request.role.value if request.role else "worker"
+            if role_val == "vtuber":
+                workflow_id = "template-vtuber"
+                if not graph_name:
+                    graph_name = "VTuber Conversational"
+            elif graph_name and 'optimized' in graph_name.lower() and 'autonomous' in graph_name.lower():
                 workflow_id = "template-optimized-autonomous"
             elif graph_name and 'autonomous' in graph_name.lower():
                 workflow_id = "template-autonomous"
@@ -485,6 +502,63 @@ class AgentSessionManager(SessionManager):
         self._store.register(session_id, session_info.model_dump(mode="json"))
 
         logger.info(f"[{session_id}] ✅ AgentSession created successfully")
+
+        # ── Auto-create paired CLI session for VTuber agents ───────────
+        if (
+            request.role == SessionRole.VTUBER
+            and not request.linked_session_id  # Avoid recursion: CLI request already has linked_id
+        ):
+            try:
+                cli_name = f"{request.session_name or 'vtuber'}_cli"
+                # Share the VTuber's actual storage path so memory is shared
+                shared_dir = (
+                    request.working_dir
+                    or (agent.storage_path if hasattr(agent, 'storage_path') else None)
+                )
+                cli_request = CreateSessionRequest(
+                    session_name=cli_name,
+                    working_dir=shared_dir,  # Share same working dir for memory sharing
+                    model=request.model,               # Same model by default
+                    max_turns=request.max_turns or 50,
+                    timeout=request.timeout or 1800.0,
+                    max_iterations=request.max_iterations or 50,
+                    role=SessionRole.WORKER,
+                    workflow_id="template-optimized-autonomous",
+                    graph_name="Optimized Autonomous",
+                    tool_preset_id=request.tool_preset_id,
+                    linked_session_id=session_id,  # Link back to VTuber
+                    session_type="cli",
+                    env_vars=request.env_vars,
+                )
+                cli_agent = await self.create_agent_session(cli_request)
+                cli_id = cli_agent.session_id
+
+                # Back-link: update VTuber session with CLI session ID
+                self._store.update(session_id, {
+                    "linked_session_id": cli_id,
+                    "session_type": "vtuber",
+                })
+
+                agent._linked_session_id = cli_id
+                agent._session_type = "vtuber"
+
+                # Rebuild system prompt with CLI session ID injected
+                vtuber_ctx = (
+                    f"\n\n## Linked CLI Agent\n"
+                    f"Your paired CLI worker session ID: `{cli_id}`\n"
+                    f"Delegate complex tasks to this agent via `geny_send_direct_message`.\n"
+                    f"You will receive results back when the CLI agent completes work."
+                )
+                agent._system_prompt = agent._system_prompt + vtuber_ctx
+                if agent.process:
+                    agent.process.system_prompt = agent._system_prompt
+
+                logger.info(
+                    f"[{session_id}] 🔗 Paired CLI session created: {cli_id} ({cli_name})"
+                )
+            except Exception as e:
+                logger.error(f"[{session_id}] Failed to create paired CLI session: {e}", exc_info=True)
+
         return agent
 
     # ========================================================================

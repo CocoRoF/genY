@@ -47,4 +47,5 @@ ROLE_DEFAULT_PRESET: dict[str, str] = {
     "developer": "template-all-tools",
     "researcher": "template-all-tools",
     "planner": "template-all-tools",
+    "vtuber": "template-all-tools",
 }

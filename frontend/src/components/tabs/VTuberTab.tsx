@@ -6,6 +6,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { useVTuberStore } from '@/store/useVTuberStore';
 import { useI18n } from '@/lib/i18n';
 import VTuberLogPanel from '@/components/live2d/VTuberLogPanel';
+import VTuberChatPanel from '@/components/live2d/VTuberChatPanel';
 
 const Live2DCanvas = dynamic(() => import('@/components/live2d/Live2DCanvas'), { ssr: false });
 
@@ -27,7 +28,10 @@ const DEFAULT_LOG_HEIGHT = 180;
 export default function VTuberTab() {
   const { t } = useI18n();
   const selectedSessionId = useAppStore((s) => s.selectedSessionId);
+  const sessions = useAppStore((s) => s.sessions);
   const sessionId = selectedSessionId || '';
+  const currentSession = sessions.find(s => s.session_id === sessionId);
+  const isVTuberRole = currentSession?.role === 'vtuber';
 
   // Use individual selectors to avoid full-store re-renders on every SSE event
   const models = useVTuberStore((s) => s.models);
@@ -164,18 +168,28 @@ export default function VTuberTab() {
         )}
       </div>
 
-      {/* ── Canvas Area ── */}
-      <div className="flex-1 min-h-0 relative bg-[var(--bg-primary)]">
-        {assignedModelName ? (
-          <Live2DCanvas sessionId={sessionId} />
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
-            <svg className="w-16 h-16 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-            </svg>
-            <p className="text-sm">
-              {t('vtuber.noModel') ?? 'No model assigned. Select a model above.'}
-            </p>
+      {/* ── Canvas + Chat Area ── */}
+      <div className={`flex-1 min-h-0 relative ${isVTuberRole ? 'flex' : ''}`}>
+        {/* Live2D Canvas */}
+        <div className={`relative bg-[var(--bg-primary)] ${isVTuberRole ? 'w-1/2 border-r border-[var(--border-color)]' : 'w-full h-full'}`}>
+          {assignedModelName ? (
+            <Live2DCanvas sessionId={sessionId} />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+              <svg className="w-16 h-16 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              <p className="text-sm">
+                {t('vtuber.noModel') ?? 'No model assigned. Select a model above.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Chat Panel (VTuber role only) */}
+        {isVTuberRole && (
+          <div className="w-1/2 bg-[var(--bg-secondary)]">
+            <VTuberChatPanel sessionId={sessionId} />
           </div>
         )}
       </div>

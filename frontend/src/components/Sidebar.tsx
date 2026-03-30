@@ -47,7 +47,12 @@ function SessionItem({ session, isSelected, onSelect }: {
       <span
         className="inline-flex items-center justify-center w-[18px] h-[18px] rounded text-[10px] font-semibold mr-1.5 text-white shrink-0"
         style={{
-          background: 'linear-gradient(135deg, #10b981, #059669)',
+          background: {
+            developer: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            researcher: 'linear-gradient(135deg, #f97316, #ea580c)',
+            planner: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+            vtuber: 'linear-gradient(135deg, #ec4899, #db2777)',
+          }[session.role || ''] || 'linear-gradient(135deg, #10b981, #059669)',
         }}
       >
         {session.role?.charAt(0).toUpperCase() || 'W'}

@@ -24,6 +24,7 @@ class SessionRole(str, Enum):
     DEVELOPER = "developer"    # Alias for worker — implementation focus
     RESEARCHER = "researcher"  # Research & Ideation — discovers info, generates ideas
     PLANNER = "planner"        # Plan Architect — creates detailed plans and designs
+    VTUBER = "vtuber"          # VTuber persona — conversational front-end agent
 
 
 # =============================================================================
@@ -193,6 +194,16 @@ class CreateSessionRequest(BaseModel):
                     "If None, the default preset for the session role is used."
     )
 
+    # Dual-agent pairing (VTuber ↔ CLI)
+    linked_session_id: Optional[str] = Field(
+        default=None,
+        description="Linked session ID for VTuber↔CLI dual-agent pairing"
+    )
+    session_type: Optional[str] = Field(
+        default=None,
+        description="Session type: 'vtuber' or 'cli' (None defaults to standard CLI)"
+    )
+
 
 class SessionInfo(BaseModel):
     """
@@ -272,6 +283,16 @@ class SessionInfo(BaseModel):
     total_cost: Optional[float] = Field(
         default=0.0,
         description="Cumulative API usage cost (USD) across all executions"
+    )
+
+    # Dual-agent pairing (VTuber ↔ CLI)
+    linked_session_id: Optional[str] = Field(
+        default=None,
+        description="Linked session ID for VTuber↔CLI dual-agent pairing"
+    )
+    session_type: Optional[str] = Field(
+        default=None,
+        description="Session type: 'vtuber' or 'cli' (None defaults to standard CLI)"
     )
 
 

@@ -213,7 +213,12 @@ class SessionStore:
         """Mark a session as deleted (soft-delete).
 
         The record is kept with is_deleted=True and deleted_at timestamp.
+        Also cascades to linked sessions (VTuber ↔ CLI pairs).
         """
+        # Cascade: if this session has a linked partner, soft-delete it too
+        rec = self.get(session_id)
+        linked_id = rec.get("linked_session_id") if rec else None
+
         # DB primary
         if self._db_available:
             try:
@@ -232,6 +237,13 @@ class SessionStore:
             self._data[session_id]["status"] = "stopped"
             self._save()
         logger.info(f"[SessionStore] Soft-deleted session {session_id}")
+
+        # Cascade to linked session (avoid infinite recursion via is_deleted check)
+        if linked_id:
+            linked_rec = self.get(linked_id)
+            if linked_rec and not linked_rec.get("is_deleted"):
+                logger.info(f"[SessionStore] Cascading soft-delete to linked session {linked_id}")
+                self.soft_delete(linked_id)
 
     def restore(self, session_id: str) -> bool:
         """Un-delete a soft-deleted session (mark as active again).
@@ -385,6 +397,8 @@ class SessionStore:
             "graph_name": rec.get("graph_name"),
             "workflow_id": rec.get("workflow_id"),
             "tool_preset_id": rec.get("tool_preset_id"),
+            "linked_session_id": rec.get("linked_session_id"),
+            "session_type": rec.get("session_type"),
         }
 
     def contains(self, session_id: str) -> bool:

@@ -132,6 +132,65 @@ async def _emit_avatar_state(session_id: str, result: 'ExecutionResult') -> None
 
 
 # ============================================================================
+# CLI → VTuber auto-report (called after every execution)
+# ============================================================================
+
+async def _notify_linked_vtuber(session_id: str, result: 'ExecutionResult') -> None:
+    """
+    If this session is a CLI worker linked to a VTuber, fire-and-forget
+    a [CLI_RESULT] message to the VTuber so it can summarise for the user.
+
+    Best-effort: never raises.
+    """
+    try:
+        from service.langgraph import get_agent_session_manager
+
+        manager = get_agent_session_manager()
+        agent = manager.get_agent(session_id)
+        if not agent:
+            return
+
+        # Only CLI workers with a linked VTuber should notify
+        if getattr(agent, '_session_type', None) != 'cli':
+            return
+        linked_id = getattr(agent, 'linked_session_id', None)
+        if not linked_id:
+            return
+
+        vtuber_agent = manager.get_agent(linked_id)
+        if not vtuber_agent:
+            return
+
+        # Build a concise summary for the VTuber
+        if result.success and result.output:
+            summary = result.output[:2000]
+            content = f"[CLI_RESULT] Task completed successfully.\n\n{summary}"
+        elif result.error:
+            content = f"[CLI_RESULT] Task failed: {result.error[:500]}"
+        else:
+            content = "[CLI_RESULT] Task finished with no output."
+
+        # Fire-and-forget: trigger VTuber to process the result
+        async def _trigger_vtuber() -> None:
+            try:
+                await execute_command(linked_id, content)
+            except (AlreadyExecutingError, AgentNotFoundError, AgentNotAliveError) as exc:
+                logger.debug(
+                    "VTuber notification to %s skipped: %s", linked_id, exc
+                )
+
+        asyncio.create_task(_trigger_vtuber())
+        logger.info(
+            "CLI→VTuber auto-report queued: %s → %s", session_id, linked_id
+        )
+
+    except Exception:
+        logger.debug(
+            "VTuber notification failed for %s", session_id, exc_info=True
+        )
+
+
+# ============================================================================
 # Centralised active-execution registry
 # ============================================================================
 
@@ -380,6 +439,14 @@ async def execute_command(
     # 1. Resolve & revive
     agent = await _resolve_agent(session_id)
 
+    # 1b. Record activity for VTuber thinking trigger
+    if getattr(agent, '_session_type', None) == 'vtuber':
+        try:
+            from service.vtuber.thinking_trigger import get_thinking_trigger_service
+            get_thinking_trigger_service().record_activity(session_id)
+        except Exception:
+            pass  # best-effort
+
     # 2. Double-execution guard
     if is_executing(session_id):
         raise AlreadyExecutingError(
@@ -408,6 +475,8 @@ async def execute_command(
         )
         # 5. Emit avatar state (best-effort, never raises)
         await _emit_avatar_state(session_id, result)
+        # 6. Notify linked VTuber if this is a CLI worker (best-effort)
+        await _notify_linked_vtuber(session_id, result)
         return result
     finally:
         # Cleanup — holder is no longer needed for SSE streaming

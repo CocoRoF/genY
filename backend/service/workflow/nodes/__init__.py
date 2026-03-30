@@ -56,6 +56,12 @@ from service.workflow.nodes.memory import memory_inject_node        # noqa: F401
 from service.workflow.nodes.memory import transcript_record_node    # noqa: F401
 from service.workflow.nodes.memory import memory_reflect_node       # noqa: F401
 
+# ── VTuber nodes ─────────────────────────────────────────────
+from service.workflow.nodes.vtuber import vtuber_classify_node      # noqa: F401
+from service.workflow.nodes.vtuber import vtuber_respond_node       # noqa: F401
+from service.workflow.nodes.vtuber import vtuber_delegate_node      # noqa: F401
+from service.workflow.nodes.vtuber import vtuber_think_node         # noqa: F401
+
 
 def register_all_nodes() -> None:
     """Ensure all node types are registered.

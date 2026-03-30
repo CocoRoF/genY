@@ -43,7 +43,7 @@ interface AppState {
   loadSessions: () => Promise<void>;
   loadDeletedSessions: () => Promise<void>;
   selectSession: (id: string | null) => void;
-  createSession: (data: Parameters<typeof agentApi.create>[0]) => Promise<void>;
+  createSession: (data: Parameters<typeof agentApi.create>[0]) => Promise<SessionInfo>;
   deleteSession: (id: string) => Promise<void>;
   permanentDeleteSession: (id: string) => Promise<void>;
   restoreSession: (id: string) => Promise<void>;
@@ -104,11 +104,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   selectSession: (id) => {
-    const { activeTab } = get();
+    const { activeTab, sessions } = get();
     const updates: Partial<AppState> = { selectedSessionId: id };
     if (id && !SESSION_TAB_IDS.has(activeTab)) {
-      // Selecting a session while on a global tab → jump to Command
-      updates.activeTab = 'command';
+      // Selecting a session while on a global tab → jump to appropriate tab
+      const session = sessions.find(s => s.session_id === id);
+      updates.activeTab = session?.role === 'vtuber' ? 'vtuber' : 'command';
     } else if (!id && SESSION_TAB_IDS.has(activeTab)) {
       // Deselecting session while on a session tab → fall back to Main
       updates.activeTab = 'main';
@@ -117,8 +118,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   createSession: async (data) => {
-    await agentApi.create(data);
+    const session = await agentApi.create(data);
     await get().loadSessions();
+    return session;
   },
 
   deleteSession: async (id) => {
