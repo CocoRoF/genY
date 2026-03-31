@@ -122,7 +122,11 @@ class ThinkingTriggerService:
                 logger.debug("ThinkingTrigger loop error", exc_info=True)
 
     async def _fire_trigger(self, session_id: str) -> None:
-        """Send a context-aware [THINKING_TRIGGER] to the VTuber session."""
+        """Send a context-aware [THINKING_TRIGGER] to the VTuber session.
+
+        If the session has a chat_room_id, the response is also saved
+        to the chat room so it appears in the VTuber chat panel in real-time.
+        """
         try:
             from service.execution.agent_executor import (
                 AlreadyExecutingError,
@@ -135,8 +139,21 @@ class ThinkingTriggerService:
             # Check if the linked CLI worker is busy
             prompt = self._build_trigger_prompt(session_id, is_executing)
 
-            await execute_command(session_id, prompt)
-            logger.info("Thinking trigger fired for %s", session_id)
+            result = await execute_command(session_id, prompt)
+
+            # Save response to chat room (if available)
+            if result.success and result.output and result.output.strip():
+                self._save_to_chat_room(session_id, result)
+                logger.info(
+                    "Thinking trigger fired for %s (output=%d chars, saved to chat)",
+                    session_id, len(result.output),
+                )
+            else:
+                logger.info(
+                    "Thinking trigger fired for %s (success=%s, output_len=%s, not saved)",
+                    session_id, result.success,
+                    len(result.output) if result.output else 0,
+                )
 
         except AlreadyExecutingError:
             logger.debug("Thinking trigger skipped (busy): %s", session_id)
@@ -146,6 +163,55 @@ class ThinkingTriggerService:
         except Exception:
             logger.debug("Thinking trigger failed for %s", session_id, exc_info=True)
             self.unregister(session_id)
+
+    def _save_to_chat_room(self, session_id: str, result) -> None:
+        """Persist the trigger response to the session's chat room.
+
+        Also notifies SSE listeners so the VTuber chat panel updates live.
+        """
+        try:
+            from service.langgraph import get_agent_session_manager
+            agent = get_agent_session_manager().get_agent(session_id)
+            if not agent:
+                logger.warning("[ThinkingTrigger] No agent found for %s, skipping chat save", session_id)
+                return
+
+            chat_room_id = getattr(agent, '_chat_room_id', None)
+            if not chat_room_id:
+                logger.warning("[ThinkingTrigger] No chat_room_id on agent %s, skipping chat save", session_id)
+                return
+
+            from service.chat.conversation_store import get_chat_store
+            store = get_chat_store()
+
+            session_name = getattr(agent, '_session_name', None) or session_id
+            role_val = getattr(agent, '_role', None)
+            role = role_val.value if hasattr(role_val, 'value') else str(role_val or 'vtuber')
+
+            msg = store.add_message(chat_room_id, {
+                "type": "agent",
+                "content": result.output.strip(),
+                "session_id": session_id,
+                "session_name": session_name,
+                "role": role,
+                "duration_ms": result.duration_ms,
+                "cost_usd": result.cost_usd,
+            })
+
+            logger.info(
+                "[ThinkingTrigger] Saved response to chat room %s (msg_id=%s, len=%d)",
+                chat_room_id, msg.get("id", "?"), len(result.output),
+            )
+
+            # Notify SSE listeners
+            try:
+                from controller.chat_controller import _notify_room
+                _notify_room(chat_room_id)
+            except Exception:
+                logger.warning("[ThinkingTrigger] _notify_room failed for %s", chat_room_id, exc_info=True)
+
+        except Exception:
+            logger.warning("[ThinkingTrigger] Failed to save trigger response to chat room", exc_info=True)
 
     def _build_trigger_prompt(self, session_id: str, is_executing_fn) -> str:
         """Select a trigger prompt based on context."""

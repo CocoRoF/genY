@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // 5 minutes — SSE is long-lived
 
-const API_URL = process.env.API_URL || "http://localhost:8000";
+const API_URL = process.env.API_URL || `http://localhost:${process.env.NEXT_PUBLIC_BACKEND_PORT || "8000"}`;
 
 export async function GET(
   request: NextRequest,

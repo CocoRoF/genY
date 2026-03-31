@@ -18,10 +18,28 @@ export default function SessionToolsTab() {
     custom_root: true,
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState<'vtuber' | 'cli'>('vtuber');
 
   useEffect(() => { loadPresets(); loadCatalog(); }, [loadPresets, loadCatalog]);
 
   const session = sessions.find(s => s.session_id === selectedSessionId);
+
+  // Find linked CLI session (if current is VTuber)
+  const linkedCliSession = useMemo(() => {
+    if (!session || session.session_type !== 'vtuber') return null;
+    return sessions.find(s => s.session_type === 'cli' && s.linked_session_id === session.session_id) ?? null;
+  }, [session, sessions]);
+
+  const hasDualView = !!linkedCliSession;
+
+  // Resolve which session to display
+  const targetSession = useMemo(() => {
+    if (!hasDualView || viewMode === 'vtuber') return session;
+    return linkedCliSession ?? session;
+  }, [hasDualView, viewMode, session, linkedCliSession]);
+
+  // Reset viewMode when session changes
+  useEffect(() => { setViewMode('vtuber'); }, [selectedSessionId]);
 
   const filteredBuiltIn = useMemo(() => {
     if (!catalog) return [];
@@ -53,7 +71,7 @@ export default function SessionToolsTab() {
     );
   }
 
-  const presetId = session.tool_preset_id;
+  const presetId = targetSession?.tool_preset_id;
   const boundPreset = presetId ? presets.find(p => p.id === presetId) : null;
 
   // Resolve which tools are enabled
@@ -99,6 +117,32 @@ export default function SessionToolsTab() {
           <h3 className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">
             {t('sessionTools.title')}
           </h3>
+
+          {/* VTuber / CLI toggle */}
+          {hasDualView && (
+            <div className="flex items-center h-6 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] overflow-hidden shrink-0">
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors ${
+                  viewMode === 'vtuber'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                }`}
+                onClick={() => setViewMode('vtuber')}
+              >
+                VTuber
+              </button>
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors ${
+                  viewMode === 'cli'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                }`}
+                onClick={() => setViewMode('cli')}
+              >
+                CLI
+              </button>
+            </div>
+          )}
 
           {/* Preset name */}
           {boundPreset && (

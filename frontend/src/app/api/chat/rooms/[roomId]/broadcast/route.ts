@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 /* Allow generous timeout — the POST itself returns quickly but keep headroom */
 export const maxDuration = 60;
 
-const API_URL = process.env.API_URL || "http://localhost:8000";
+const API_URL = process.env.API_URL || `http://localhost:${process.env.NEXT_PUBLIC_BACKEND_PORT || "8000"}`;
 
 export async function POST(
   request: NextRequest,

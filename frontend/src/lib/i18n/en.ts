@@ -785,6 +785,15 @@ const en = {
     noModels: 'No models registered',
     selectModelPreview: 'Select a model to preview',
   },
+
+  // ─── VTuber Chat Panel ───
+  vtuberChat: {
+    preparingRoom: 'Preparing chat room...',
+    startConversation: 'Start a conversation ✨',
+    loadingHistory: 'Loading chat history...',
+    inputPlaceholder: 'Type a message...',
+    errorMessage: 'Sorry, something went wrong.',
+  },
 };
 
 export default en;

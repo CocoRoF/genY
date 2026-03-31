@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { chatApi } from '@/lib/api';
+import { useI18n } from '@/lib/i18n';
 import type { ChatRoomMessage } from '@/types';
 
 interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
 }
@@ -32,6 +33,7 @@ export default function VTuberChatPanel({
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastMsgIdRef = useRef<string | null>(null);
@@ -39,9 +41,10 @@ export default function VTuberChatPanel({
 
   // Convert ChatRoomMessage to display format
   const toDisplayMessage = useCallback((msg: ChatRoomMessage): ChatMessage => {
+    const role = msg.type === 'user' ? 'user' : msg.type === 'system' ? 'system' : 'assistant';
     return {
       id: msg.id,
-      role: msg.type === 'user' ? 'user' : 'assistant',
+      role,
       content: msg.content,
       timestamp: new Date(msg.timestamp).getTime(),
     };
@@ -137,7 +140,7 @@ export default function VTuberChatPanel({
       const errorMsg: ChatMessage = {
         id: `e-${Date.now()}`,
         role: 'assistant',
-        content: '[neutral] 죄송해요, 잠시 문제가 생겼어요.',
+        content: `[neutral] ${t('vtuberChat.errorMessage')}`,
         timestamp: Date.now(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -167,7 +170,7 @@ export default function VTuberChatPanel({
   if (!roomId) {
     return (
       <div className="flex flex-col h-full items-center justify-center text-[var(--text-muted)] text-sm opacity-60">
-        채팅방을 준비하고 있어요...
+        {t('vtuberChat.preparingRoom')}
       </div>
     );
   }
@@ -181,17 +184,29 @@ export default function VTuberChatPanel({
       >
         {historyLoaded && messages.length === 0 && (
           <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm opacity-60">
-            대화를 시작해보세요 ✨
+            {t('vtuberChat.startConversation')}
           </div>
         )}
         {!historyLoaded && (
           <div className="flex-1 flex items-center justify-center text-[var(--text-muted)] text-sm opacity-60">
-            <span className="animate-pulse">채팅 기록을 불러오는 중...</span>
+            <span className="animate-pulse">{t('vtuberChat.loadingHistory')}</span>
           </div>
         )}
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
-          const [emotion, text] = isUser ? [null, msg.content] : parseMessage(msg.content);
+          const isSystem = msg.role === 'system';
+          const [emotion, text] = isUser || isSystem ? [null, msg.content] : parseMessage(msg.content);
+
+          // System messages (e.g. "1/1 sessions responded") — subtle inline
+          if (isSystem) {
+            return (
+              <div key={msg.id} className="flex justify-center py-0.5">
+                <span className="text-[0.6875rem] text-[var(--text-muted)] opacity-50">
+                  {text}
+                </span>
+              </div>
+            );
+          }
 
           return (
             <div
@@ -230,7 +245,7 @@ export default function VTuberChatPanel({
           <textarea
             ref={inputRef}
             className="flex-1 resize-none px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-xl text-[0.875rem] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--primary-color)] transition-colors max-h-[120px]"
-            placeholder="메시지를 입력하세요..."
+            placeholder={t('vtuberChat.inputPlaceholder')}
             rows={1}
             value={input}
             onChange={(e) => setInput(e.target.value)}

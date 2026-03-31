@@ -785,6 +785,15 @@ const ko: Translations = {
     noModels: '등록된 모델이 없습니다',
     selectModelPreview: '미리보기할 모델을 선택하세요',
   },
+
+  // ─── VTuber Chat Panel ───
+  vtuberChat: {
+    preparingRoom: '채팅방을 준비하고 있어요...',
+    startConversation: '대화를 시작해보세요 ✨',
+    loadingHistory: '채팅 기록을 불러오는 중...',
+    inputPlaceholder: '메시지를 입력하세요...',
+    errorMessage: '죄송해요, 잠시 문제가 생겼어요.',
+  },
 };
 
 export default ko;

@@ -23,6 +23,7 @@ export default function GraphTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [workflowDef, setWorkflowDef] = useState<WorkflowDefinition | null>(null);
+  const [viewMode, setViewMode] = useState<'vtuber' | 'cli'>('vtuber');
 
   // Get current session info
   const session = useMemo(
@@ -30,23 +31,41 @@ export default function GraphTab() {
     [sessions, selectedSessionId],
   );
 
+  // Find linked CLI session (if current is VTuber)
+  const linkedCliSession = useMemo(() => {
+    if (!session || session.session_type !== 'vtuber') return null;
+    return sessions.find(s => s.session_type === 'cli' && s.linked_session_id === session.session_id) ?? null;
+  }, [session, sessions]);
+
+  const hasDualView = !!linkedCliSession;
+
+  // Resolve which session ID to use for fetching
+  const targetSessionId = useMemo(() => {
+    if (!hasDualView || viewMode === 'vtuber') return selectedSessionId;
+    return linkedCliSession?.session_id ?? selectedSessionId;
+  }, [hasDualView, viewMode, selectedSessionId, linkedCliSession]);
+
+  const targetSession = useMemo(
+    () => sessions.find(s => s.session_id === targetSessionId),
+    [sessions, targetSessionId],
+  );
+
+  // Reset viewMode when session changes
+  useEffect(() => { setViewMode('vtuber'); }, [selectedSessionId]);
+
   // Load workflow definition for the selected session
   const fetchSessionWorkflow = useCallback(async () => {
-    if (!selectedSessionId) return;
+    if (!targetSessionId) return;
     setLoading(true);
     setError('');
     try {
-      // Ensure node catalog is loaded first (needed for proper node rendering)
       const store = useWorkflowStore.getState();
       if (!store.nodeCatalog) {
         await store.loadCatalog();
       }
 
-      // Fetch the workflow definition associated with this session
-      const wfDef = await agentApi.getWorkflow(selectedSessionId);
+      const wfDef = await agentApi.getWorkflow(targetSessionId);
       setWorkflowDef(wfDef);
-
-      // Load into the workflow store for ReactFlow rendering
       useWorkflowStore.getState().loadFromDefinition(wfDef);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to load graph';
@@ -54,14 +73,14 @@ export default function GraphTab() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSessionId]);
+  }, [targetSessionId]);
 
   useEffect(() => {
     fetchSessionWorkflow();
   }, [fetchSessionWorkflow]);
 
   // Derive display metadata
-  const graphName = session?.graph_name || workflowDef?.name || 'Simple';
+  const graphName = targetSession?.graph_name || workflowDef?.name || 'Simple';
   const isTemplate = workflowDef?.is_template ?? false;
   const nodeCount = workflowDef?.nodes?.length ?? nodes.length;
   const edgeCount = workflowDef?.edges?.length ?? 0;
@@ -130,6 +149,32 @@ export default function GraphTab() {
               {t('graphTab.title')}
             </span>
 
+            {/* VTuber / CLI toggle */}
+            {hasDualView && (
+              <div className="flex items-center h-6 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] overflow-hidden shrink-0">
+                <button
+                  className={`px-2 h-full text-[10px] font-semibold transition-colors ${
+                    viewMode === 'vtuber'
+                      ? 'bg-[var(--primary-color)] text-white'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                  onClick={() => setViewMode('vtuber')}
+                >
+                  VTuber
+                </button>
+                <button
+                  className={`px-2 h-full text-[10px] font-semibold transition-colors ${
+                    viewMode === 'cli'
+                      ? 'bg-[var(--primary-color)] text-white'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
+                  }`}
+                  onClick={() => setViewMode('cli')}
+                >
+                  CLI
+                </button>
+              </div>
+            )}
+
             {/* Graph name */}
             <span className="text-[11px] md:text-[12px] font-medium text-[var(--text-secondary)] truncate max-w-[120px] md:max-w-[200px]">
               {graphName}
@@ -143,11 +188,11 @@ export default function GraphTab() {
             )}
 
             {/* Session name */}
-            {session?.session_name && (
+            {targetSession?.session_name && (
               <>
                 <span className="w-px h-4 bg-[var(--border-color)] shrink-0 hidden md:block" />
                 <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[100px] md:max-w-[150px] hidden md:block">
-                  {session.session_name}
+                  {targetSession.session_name}
                 </span>
               </>
             )}
