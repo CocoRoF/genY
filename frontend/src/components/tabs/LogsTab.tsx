@@ -74,7 +74,7 @@ const ALL_LEVELS = ['INFO', 'ERROR', 'WARNING', 'DEBUG', 'COMMAND', 'RESPONSE', 
 const PAGE_SIZE = 50;
 
 export default function LogsTab() {
-  const { selectedSessionId } = useAppStore();
+  const { selectedSessionId, sessions } = useAppStore();
   const { t } = useI18n();
   const isMobile = useIsMobile();
   const [entries, setEntries] = useState<LogEntry[]>([]);
@@ -83,6 +83,29 @@ export default function LogsTab() {
   const [filter, setFilter] = useState('group:default');
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<'vtuber' | 'cli'>('vtuber');
+
+  // VTuber/CLI dual-view support
+  const session = useMemo(
+    () => sessions.find(s => s.session_id === selectedSessionId),
+    [sessions, selectedSessionId],
+  );
+
+  const linkedCliSession = useMemo(() => {
+    if (!session || session.session_type !== 'vtuber') return null;
+    return sessions.find(s => s.session_type === 'cli' && s.linked_session_id === session.session_id) ?? null;
+  }, [session, sessions]);
+
+  const hasDualView = !!linkedCliSession;
+
+  // Resolve which session ID to fetch logs for
+  const targetSessionId = useMemo(() => {
+    if (!hasDualView || viewMode === 'vtuber') return selectedSessionId;
+    return linkedCliSession?.session_id ?? selectedSessionId;
+  }, [hasDualView, viewMode, selectedSessionId, linkedCliSession]);
+
+  // Reset viewMode when session changes
+  useEffect(() => { setViewMode('vtuber'); }, [selectedSessionId]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Split pane state
@@ -106,17 +129,17 @@ export default function LogsTab() {
   }, [filter]);
 
   const fetchLogs = useCallback(async (page: number) => {
-    if (!selectedSessionId) return;
+    if (!targetSessionId) return;
     setLoading(true);
     try {
       const offset = (page - 1) * PAGE_SIZE;
-      const res = await commandApi.getLogs(selectedSessionId, PAGE_SIZE, apiLevelParam, offset);
+      const res = await commandApi.getLogs(targetSessionId, PAGE_SIZE, apiLevelParam, offset);
       setEntries(res.entries || []);
       setTotalEntries(res.total_entries || 0);
       setSelectedIdx(null);
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, [selectedSessionId, apiLevelParam]);
+  }, [targetSessionId, apiLevelParam]);
 
   // Fetch on session/filter/page change
   useEffect(() => {
@@ -126,12 +149,12 @@ export default function LogsTab() {
   // Reset to page 1 when session or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedSessionId, apiLevelParam]);
+  }, [targetSessionId, apiLevelParam]);
 
   // Clear selection when session changes
   useEffect(() => {
     setSelectedIdx(null);
-  }, [selectedSessionId]);
+  }, [targetSessionId]);
 
   // Scroll to top when entries change
   useEffect(() => {
@@ -191,8 +214,60 @@ export default function LogsTab() {
             <ScrollText size={13} className="text-white" />
           </div>
           <h3 className="text-[0.8125rem] font-semibold text-[var(--text-primary)]">{t('logsTab.title')}</h3>
+
+          {/* VTuber / CLI toggle */}
+          {hasDualView && (
+            <div className="flex items-center h-6 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] overflow-hidden shrink-0">
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors border-none cursor-pointer ${
+                  viewMode === 'vtuber'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] bg-transparent'
+                }`}
+                onClick={() => setViewMode('vtuber')}
+              >
+                VTuber
+              </button>
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors border-none cursor-pointer ${
+                  viewMode === 'cli'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] bg-transparent'
+                }`}
+                onClick={() => setViewMode('cli')}
+              >
+                CLI
+              </button>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {/* VTuber / CLI toggle — mobile */}
+          {hasDualView && (
+            <div className="flex md:hidden items-center h-6 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] overflow-hidden shrink-0">
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors border-none cursor-pointer ${
+                  viewMode === 'vtuber'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] bg-transparent'
+                }`}
+                onClick={() => setViewMode('vtuber')}
+              >
+                VTuber
+              </button>
+              <button
+                className={`px-2 h-full text-[10px] font-semibold transition-colors border-none cursor-pointer ${
+                  viewMode === 'cli'
+                    ? 'bg-[var(--primary-color)] text-white'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] bg-transparent'
+                }`}
+                onClick={() => setViewMode('cli')}
+              >
+                CLI
+              </button>
+            </div>
+          )}
+
           {/* Filter selector */}
           <select
             className="flex-1 sm:flex-initial py-1 pl-2 pr-6 bg-[var(--bg-tertiary)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] text-[0.6875rem] font-medium cursor-pointer appearance-none transition-all hover:border-[var(--text-muted)] focus:outline-none focus:border-[var(--primary-color)]"
