@@ -307,6 +307,25 @@ export const agentApi = {
       body: JSON.stringify({ system_prompt: systemPrompt }),
     }),
 
+  /** GET /api/agents/{id}/thinking-trigger — get thinking trigger status */
+  getThinkingTrigger: (id: string) =>
+    apiCall<{
+      session_id: string;
+      enabled: boolean;
+      registered: boolean;
+      consecutive_triggers: number;
+      current_threshold_seconds: number;
+      base_threshold_seconds: number;
+      max_threshold_seconds: number;
+    }>(`/api/agents/${id}/thinking-trigger`),
+
+  /** PUT /api/agents/{id}/thinking-trigger — enable/disable thinking trigger */
+  updateThinkingTrigger: (id: string, enabled: boolean) =>
+    apiCall<{ success: boolean; enabled: boolean }>(`/api/agents/${id}/thinking-trigger`, {
+      method: 'PUT',
+      body: JSON.stringify({ enabled }),
+    }),
+
   /** GET /api/agents/{id}/storage — list storage files */
   listStorage: (id: string) => apiCall<StorageListResponse>(`/api/agents/${id}/storage`),
 

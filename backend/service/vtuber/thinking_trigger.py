@@ -12,14 +12,19 @@ checks whether any VTuber session should fire a [THINKING_TRIGGER].
 from __future__ import annotations
 
 import asyncio
+import math
 import random
 from logging import getLogger
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 logger = getLogger(__name__)
 
 # Minimum idle seconds before a thinking trigger fires
 _DEFAULT_IDLE_THRESHOLD = 120  # 2 minutes
+# Maximum idle threshold (adaptive ceiling)
+_MAX_IDLE_THRESHOLD = 3600  # 1 hour
+# Number of consecutive triggers to approach max threshold (log scale)
+_ADAPTIVE_SCALE_TRIGGERS = 20
 
 # Varied trigger prompts for more natural behavior
 _TRIGGER_PROMPTS = [
@@ -52,12 +57,21 @@ _CLI_AWARE_PROMPT = (
 class ThinkingTriggerService:
     """Background service that fires [THINKING_TRIGGER] for idle VTuber sessions."""
 
-    def __init__(self, idle_threshold: float = _DEFAULT_IDLE_THRESHOLD) -> None:
-        self._idle_threshold = idle_threshold
+    def __init__(
+        self,
+        idle_threshold: float = _DEFAULT_IDLE_THRESHOLD,
+        max_idle_threshold: float = _MAX_IDLE_THRESHOLD,
+    ) -> None:
+        self._base_threshold = idle_threshold
+        self._max_threshold = max_idle_threshold
         self._task: Optional[asyncio.Task] = None
         self._stopped = False
         # session_id → last_activity_epoch  (updated externally)
         self._activity: Dict[str, float] = {}
+        # Sessions explicitly disabled by user
+        self._disabled_sessions: Set[str] = set()
+        # session_id → consecutive trigger count (resets on user activity)
+        self._consecutive_triggers: Dict[str, int] = {}
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -69,7 +83,10 @@ class ThinkingTriggerService:
             return
         self._stopped = False
         self._task = asyncio.create_task(self._loop())
-        logger.info("ThinkingTriggerService started (idle=%ss)", self._idle_threshold)
+        logger.info(
+            "ThinkingTriggerService started (base=%ss, max=%ss)",
+            self._base_threshold, self._max_threshold,
+        )
 
     def stop(self) -> None:
         """Stop the background loop gracefully."""
@@ -78,6 +95,8 @@ class ThinkingTriggerService:
             self._task.cancel()
             self._task = None
         self._activity.clear()
+        self._disabled_sessions.clear()
+        self._consecutive_triggers.clear()
         logger.info("ThinkingTriggerService stopped")
 
     # ------------------------------------------------------------------
@@ -88,10 +107,52 @@ class ThinkingTriggerService:
         """Record that a VTuber session just had user interaction."""
         import time
         self._activity[session_id] = time.time()
+        # User activity resets adaptive frequency back to base
+        self._consecutive_triggers.pop(session_id, None)
 
     def unregister(self, session_id: str) -> None:
         """Remove a session from tracking (e.g. on deletion)."""
         self._activity.pop(session_id, None)
+        self._disabled_sessions.discard(session_id)
+        self._consecutive_triggers.pop(session_id, None)
+
+    def enable(self, session_id: str) -> None:
+        """Enable thinking trigger for a session."""
+        self._disabled_sessions.discard(session_id)
+        logger.info("ThinkingTrigger enabled for %s", session_id)
+
+    def disable(self, session_id: str) -> None:
+        """Disable thinking trigger for a session."""
+        self._disabled_sessions.add(session_id)
+        logger.info("ThinkingTrigger disabled for %s", session_id)
+
+    def is_enabled(self, session_id: str) -> bool:
+        """Check if thinking trigger is enabled for a session."""
+        return session_id not in self._disabled_sessions
+
+    def get_status(self, session_id: str) -> dict:
+        """Return thinking trigger status for a session."""
+        return {
+            "enabled": self.is_enabled(session_id),
+            "registered": session_id in self._activity,
+            "consecutive_triggers": self._consecutive_triggers.get(session_id, 0),
+            "current_threshold_seconds": round(self._get_adaptive_threshold(session_id), 1),
+            "base_threshold_seconds": self._base_threshold,
+            "max_threshold_seconds": self._max_threshold,
+        }
+
+    def _get_adaptive_threshold(self, session_id: str) -> float:
+        """Calculate adaptive idle threshold using log scale.
+
+        Grows from base (120s) toward max (3600s / 1hr) as consecutive
+        triggers accumulate without user interaction.
+        """
+        count = self._consecutive_triggers.get(session_id, 0)
+        if count <= 0:
+            return self._base_threshold
+        scale = math.log1p(count) / math.log1p(_ADAPTIVE_SCALE_TRIGGERS)
+        scale = min(scale, 1.0)
+        return self._base_threshold + (self._max_threshold - self._base_threshold) * scale
 
     # ------------------------------------------------------------------
     # Background loop
@@ -107,8 +168,13 @@ class ThinkingTriggerService:
                 now = time.time()
 
                 for sid, last in list(self._activity.items()):
+                    # Skip disabled sessions
+                    if sid in self._disabled_sessions:
+                        continue
+
                     idle = now - last
-                    if idle < self._idle_threshold:
+                    threshold = self._get_adaptive_threshold(sid)
+                    if idle < threshold:
                         continue
 
                     # Fire a thinking trigger
@@ -141,28 +207,46 @@ class ThinkingTriggerService:
 
             result = await execute_command(session_id, prompt)
 
+            # Increment consecutive count (drives adaptive backoff)
+            self._consecutive_triggers[session_id] = (
+                self._consecutive_triggers.get(session_id, 0) + 1
+            )
+
             # Save response to chat room (if available)
             if result.success and result.output and result.output.strip():
                 self._save_to_chat_room(session_id, result)
                 logger.info(
-                    "Thinking trigger fired for %s (output=%d chars, saved to chat)",
+                    "Thinking trigger fired for %s (output=%d chars, consecutive=%d, next_threshold=%.0fs)",
                     session_id, len(result.output),
+                    self._consecutive_triggers.get(session_id, 0),
+                    self._get_adaptive_threshold(session_id),
                 )
             else:
                 logger.info(
-                    "Thinking trigger fired for %s (success=%s, output_len=%s, not saved)",
+                    "Thinking trigger fired for %s (success=%s, output_len=%s, consecutive=%d)",
                     session_id, result.success,
                     len(result.output) if result.output else 0,
+                    self._consecutive_triggers.get(session_id, 0),
                 )
 
         except AlreadyExecutingError:
             logger.debug("Thinking trigger skipped (busy): %s", session_id)
-        except (AgentNotFoundError, AgentNotAliveError):
-            logger.debug("Thinking trigger skipped (not alive): %s", session_id)
+        except AgentNotFoundError:
+            # Session deleted — permanently stop tracking
+            logger.debug("Thinking trigger: session gone, unregistering %s", session_id)
             self.unregister(session_id)
+        except AgentNotAliveError:
+            # Process dead but session exists — back off, will retry next cycle
+            # (auto-revival may succeed later; adaptive backoff limits frequency)
+            logger.debug("Thinking trigger skipped (not alive, will retry): %s", session_id)
+            self._consecutive_triggers[session_id] = (
+                self._consecutive_triggers.get(session_id, 0) + 1
+            )
         except Exception:
             logger.debug("Thinking trigger failed for %s", session_id, exc_info=True)
-            self.unregister(session_id)
+            self._consecutive_triggers[session_id] = (
+                self._consecutive_triggers.get(session_id, 0) + 1
+            )
 
     def _save_to_chat_room(self, session_id: str, result) -> None:
         """Persist the trigger response to the session's chat room.

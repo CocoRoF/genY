@@ -5,7 +5,7 @@ import { useAppStore } from '@/store/useAppStore';
 import { agentApi } from '@/lib/api';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
-import { RotateCcw, Trash2, Pencil, Save, X, FileText, Eraser, Link2, Terminal } from 'lucide-react';
+import { RotateCcw, Trash2, Pencil, Save, X, FileText, Eraser, Link2, Terminal, Brain } from 'lucide-react';
 import type { SessionInfo } from '@/types';
 import ConfirmModal from '@/components/modals/ConfirmModal';
 
@@ -34,6 +34,10 @@ export default function InfoTab() {
   const [cliPromptDraft, setCliPromptDraft] = useState('');
   const [savingCliPrompt, setSavingCliPrompt] = useState(false);
   const [cliPromptMsg, setCliPromptMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+  const [thinkingTriggerEnabled, setThinkingTriggerEnabled] = useState<boolean | null>(null);
+  const [thinkingTriggerInfo, setThinkingTriggerInfo] = useState<{ consecutive_triggers: number; current_threshold_seconds: number } | null>(null);
+  const [thinkingTriggerLoading, setThinkingTriggerLoading] = useState(false);
+  const [thinkingTriggerMsg, setThinkingTriggerMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const fetchDetail = useCallback(async () => {
     if (!selectedSessionId) { setData(null); return; }
@@ -84,6 +88,31 @@ export default function InfoTab() {
     })();
     return () => { cancelled = true; };
   }, [data?.linked_session_id, data?.session_type]);
+
+  // Fetch thinking trigger status for VTuber sessions
+  useEffect(() => {
+    if (!data?.session_id || data?.session_type !== 'vtuber') {
+      setThinkingTriggerEnabled(null);
+      setThinkingTriggerInfo(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await agentApi.getThinkingTrigger(data.session_id);
+        if (!cancelled) {
+          setThinkingTriggerEnabled(result.enabled);
+          setThinkingTriggerInfo({
+            consecutive_triggers: result.consecutive_triggers,
+            current_threshold_seconds: result.current_threshold_seconds,
+          });
+        }
+      } catch {
+        if (!cancelled) setThinkingTriggerEnabled(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [data?.session_id, data?.session_type]);
 
   if (!selectedSessionId) {
     return (
@@ -236,6 +265,59 @@ export default function InfoTab() {
               ) : (
                 <span className="text-[12px] text-[var(--text-muted)] italic">{t('info.systemPrompt.empty')}</span>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Thinking Trigger Toggle (VTuber sessions only) ── */}
+      {!isDeleted && data.session_type === 'vtuber' && thinkingTriggerEnabled !== null && (
+        <div className="mt-4 pt-4 border-t border-[var(--border-color)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Brain size={14} className="text-[var(--text-muted)]" />
+              <span className="text-[12px] font-semibold uppercase tracking-[0.5px] text-[var(--text-muted)]">{t('info.thinkingTrigger.title')}</span>
+            </div>
+            <button
+              disabled={thinkingTriggerLoading}
+              className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              style={{ background: thinkingTriggerEnabled ? 'var(--success-color)' : 'var(--bg-tertiary)' }}
+              onClick={async () => {
+                setThinkingTriggerLoading(true);
+                setThinkingTriggerMsg(null);
+                try {
+                  const newVal = !thinkingTriggerEnabled;
+                  const result = await agentApi.updateThinkingTrigger(data.session_id, newVal);
+                  setThinkingTriggerEnabled(result.enabled);
+                  setThinkingTriggerMsg({
+                    type: 'ok',
+                    text: result.enabled ? t('info.thinkingTrigger.turnedOn') : t('info.thinkingTrigger.turnedOff'),
+                  });
+                } catch {
+                  setThinkingTriggerMsg({ type: 'err', text: t('info.thinkingTrigger.error') });
+                } finally {
+                  setThinkingTriggerLoading(false);
+                }
+              }}
+            >
+              <span
+                className="inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform duration-200"
+                style={{ transform: thinkingTriggerEnabled ? 'translateX(17px)' : 'translateX(3px)' }}
+              />
+            </button>
+          </div>
+          <p className="text-[11px] text-[var(--text-muted)] mt-1.5">{t('info.thinkingTrigger.description')}</p>
+          {thinkingTriggerInfo && thinkingTriggerInfo.consecutive_triggers > 0 && (
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              {t('info.thinkingTrigger.adaptiveInfo', {
+                threshold: String(thinkingTriggerInfo.current_threshold_seconds),
+                count: String(thinkingTriggerInfo.consecutive_triggers),
+              })}
+            </p>
+          )}
+          {thinkingTriggerMsg && (
+            <div className={`text-[11px] mt-1.5 ${thinkingTriggerMsg.type === 'ok' ? 'text-[var(--success-color)]' : 'text-[var(--danger-color)]'}`}>
+              {thinkingTriggerMsg.text}
             </div>
           )}
         </div>

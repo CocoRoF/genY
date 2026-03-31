@@ -298,6 +298,16 @@ const en = {
       noPrompt: 'No CLI system prompt configured',
       notFound: 'Linked CLI session could not be loaded',
     },
+    thinkingTrigger: {
+      title: 'Autonomous Thinking (Thinking Trigger)',
+      enabled: 'Enabled',
+      disabled: 'Disabled',
+      description: 'Allows the VTuber to think autonomously during idle periods.',
+      adaptiveInfo: 'Adaptive interval: {threshold}s (consecutive: {count})',
+      turnedOn: 'Thinking Trigger enabled',
+      turnedOff: 'Thinking Trigger disabled',
+      error: 'Failed to update Thinking Trigger setting',
+    },
   },
 
   // ─── Logs Tab ───

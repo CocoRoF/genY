@@ -298,6 +298,16 @@ const ko: Translations = {
       noPrompt: '설정된 CLI 시스템 프롬프트가 없습니다',
       notFound: '연결된 CLI 세션을 로드할 수 없습니다',
     },
+    thinkingTrigger: {
+      title: '자율 사고 (Thinking Trigger)',
+      enabled: '활성화됨',
+      disabled: '비활성화됨',
+      description: '유휴 시 VTuber가 자발적으로 사고하는 기능입니다.',
+      adaptiveInfo: '적응형 빈도: {threshold}초 (연속 {count}회)',
+      turnedOn: 'Thinking Trigger가 활성화되었습니다',
+      turnedOff: 'Thinking Trigger가 비활성화되었습니다',
+      error: 'Thinking Trigger 설정 변경에 실패했습니다',
+    },
   },
 
   // ─── Logs Tab ───

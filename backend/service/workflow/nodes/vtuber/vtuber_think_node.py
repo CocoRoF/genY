@@ -82,7 +82,7 @@ class VTuberThinkNode(BaseNode):
     color = "#f59e0b"
     state_usage = NodeStateUsage(
         reads=["input", "messages", "memory_context"],
-        writes=["messages", "last_output", "answer", "final_answer", "is_complete"],
+        writes=["messages", "last_output", "answer", "final_answer", "is_complete", "skip_memory_reflect"],
     )
 
     parameters = [
@@ -122,6 +122,7 @@ class VTuberThinkNode(BaseNode):
                 return {
                     "is_complete": True,
                     "current_step": "vtuber_think_silent",
+                    "skip_memory_reflect": True,
                 }
 
             result: Dict[str, Any] = {

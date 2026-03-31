@@ -84,7 +84,7 @@ class MemoryReflectNode(BaseNode):
     color = "#ec4899"
     i18n = MEMORY_REFLECT_I18N
     state_usage = NodeStateUsage(
-        reads=[],
+        reads=["skip_memory_reflect"],
         writes=[],
         config_dynamic_reads={
             "input_field": "input",
@@ -132,6 +132,11 @@ class MemoryReflectNode(BaseNode):
     ) -> Dict[str, Any]:
         if not context.memory_manager:
             logger.debug(f"[{context.session_id}] memory_reflect: no memory manager")
+            return {}
+
+        # Skip when upstream node explicitly requests it (e.g. [SILENT] thinking)
+        if state.get("skip_memory_reflect"):
+            logger.debug(f"[{context.session_id}] memory_reflect: skipped (skip_memory_reflect flag)")
             return {}
 
         try:

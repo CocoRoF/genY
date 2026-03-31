@@ -250,6 +250,14 @@ class UpdateSystemPromptRequest(BaseModel):
     )
 
 
+class UpdateThinkingTriggerRequest(BaseModel):
+    """Request to enable/disable thinking trigger for a session."""
+    enabled: bool = Field(
+        ...,
+        description="Whether thinking trigger is enabled for this session.",
+    )
+
+
 @router.put("/{session_id}/system-prompt")
 async def update_system_prompt(
     request: UpdateSystemPromptRequest,
@@ -283,6 +291,32 @@ async def update_system_prompt(
         f"({len(new_prompt) if new_prompt else 0} chars)"
     )
     return {"success": True, "session_id": session_id, "system_prompt_length": len(new_prompt) if new_prompt else 0}
+
+
+@router.get("/{session_id}/thinking-trigger")
+async def get_thinking_trigger(
+    session_id: str = Path(..., description="Session ID"),
+):
+    """Get thinking trigger status for a VTuber session."""
+    from service.vtuber.thinking_trigger import get_thinking_trigger_service
+    service = get_thinking_trigger_service()
+    status = service.get_status(session_id)
+    return {"session_id": session_id, **status}
+
+
+@router.put("/{session_id}/thinking-trigger")
+async def update_thinking_trigger(
+    request: UpdateThinkingTriggerRequest,
+    session_id: str = Path(..., description="Session ID"),
+):
+    """Enable or disable thinking trigger for a VTuber session."""
+    from service.vtuber.thinking_trigger import get_thinking_trigger_service
+    service = get_thinking_trigger_service()
+    if request.enabled:
+        service.enable(session_id)
+    else:
+        service.disable(session_id)
+    return {"success": True, "session_id": session_id, **service.get_status(session_id)}
 
 
 @router.delete("/{session_id}")
