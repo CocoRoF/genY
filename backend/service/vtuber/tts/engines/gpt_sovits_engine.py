@@ -132,7 +132,7 @@ class GPTSoVITSEngine(TTSEngine):
     async def health_check(self) -> bool:
         """Check if GPT-SoVITS API v2 server is running (api_v2.py on port 9880).
 
-        Uses httpx.AsyncClient (same pattern as Fish Speech, OpenAI, ElevenLabs engines).
+        Uses httpx.AsyncClient (same pattern as OpenAI, ElevenLabs engines).
         GET /tts with minimal params — 400/422/500 all mean the server is alive.
         """
         try:

@@ -212,11 +212,9 @@ def get_tts_service() -> TTSService:
         from service.vtuber.tts.engines.openai_tts_engine import OpenAITTSEngine
         from service.vtuber.tts.engines.elevenlabs_engine import ElevenLabsEngine
         from service.vtuber.tts.engines.gpt_sovits_engine import GPTSoVITSEngine
-        from service.vtuber.tts.engines.fish_speech_engine import FishSpeechEngine
 
         _tts_service.register_engine(EdgeTTSEngine())
         _tts_service.register_engine(OpenAITTSEngine())
         _tts_service.register_engine(ElevenLabsEngine())
         _tts_service.register_engine(GPTSoVITSEngine())
-        _tts_service.register_engine(FishSpeechEngine())
     return _tts_service

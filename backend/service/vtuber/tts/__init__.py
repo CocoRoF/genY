@@ -6,5 +6,4 @@ Provides text-to-speech synthesis with multiple engine backends:
 - OpenAI TTS
 - ElevenLabs
 - GPT-SoVITS (open-source, local)
-- Fish Speech (open-source, local)
 """

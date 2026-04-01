@@ -7,5 +7,4 @@ This category contains configs for TTS (Text-to-Speech) engine settings:
 - OpenAI TTS: OpenAI API settings
 - ElevenLabs: Voice cloning + emotion settings
 - GPT-SoVITS: Open-source voice cloning with emotion references
-- Fish Speech: Open-source fast TTS
 """
