@@ -98,6 +98,7 @@ services:
       - "${FRONTEND_PORT:-3000}:3000"
     environment:
       - API_URL=http://backend:8000
+      - NEXT_PUBLIC_BACKEND_PORT=${BACKEND_PORT:-8000}
       - PORT=3000
       - HOSTNAME=0.0.0.0
       - WATCHPACK_POLLING=true
