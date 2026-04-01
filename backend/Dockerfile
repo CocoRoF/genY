@@ -33,8 +33,12 @@ RUN groupadd -r geny && useradd -r -g geny -m -d /home/geny -s /bin/bash geny
 
 # ── Storage directories ──────────────────────────────────────────────
 # Agent session workspaces — bind-mounted to host for visibility
+# /app/cache/tts, /app/static/voices: Docker named volumes —
+# 이미지에 geny:geny 소유로 존재해야 볼륨 초기화 시 권한이 복사됨
 RUN mkdir -p /data/geny_agent_sessions && \
     mkdir -p /app/logs && \
+    mkdir -p /app/cache/tts && \
+    mkdir -p /app/static/voices && \
     mkdir -p /app/service/claude_manager/session_data && \
     mkdir -p /home/geny/.claude && \
     chown -R geny:geny /data /app /home/geny
