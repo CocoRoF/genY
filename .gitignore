@@ -4,8 +4,7 @@ backend/service/chat_conversations
 /frontend-legacy
 
 # TTS model checkpoints (large binary files)
-fish-speech-checkpoints/
-
+backend/cache
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
