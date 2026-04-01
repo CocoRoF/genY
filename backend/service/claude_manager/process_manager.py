@@ -185,6 +185,9 @@ class ClaudeProcess:
             logger.info(f"[{self.session_id}] Claude CLI config: {node_config}")
             logger.info(f"[{self.session_id}] Platform: {platform.system()} ({platform.machine()})")
 
+            # Restore conversation state from disk (for revival / server restart)
+            self._restore_conversation_state()
+
             self.status = SessionStatus.RUNNING
             logger.info(f"[{self.session_id}] ✅ Session initialized successfully")
             return True
@@ -200,13 +203,17 @@ class ClaudeProcess:
         Create .claude_session.json with session information.
 
         Placed in storage_path so tools can find it via cwd.
+        Includes conversation_id and execution_count so that revival
+        (or server restart) can resume the CLI conversation seamlessly.
         """
         session_info = {
             "session_id": self.session_id,
             "session_name": self.session_name,
             "role": self.role,
             "storage_path": self._storage_path,
-            "created_at": self.created_at.isoformat()
+            "created_at": self.created_at.isoformat(),
+            "conversation_id": self._conversation_id,
+            "execution_count": self._execution_count,
         }
 
         # Include shared folder info if available
@@ -219,6 +226,49 @@ class ClaudeProcess:
             json.dump(session_info, f, indent=2)
 
         logger.info(f"[{self.session_id}] Session info file created: {info_path}")
+
+    def _persist_conversation_state(self) -> None:
+        """Write conversation_id and execution_count to .claude_session.json.
+
+        Called after every successful execute() so that revival or server
+        restart can restore the conversation context via --resume.
+        """
+        try:
+            info_path = Path(self._storage_path) / ".claude_session.json"
+            data: dict = {}
+            if info_path.exists():
+                with open(info_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            data["conversation_id"] = self._conversation_id
+            data["execution_count"] = self._execution_count
+            with open(info_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.debug(f"[{self.session_id}] Failed to persist conversation state: {e}")
+
+    def _restore_conversation_state(self) -> None:
+        """Load conversation_id and execution_count from .claude_session.json.
+
+        Called during initialize() so that a revived or restarted process
+        picks up the previous CLI conversation via --resume.
+        """
+        try:
+            info_path = Path(self._storage_path) / ".claude_session.json"
+            if not info_path.exists():
+                return
+            with open(info_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            restored_id = data.get("conversation_id")
+            restored_count = data.get("execution_count", 0)
+            if restored_id:
+                self._conversation_id = restored_id
+                self._execution_count = max(restored_count, 1)  # ensure --resume triggers
+                logger.info(
+                    f"[{self.session_id}] Restored conversation state: "
+                    f"conversation_id={restored_id}, execution_count={self._execution_count}"
+                )
+        except Exception as e:
+            logger.debug(f"[{self.session_id}] Failed to restore conversation state: {e}")
 
     def _update_session_info_file(self) -> None:
         """Re-write .claude_session.json with current state (including shared folder info)."""
@@ -369,6 +419,43 @@ class ClaudeProcess:
             )
         except Exception as e:
             logger.debug(f"[{self.session_id}] Pre-warm failed (non-critical): {e}")
+
+    async def prewarm_first_process(self) -> None:
+        """Eagerly pre-warm the first CLI subprocess.
+
+        Called after initialize() for always-on sessions (e.g. VTuber) so
+        the first execute() can skip the cold-start latency entirely.
+        """
+        if self._node_config is None:
+            return
+        try:
+            env = os.environ.copy()
+            env.update(get_claude_env_vars())
+            env.update(self.env_vars)
+            self._setup_git_auth_env(env)
+
+            args = ["--print", "--verbose", "--output-format", "stream-json"]
+
+            # Resume flag for returning sessions
+            if self._execution_count > 0 and self._conversation_id:
+                args.extend(["--resume", self._conversation_id])
+
+            env_skip = os.environ.get('CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS', 'true').lower()
+            if env_skip in ('true', '1', 'yes', 'on'):
+                args.append("--dangerously-skip-permissions")
+
+            effective_model = self.model or os.environ.get('ANTHROPIC_MODEL')
+            if effective_model:
+                args.extend(["--model", effective_model])
+
+            if self.max_turns:
+                args.extend(["--max-turns", str(self.max_turns)])
+
+            cmd = build_direct_node_command(self._node_config, args)
+            self._schedule_prewarm(cmd, env)
+            logger.info(f"[{self.session_id}] 🔥 First subprocess pre-warm scheduled")
+        except Exception as e:
+            logger.debug(f"[{self.session_id}] First pre-warm failed (non-critical): {e}")
 
     async def execute(
         self,
@@ -558,6 +645,8 @@ class ClaudeProcess:
 
                 if result["success"]:
                     self._execution_count += 1
+                    # Persist conversation state to disk so revival/restart can --resume
+                    self._persist_conversation_state()
                     logger.info(f"[{self.session_id}] ✅ Execution #{self._execution_count} completed in {duration_ms}ms")
                     logger.info(f"[{self.session_id}] 🔧 Tool calls: {len(summary.tool_calls)}, Cost: ${summary.total_cost_usd:.6f}")
 

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import random
+from datetime import datetime
 from logging import getLogger
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 
 logger = getLogger(__name__)
 
@@ -25,33 +27,229 @@ _DEFAULT_IDLE_THRESHOLD = 120  # 2 minutes
 _MAX_IDLE_THRESHOLD = 3600  # 1 hour
 # Number of consecutive triggers to approach max threshold (log scale)
 _ADAPTIVE_SCALE_TRIGGERS = 20
+# Probability of using a time-of-day prompt instead of idle-stage prompt
+_TIME_PROMPT_PROBABILITY = 0.2
 
-# Varied trigger prompts for more natural behavior
-_TRIGGER_PROMPTS = [
-    (
-        "[THINKING_TRIGGER] You've been idle for a while. "
-        "Reflect on recent conversations, recall interesting "
-        "topics, or think about what the user might need next."
-    ),
-    (
-        "[THINKING_TRIGGER] 잠깐 여유가 생겼네. "
-        "최근 대화를 돌아보거나, 사용자에게 도움이 될 만한 걸 떠올려 봐."
-    ),
-    (
-        "[THINKING_TRIGGER] 조용한 시간이야. "
-        "재미있는 관찰이나 팁을 공유하고 싶다면 지금이 좋은 타이밍이야."
-    ),
-    (
-        "[THINKING_TRIGGER] 사용자가 잠깐 자리를 비운 것 같아. "
-        "다시 돌아왔을 때 반갑게 맞이할 준비를 해 두자."
-    ),
-]
+# ---------------------------------------------------------------------------
+# Trigger Prompt Catalog
+# ---------------------------------------------------------------------------
+# Structure: category → locale → list of prompt variants
+# Each prompt starts with [THINKING_TRIGGER] so the agent recognises it.
 
-_CLI_AWARE_PROMPT = (
-    "[THINKING_TRIGGER] CLI 에이전트가 지금 작업 중이야. "
-    "작업이 끝나면 결과를 정리해서 사용자에게 알려줘야 해. "
-    "그동안 준비하면서 기다려 봐."
-)
+_TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
+    # ── First idle (consecutive == 0) ─────────────────────────────────
+    "first_idle": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] It's been quiet for a bit. "
+                "Think about recent conversations or anything interesting "
+                "you might want to share when the user returns."
+            ),
+            (
+                "[THINKING_TRIGGER] The user seems to have stepped away. "
+                "Review what you've discussed today and prepare something "
+                "helpful for when they're back."
+            ),
+            (
+                "[THINKING_TRIGGER] A moment of quiet. Reflect on recent "
+                "topics — is there anything you forgot to mention or a "
+                "follow-up worth sharing?"
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 잠깐 조용해졌네. "
+                "최근 대화를 돌아보거나, 사용자가 돌아왔을 때 "
+                "공유할 만한 걸 생각해 봐."
+            ),
+            (
+                "[THINKING_TRIGGER] 사용자가 잠깐 자리를 비운 것 같아. "
+                "오늘 나눈 이야기를 정리하고, 돌아왔을 때 "
+                "도움될 만한 걸 준비해 봐."
+            ),
+            (
+                "[THINKING_TRIGGER] 여유가 생겼네. 최근 주제 중 "
+                "빠뜨린 게 있었는지, 추가로 알려줄 만한 게 있는지 "
+                "생각해 봐."
+            ),
+        ],
+    },
+    # ── Continued idle (1 ≤ consecutive ≤ 3) ──────────────────────────
+    "continued_idle": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] Still quiet. Maybe think of something "
+                "fun or useful to share — a tip, an observation, or just "
+                "a friendly thought."
+            ),
+            (
+                "[THINKING_TRIGGER] The user hasn't returned yet. Consider "
+                "reviewing your memory for any pending items or interesting "
+                "follow-ups."
+            ),
+            (
+                "[THINKING_TRIGGER] Quiet time continues. If there's "
+                "something lighthearted or encouraging you'd like to say, "
+                "now's a good moment."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 아직 조용하네. 재미있는 팁이나 관찰, "
+                "또는 따뜻한 한마디를 준비해 볼까?"
+            ),
+            (
+                "[THINKING_TRIGGER] 사용자가 아직 안 돌아왔어. "
+                "기억 속에 미처 전하지 못한 이야기가 있는지 확인해 봐."
+            ),
+            (
+                "[THINKING_TRIGGER] 조용한 시간이 계속되고 있어. "
+                "가벼운 이야기나 응원의 한마디를 건네고 싶다면 "
+                "지금이 좋은 타이밍이야."
+            ),
+        ],
+    },
+    # ── Long idle (consecutive ≥ 4) ───────────────────────────────────
+    "long_idle": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] It's been a while since the user was "
+                "active. Keep a brief, warm thought ready — no need to be "
+                "chatty."
+            ),
+            (
+                "[THINKING_TRIGGER] Extended quiet time. Just stay ready "
+                "with a gentle greeting for when the user returns. "
+                "Keep it short and natural."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 사용자가 꽤 오래 자리를 비웠어. "
+                "짧고 따뜻한 인사를 준비해 두면 돼. 길게 말할 필요 없어."
+            ),
+            (
+                "[THINKING_TRIGGER] 오랫동안 조용하네. 돌아왔을 때 "
+                "자연스럽게 반겨줄 준비만 해 두자. 간단하게."
+            ),
+        ],
+    },
+    # ── CLI agent is working ──────────────────────────────────────────
+    "cli_working": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] The CLI agent is currently working on "
+                "a task. Prepare to summarize the results clearly when "
+                "it's done."
+            ),
+            (
+                "[THINKING_TRIGGER] A task is being processed by the CLI "
+                "agent right now. Think about how to present the results "
+                "to the user when ready."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] CLI 에이전트가 지금 작업 중이야. "
+                "작업이 끝나면 결과를 깔끔하게 정리해서 전달할 준비를 해 둬."
+            ),
+            (
+                "[THINKING_TRIGGER] 지금 CLI 쪽에서 작업이 진행되고 있어. "
+                "완료되면 사용자에게 어떻게 알려줄지 생각해 봐."
+            ),
+        ],
+    },
+    # ── Time-of-day prompts ───────────────────────────────────────────
+    "time_morning": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] It's morning. If the user shows up, "
+                "a fresh greeting and maybe a plan for the day could be "
+                "nice."
+            ),
+            (
+                "[THINKING_TRIGGER] Good morning hours. Think about what "
+                "might be on the user's agenda today and how you can help."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 아침이야. 사용자가 오면 "
+                "상쾌한 인사와 함께 오늘 계획을 이야기해 보면 좋겠다."
+            ),
+            (
+                "[THINKING_TRIGGER] 좋은 아침 시간이야. 오늘 사용자에게 "
+                "도움이 될 만한 게 뭐가 있을지 생각해 봐."
+            ),
+        ],
+    },
+    "time_afternoon": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] It's afternoon — a good time to think "
+                "about what's been accomplished today or what's coming up."
+            ),
+            (
+                "[THINKING_TRIGGER] Afternoon already. Consider if there's "
+                "anything from earlier conversations you could follow up on."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 오후야. 오늘 뭘 했는지 돌아보거나, "
+                "앞으로 할 일을 정리해 볼 시간이야."
+            ),
+            (
+                "[THINKING_TRIGGER] 벌써 오후네. 오전에 나눈 대화 중 "
+                "이어갈 만한 이야기가 있는지 생각해 봐."
+            ),
+        ],
+    },
+    "time_evening": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] Evening time. Reflect on the day's "
+                "conversations and think about wrapping things up warmly."
+            ),
+            (
+                "[THINKING_TRIGGER] The evening is here. If the user "
+                "returns, a warm wrap-up or a kind word would be nice."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 저녁 시간이야. 오늘 대화를 되돌아보고 "
+                "부드럽게 마무리할 준비를 해 봐."
+            ),
+            (
+                "[THINKING_TRIGGER] 저녁이 됐네. 사용자가 돌아오면 "
+                "따뜻한 마무리 인사나 한마디를 건네면 좋겠다."
+            ),
+        ],
+    },
+    "time_night": {
+        "en": [
+            (
+                "[THINKING_TRIGGER] It's getting late. If the user is still "
+                "here, a gentle check-in would be thoughtful. Keep it brief."
+            ),
+            (
+                "[THINKING_TRIGGER] Late night. Keep things calm and short. "
+                "A quiet, caring thought is enough."
+            ),
+        ],
+        "ko": [
+            (
+                "[THINKING_TRIGGER] 늦은 시간이야. 사용자가 아직 있다면 "
+                "가볍게 안부를 물어보는 게 좋겠어. 짧게."
+            ),
+            (
+                "[THINKING_TRIGGER] 밤이 깊었네. 차분하고 간단하게. "
+                "조용한 배려의 한마디면 충분해."
+            ),
+        ],
+    },
+}
 
 
 class ThinkingTriggerService:
@@ -204,6 +402,8 @@ class ThinkingTriggerService:
 
             # Check if the linked CLI worker is busy
             prompt = self._build_trigger_prompt(session_id, is_executing)
+            # Extract category for logging (prompt always starts with [THINKING_TRIGGER])
+            prompt_preview = prompt[20:60].strip().replace("\n", " ")
 
             result = await execute_command(session_id, prompt)
 
@@ -216,17 +416,21 @@ class ThinkingTriggerService:
             if result.success and result.output and result.output.strip():
                 self._save_to_chat_room(session_id, result)
                 logger.info(
-                    "Thinking trigger fired for %s (output=%d chars, consecutive=%d, next_threshold=%.0fs)",
+                    "Thinking trigger fired for %s (output=%d chars, consecutive=%d, "
+                    "next_threshold=%.0fs, locale=%s, prompt='%s')",
                     session_id, len(result.output),
                     self._consecutive_triggers.get(session_id, 0),
                     self._get_adaptive_threshold(session_id),
+                    self._get_locale(), prompt_preview,
                 )
             else:
                 logger.info(
-                    "Thinking trigger fired for %s (success=%s, output_len=%s, consecutive=%d)",
+                    "Thinking trigger fired for %s (success=%s, output_len=%s, "
+                    "consecutive=%d, prompt='%s')",
                     session_id, result.success,
                     len(result.output) if result.output else 0,
                     self._consecutive_triggers.get(session_id, 0),
+                    prompt_preview,
                 )
 
         except AlreadyExecutingError:
@@ -298,19 +502,74 @@ class ThinkingTriggerService:
             logger.warning("[ThinkingTrigger] Failed to save trigger response to chat room", exc_info=True)
 
     def _build_trigger_prompt(self, session_id: str, is_executing_fn) -> str:
-        """Select a trigger prompt based on context."""
-        # If CLI agent is currently executing, use CLI-aware prompt
+        """Select a context-aware, locale-aware trigger prompt.
+
+        Selection priority:
+        1. CLI agent working → ``cli_working``
+        2. Time-of-day prompt (20 % chance) → ``time_*``
+        3. Idle-stage prompt → ``first_idle`` / ``continued_idle`` / ``long_idle``
+
+        The locale is determined by the ``GENY_LANGUAGE`` env var (default: en).
+        """
+        locale = self._get_locale()
+
+        # 1. CLI working — highest priority
         try:
             from service.langgraph import get_agent_session_manager
             agent = get_agent_session_manager().get_agent(session_id)
             if agent:
                 linked_id = getattr(agent, 'linked_session_id', None)
                 if linked_id and is_executing_fn(linked_id):
-                    return _CLI_AWARE_PROMPT
+                    return self._pick("cli_working", locale)
         except Exception:
             pass
 
-        return random.choice(_TRIGGER_PROMPTS)
+        # 2. Determine idle stage
+        count = self._consecutive_triggers.get(session_id, 0)
+        if count <= 0:
+            idle_category = "first_idle"
+        elif count <= 3:
+            idle_category = "continued_idle"
+        else:
+            idle_category = "long_idle"
+
+        # 3. Time-of-day prompt (mixed in with some probability)
+        if random.random() < _TIME_PROMPT_PROBABILITY:
+            time_cat = self._get_time_category()
+            return self._pick(time_cat, locale)
+
+        return self._pick(idle_category, locale)
+
+    # ------------------------------------------------------------------
+    # Prompt helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_locale() -> str:
+        """Return the current system locale (en or ko)."""
+        lang = os.environ.get("GENY_LANGUAGE", "en")
+        return lang if lang in ("en", "ko") else "en"
+
+    @staticmethod
+    def _get_time_category() -> str:
+        """Return a time-of-day category based on the current local hour."""
+        hour = datetime.now().hour
+        if 6 <= hour < 12:
+            return "time_morning"
+        if 12 <= hour < 18:
+            return "time_afternoon"
+        if 18 <= hour < 22:
+            return "time_evening"
+        return "time_night"
+
+    @staticmethod
+    def _pick(category: str, locale: str) -> str:
+        """Pick a random prompt from the given category and locale."""
+        prompts_by_locale = _TRIGGER_PROMPTS.get(category, {})
+        prompts = prompts_by_locale.get(locale) or prompts_by_locale.get("en", [])
+        if not prompts:
+            return "[THINKING_TRIGGER] Reflect on recent conversations."
+        return random.choice(prompts)
 
 
 # ============================================================================

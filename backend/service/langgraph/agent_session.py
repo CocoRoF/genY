@@ -432,6 +432,19 @@ class AgentSession:
         """Session type: 'vtuber', 'cli', or None."""
         return self._session_type
 
+    @property
+    def _is_always_on(self) -> bool:
+        """Whether this session should never go idle.
+
+        True for VTuber sessions and their linked CLI sessions — these
+        form a tightly-coupled unit that must stay warm together.
+        """
+        if self._role == SessionRole.VTUBER:
+            return True
+        if self._session_type == "cli" and self._linked_session_id:
+            return True
+        return False
+
     def _get_logger(self) -> Optional[SessionLogger]:
         """Get session logger (lazy)."""
         return get_session_logger(self._session_id, create_if_missing=True)
@@ -544,15 +557,27 @@ class AgentSession:
         NEVER marked as idle, even if the execution takes longer than
         the idle threshold.  The ``_is_executing`` guard prevents this.
 
+        VTuber sessions are EXEMPT from idle transition because they
+        must remain a permanently-bound unit with their CLI subprocess
+        (ThinkingTrigger keeps them active).
+
         Returns:
             True if the session was transitioned to IDLE, False if not
-            applicable (e.g. already IDLE, STOPPED, ERROR, or executing).
+            applicable (e.g. already IDLE, STOPPED, ERROR, executing,
+            or VTuber role).
         """
         if self._status != SessionStatus.RUNNING:
             return False
 
         # Never mark a session as idle while it is actively executing
         if self._is_executing:
+            return False
+
+        # VTuber sessions are always-on — never transition to IDLE.
+        # They form a tightly-coupled unit with their CLI subprocess;
+        # idle timeout would break session ↔ process binding.
+        # The linked CLI session is also exempt for the same reason.
+        if self._is_always_on:
             return False
 
         # Evaluate freshness to confirm the session is actually idle
@@ -579,6 +604,10 @@ class AgentSession:
         Called when the session was idle and the underlying CLI process
         has died.  Re-initializes the model and rebuilds the graph while
         preserving the session identity (same session_id, same storage).
+
+        The conversation_id is automatically restored from
+        ``.claude_session.json`` during ClaudeProcess.initialize(),
+        so the next execute() will use ``--resume`` seamlessly.
 
         Returns:
             True on success, False on failure.
@@ -650,10 +679,21 @@ class AgentSession:
             # Record revival and log success
             self._freshness.record_revival()
 
+            # Log restored conversation state (conversation_id is
+            # auto-loaded from .claude_session.json by ClaudeProcess)
+            conv_id = None
+            if self._model and self._model.process:
+                conv_id = self._model.process._conversation_id
             logger.info(
                 f"[{self._session_id}] Session revival successful "
-                f"(revive_count={self._freshness.revive_count})"
+                f"(revive_count={self._freshness.revive_count}, "
+                f"conversation_id={conv_id or 'none'})"
             )
+
+            # Pre-warm first subprocess for always-on sessions (VTuber + linked CLI)
+            if self._is_always_on and self._model and self._model.process:
+                await self._model.process.prewarm_first_process()
+
             return True
 
         except Exception as e:
@@ -767,6 +807,12 @@ class AgentSession:
 
             self._initialized = True
             self._status = SessionStatus.RUNNING
+
+            # Always-on sessions (VTuber and its linked CLI) eagerly pre-warm
+            # the first CLI subprocess so the first invoke() skips cold-start.
+            if self._is_always_on and self._model and self._model.process:
+                await self._model.process.prewarm_first_process()
+
             logger.info(f"[{self._session_id}] AgentSession initialized successfully")
             return True
 
