@@ -74,28 +74,9 @@ class GPTSoVITSConfig(BaseConfig):
                 name="voice_profile",
                 field_type=FieldType.SELECT,
                 label="Voice Profile",
-                description="Select a registered voice profile — paths are derived automatically",
+                description="Select a registered voice profile — manage profiles at /tts-voice",
                 group="voice",
                 options=profile_options,
-            ),
-            ConfigField(
-                name="prompt_text",
-                field_type=FieldType.STRING,
-                label="Fallback Prompt Text",
-                description="Used when an emotion reference has no individual prompt text",
-                group="voice",
-            ),
-            ConfigField(
-                name="prompt_lang",
-                field_type=FieldType.SELECT,
-                label="Fallback Prompt Language",
-                group="voice",
-                options=[
-                    {"value": "ko", "label": "한국어"},
-                    {"value": "ja", "label": "日本語"},
-                    {"value": "en", "label": "English"},
-                    {"value": "zh", "label": "中文"},
-                ],
             ),
             ConfigField(
                 name="top_k",
@@ -137,7 +118,7 @@ class GPTSoVITSConfig(BaseConfig):
         import json as _json
         from pathlib import Path as _Path
 
-        voices_dir = _Path(__file__).parent.parent.parent.parent / "static" / "voices"
+        voices_dir = _Path(__file__).parent.parent.parent.parent.parent / "static" / "voices"
         options = []
         if voices_dir.exists():
             for d in sorted(voices_dir.iterdir()):
@@ -177,14 +158,7 @@ class GPTSoVITSConfig(BaseConfig):
                     },
                     "voice_profile": {
                         "label": "보이스 프로필",
-                        "description": "등록된 보이스 프로필 선택 — 경로가 자동으로 설정됩니다",
-                    },
-                    "prompt_text": {
-                        "label": "폴백 프롬프트 텍스트",
-                        "description": "감정별 개별 프롬프트가 없는 오디오에 사용되는 기본 텍스트",
-                    },
-                    "prompt_lang": {
-                        "label": "폴백 프롬프트 언어",
+                        "description": "등록된 보이스 프로필 선택 — /tts-voice 페이지에서 관리",
                     },
                     "speed": {
                         "label": "발화 속도",
