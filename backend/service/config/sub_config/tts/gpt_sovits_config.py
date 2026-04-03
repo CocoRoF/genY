@@ -22,7 +22,7 @@ class GPTSoVITSConfig(BaseConfig):
     voice_profile: str = "paimon_ko"
     ref_audio_dir: str = "/app/static/voices/paimon_ko"
     container_ref_dir: str = "/workspace/GPT-SoVITS/references/paimon_ko"
-    prompt_text: str = "우와아 이건 세상에서 제일 맛있는 요리야 이히힛 역시 네가 최고야"
+    prompt_text: str = "으음~ 나쁘지 않은데? 너도 먹어봐~ 우리 같이 먹자!"
     prompt_lang: str = "ko"
     top_k: int = 5
     top_p: float = 1.0
