@@ -50,24 +50,33 @@ class GPTSoVITSEngine(TTSEngine):
         if not config.enabled:
             raise ValueError("GPT-SoVITS is not enabled")
 
-        # Select emotion-specific reference audio (GPT-SoVITS 컨테이너 기준 경로)
-        ref_audio_path = self._get_emotion_ref(request.emotion, config)
+        # Resolve paths from voice_profile (or legacy direct paths)
+        ref_audio_dir, container_ref_dir = self._resolve_profile_paths(config)
+
+        # Select emotion-specific reference audio + per-emotion prompt
+        ref_audio_path, per_prompt_text, per_prompt_lang = self._get_emotion_ref(
+            request.emotion, config, ref_audio_dir, container_ref_dir,
+        )
         if not ref_audio_path:
             logger.warning(
                 "No reference audio found for GPT-SoVITS. "
-                "Set ref_audio_dir (backend path) and container_ref_dir (GPT-SoVITS container path) in config."
+                "Set voice_profile in config or upload reference audio."
             )
 
         # Map language code — v2 supports ko natively
         text_lang = self._lang_to_sovits(request.language)
-        prompt_lang = self._lang_to_sovits(config.prompt_lang) if config.prompt_lang else text_lang
+
+        # Use per-emotion prompt if available, else fallback to config-level
+        prompt_text = per_prompt_text or config.prompt_text or ""
+        prompt_lang_raw = per_prompt_lang or config.prompt_lang or request.language
+        prompt_lang = self._lang_to_sovits(prompt_lang_raw)
 
         # GPT-SoVITS v2 API payload — POST /tts
         payload = {
             "text": request.text,
             "text_lang": text_lang,
             "ref_audio_path": ref_audio_path,
-            "prompt_text": config.prompt_text or "",
+            "prompt_text": prompt_text,
             "prompt_lang": prompt_lang,
             "media_type": "wav",
             "top_k": config.top_k,
@@ -107,12 +116,13 @@ class GPTSoVITSEngine(TTSEngine):
             from service.config.sub_config.tts.gpt_sovits_config import GPTSoVITSConfig
 
             config = get_config_manager().load_config(GPTSoVITSConfig)
-            if not config.ref_audio_dir or not os.path.isdir(config.ref_audio_dir):
+            ref_audio_dir, _ = self._resolve_profile_paths(config)
+            if not ref_audio_dir or not os.path.isdir(ref_audio_dir):
                 return []
 
             # List reference audio files as "voices"
             voices = []
-            for f in os.listdir(config.ref_audio_dir):
+            for f in os.listdir(ref_audio_dir):
                 if f.endswith(".wav") and f.startswith("ref_"):
                     emotion = f.replace("ref_", "").replace(".wav", "")
                     voices.append(
@@ -170,38 +180,80 @@ class GPTSoVITSEngine(TTSEngine):
             logger.warning(f"GPT-SoVITS health check error: {type(e).__name__}: {e}")
             return False
 
-    def _get_emotion_ref(self, emotion: str, config) -> str:
-        """Get the reference audio path for a given emotion, with neutral fallback.
+    @staticmethod
+    def _resolve_profile_paths(config) -> tuple[str, str]:
+        """Derive ref_audio_dir and container_ref_dir from voice_profile.
 
-        Backend의 ref_audio_dir 에서 파일 존재를 확인한 뒤,
-        GPT-SoVITS 컨테이너 기준 경로(container_ref_dir)로 변환하여 반환.
+        Falls back to legacy direct path fields for backward compatibility.
         """
-        ref_dir = config.ref_audio_dir
+        profile = getattr(config, "voice_profile", "") or ""
+        if profile:
+            return (
+                f"/app/static/voices/{profile}",
+                f"/workspace/GPT-SoVITS/references/{profile}",
+            )
+        # Legacy fallback
+        return (
+            getattr(config, "ref_audio_dir", "") or "",
+            getattr(config, "container_ref_dir", "") or "",
+        )
+
+    def _get_emotion_ref(
+        self, emotion: str, config, ref_dir: str, container_dir: str,
+    ) -> tuple[str, str, str]:
+        """Get (audio_path, prompt_text, prompt_lang) for a given emotion.
+
+        Reads per-emotion prompt from profile.json.
+        Falls back to neutral emotion, then to config-level prompt.
+        """
         if not ref_dir:
-            return ""
+            return ("", "", "")
 
-        # GPT-SoVITS 컨테이너 내부 경로 (docker volume mount 기준)
-        container_dir = getattr(config, "container_ref_dir", "") or ref_dir
+        if not container_dir:
+            container_dir = ref_dir
 
-        emotion_file = f"ref_{emotion}.wav"
-        full_path = os.path.join(ref_dir, emotion_file)
+        # Try to load per-emotion prompts from profile.json
+        profile_json_path = os.path.join(ref_dir, "profile.json")
+        emotion_refs: dict = {}
+        try:
+            if os.path.exists(profile_json_path):
+                import json
+                with open(profile_json_path, "r", encoding="utf-8") as f:
+                    profile_data = json.load(f)
+                emotion_refs = profile_data.get("emotion_refs", {})
+        except Exception as e:
+            logger.warning(f"Failed to read profile.json: {e}")
 
-        if os.path.exists(full_path):
-            return os.path.join(container_dir, emotion_file)
+        def _resolve(emo: str) -> tuple[str, str, str] | None:
+            emotion_file = f"ref_{emo}.wav"
+            full_path = os.path.join(ref_dir, emotion_file)
+            if os.path.exists(full_path):
+                ref_data = emotion_refs.get(emo, {})
+                return (
+                    os.path.join(container_dir, emotion_file),
+                    ref_data.get("prompt_text", ""),
+                    ref_data.get("prompt_lang", ""),
+                )
+            return None
+
+        # Try requested emotion
+        result = _resolve(emotion)
+        if result:
+            return result
 
         # Fallback to neutral
-        neutral_file = "ref_neutral.wav"
-        neutral_path = os.path.join(ref_dir, neutral_file)
-        if os.path.exists(neutral_path):
-            return os.path.join(container_dir, neutral_file)
+        result = _resolve("neutral")
+        if result:
+            logger.info(f"Emotion '{emotion}' not found, falling back to neutral")
+            return result
 
-        # ref_dir에 파일이 없으면 container_dir 경로를 그대로 전달 (GPT-SoVITS가 확인)
-        container_path = os.path.join(container_dir, emotion_file)
+        # No local files found — send container path as-is
+        container_path = os.path.join(container_dir, f"ref_{emotion}.wav")
         logger.warning(
-            f"ref audio not found locally at {full_path}, "
+            f"ref audio not found locally at {os.path.join(ref_dir, f'ref_{emotion}.wav')}, "
             f"sending container path as-is: {container_path}"
         )
-        return container_path
+        return (container_path, "", "")
 
     @staticmethod
     def _lang_to_sovits(language: str) -> str:

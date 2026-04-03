@@ -19,6 +19,7 @@ class GPTSoVITSConfig(BaseConfig):
 
     enabled: bool = False
     api_url: str = "http://gpt-sovits:9880"
+    voice_profile: str = "paimon_ko"
     ref_audio_dir: str = "/app/static/voices/paimon_ko"
     container_ref_dir: str = "/workspace/GPT-SoVITS/references/paimon_ko"
     prompt_text: str = "우와아 이건 세상에서 제일 맛있는 요리야 이히힛 역시 네가 최고야"
@@ -50,6 +51,9 @@ class GPTSoVITSConfig(BaseConfig):
 
     @classmethod
     def get_fields_metadata(cls) -> List[ConfigField]:
+        # Dynamically build profile options from voices directory
+        profile_options = cls._get_profile_options()
+
         return [
             ConfigField(
                 name="enabled",
@@ -67,32 +71,24 @@ class GPTSoVITSConfig(BaseConfig):
                 placeholder="http://gpt-sovits:9880",
             ),
             ConfigField(
-                name="ref_audio_dir",
-                field_type=FieldType.STRING,
-                label="Reference Audio Path (Backend)",
-                description="Backend container path to per-emotion reference files",
+                name="voice_profile",
+                field_type=FieldType.SELECT,
+                label="Voice Profile",
+                description="Select a registered voice profile — paths are derived automatically",
                 group="voice",
-                placeholder="/app/static/voices/paimon_ko",
-            ),
-            ConfigField(
-                name="container_ref_dir",
-                field_type=FieldType.STRING,
-                label="Reference Audio Path (GPT-SoVITS Container)",
-                description="GPT-SoVITS container path — must match Docker volume mount (/workspace/GPT-SoVITS/references/...)",
-                group="voice",
-                placeholder="/workspace/GPT-SoVITS/references/paimon_ko",
+                options=profile_options,
             ),
             ConfigField(
                 name="prompt_text",
                 field_type=FieldType.STRING,
-                label="Prompt Text",
-                description="Transcription text for the reference audio",
+                label="Fallback Prompt Text",
+                description="Used when an emotion reference has no individual prompt text",
                 group="voice",
             ),
             ConfigField(
                 name="prompt_lang",
                 field_type=FieldType.SELECT,
-                label="Prompt Language",
+                label="Fallback Prompt Language",
                 group="voice",
                 options=[
                     {"value": "ko", "label": "한국어"},
@@ -136,6 +132,30 @@ class GPTSoVITSConfig(BaseConfig):
         ]
 
     @classmethod
+    def _get_profile_options(cls) -> List[Dict[str, str]]:
+        """Dynamically list voice profiles for the SELECT dropdown."""
+        import json as _json
+        from pathlib import Path as _Path
+
+        voices_dir = _Path(__file__).parent.parent.parent.parent / "static" / "voices"
+        options = []
+        if voices_dir.exists():
+            for d in sorted(voices_dir.iterdir()):
+                if not d.is_dir():
+                    continue
+                label = d.name
+                pj = d / "profile.json"
+                if pj.exists():
+                    try:
+                        data = _json.loads(pj.read_text(encoding="utf-8"))
+                        if data.get("display_name"):
+                            label = f"{data['display_name']} ({d.name})"
+                    except Exception:
+                        pass
+                options.append({"value": d.name, "label": label})
+        return options or [{"value": "", "label": "(no profiles)"}]
+
+    @classmethod
     def get_i18n(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "ko": {
@@ -155,20 +175,16 @@ class GPTSoVITSConfig(BaseConfig):
                         "label": "API URL",
                         "description": "GPT-SoVITS API v2 서버 주소",
                     },
-                    "ref_audio_dir": {
-                        "label": "레퍼런스 오디오 경로 (Backend)",
-                        "description": "Backend 컨테이너 기준 감정별 레퍼런스 파일 디렉토리",
-                    },
-                    "container_ref_dir": {
-                        "label": "레퍼런스 오디오 경로 (GPT-SoVITS 컨테이너)",
-                        "description": "GPT-SoVITS 컨테이너 내부 경로 — Docker 볼륨 마운트와 일치해야 합니다",
+                    "voice_profile": {
+                        "label": "보이스 프로필",
+                        "description": "등록된 보이스 프로필 선택 — 경로가 자동으로 설정됩니다",
                     },
                     "prompt_text": {
-                        "label": "프롬프트 텍스트",
-                        "description": "레퍼런스 오디오에 해당하는 발화 텍스트",
+                        "label": "폴백 프롬프트 텍스트",
+                        "description": "감정별 개별 프롬프트가 없는 오디오에 사용되는 기본 텍스트",
                     },
                     "prompt_lang": {
-                        "label": "프롬프트 언어",
+                        "label": "폴백 프롬프트 언어",
                     },
                     "speed": {
                         "label": "발화 속도",

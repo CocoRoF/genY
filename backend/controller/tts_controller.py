@@ -215,6 +215,27 @@ async def clear_cache():
 VOICES_DIR = Path(__file__).parent.parent / "static" / "voices"
 
 
+def _migrate_emotion_refs(data: dict) -> None:
+    """Ensure each emotion_ref entry has prompt_text/prompt_lang fields.
+
+    Legacy entries only had {"file": "...", "text": "..."}, so we back-fill
+    from the profile-level prompt_text/prompt_lang as fallback.
+    """
+    emotion_refs = data.get("emotion_refs")
+    if not isinstance(emotion_refs, dict):
+        return
+    fallback_text = data.get("prompt_text", "")
+    fallback_lang = data.get("prompt_lang", "ko")
+    for _emotion, ref in emotion_refs.items():
+        if not isinstance(ref, dict):
+            continue
+        if "prompt_text" not in ref:
+            # Migrate legacy "text" field → "prompt_text"
+            ref["prompt_text"] = ref.pop("text", "") or fallback_text
+        if "prompt_lang" not in ref:
+            ref["prompt_lang"] = fallback_lang
+
+
 class CreateProfileRequest(BaseModel):
     """Request body to create a voice profile"""
     name: str
@@ -222,6 +243,12 @@ class CreateProfileRequest(BaseModel):
     language: str = "ko"
     prompt_text: str = ""
     prompt_lang: str = "ko"
+
+
+class UpdateEmotionRefRequest(BaseModel):
+    """Request body to update a single emotion ref's prompt"""
+    prompt_text: Optional[str] = None
+    prompt_lang: Optional[str] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -247,6 +274,8 @@ async def list_profiles():
                 try:
                     data = json.loads(profile_json.read_text(encoding="utf-8"))
                     data["has_refs"] = refs
+                    # Ensure emotion_refs have per-emotion prompt fields
+                    _migrate_emotion_refs(data)
                     profiles.append(data)
                 except Exception as e:
                     logger.warning(f"Failed to read profile {profile_dir.name}: {e}")
@@ -292,6 +321,8 @@ async def get_profile(name: str):
 
     data = json.loads(profile_json.read_text(encoding="utf-8"))
     data["available_refs"] = [f.name for f in profile_dir.glob("ref_*.wav")]
+    data["has_refs"] = {f.stem.replace("ref_", ""): True for f in profile_dir.glob("ref_*.wav")}
+    _migrate_emotion_refs(data)
     return data
 
 
@@ -358,6 +389,7 @@ async def upload_reference_audio(
     name: str,
     emotion: str = Form(...),
     text: str = Form(""),
+    lang: str = Form(""),
     file: UploadFile = File(...),
 ):
     """Upload a reference audio file for a specific emotion"""
@@ -379,7 +411,7 @@ async def upload_reference_audio(
     content = await file.read()
     ref_path.write_bytes(content)
 
-    # Update profile.json emotion_refs
+    # Update profile.json emotion_refs with per-emotion prompt
     profile_json = profile_dir / "profile.json"
     if profile_json.exists():
         data = json.loads(profile_json.read_text(encoding="utf-8"))
@@ -387,7 +419,8 @@ async def upload_reference_audio(
             data["emotion_refs"] = {}
         data["emotion_refs"][emotion] = {
             "file": f"ref_{emotion}.wav",
-            "text": text,
+            "prompt_text": text or data["emotion_refs"].get(emotion, {}).get("prompt_text", ""),
+            "prompt_lang": lang or data["emotion_refs"].get(emotion, {}).get("prompt_lang", data.get("prompt_lang", "ko")),
         }
         profile_json.write_text(
             json.dumps(data, ensure_ascii=False, indent=2),
@@ -434,6 +467,52 @@ async def delete_reference_audio(name: str, emotion: str):
     return {"success": True, "profile": name, "emotion": emotion}
 
 
+@router.get("/profiles/{name}/ref/{emotion}/audio")
+async def get_reference_audio(name: str, emotion: str):
+    """Stream a reference audio file for playback"""
+    if "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(status_code=400, detail="Invalid profile name")
+
+    ref_path = VOICES_DIR / name / f"ref_{emotion}.wav"
+    if not ref_path.exists():
+        raise HTTPException(status_code=404, detail=f"Reference audio for '{emotion}' not found")
+
+    return StreamingResponse(
+        open(ref_path, "rb"),
+        media_type="audio/wav",
+        headers={"Content-Disposition": f'inline; filename="ref_{emotion}.wav"'},
+    )
+
+
+@router.put("/profiles/{name}/ref/{emotion}")
+async def update_emotion_ref(name: str, emotion: str, body: UpdateEmotionRefRequest):
+    """Update prompt_text / prompt_lang for a single emotion reference"""
+    if "/" in name or "\\" in name or ".." in name:
+        raise HTTPException(status_code=400, detail="Invalid profile name")
+
+    profile_dir = VOICES_DIR / name
+    profile_json = profile_dir / "profile.json"
+    if not profile_json.exists():
+        raise HTTPException(status_code=404, detail=f"Profile '{name}' not found")
+
+    data = json.loads(profile_json.read_text(encoding="utf-8"))
+    if "emotion_refs" not in data:
+        data["emotion_refs"] = {}
+    if emotion not in data["emotion_refs"]:
+        data["emotion_refs"][emotion] = {"file": f"ref_{emotion}.wav"}
+
+    if body.prompt_text is not None:
+        data["emotion_refs"][emotion]["prompt_text"] = body.prompt_text
+    if body.prompt_lang is not None:
+        data["emotion_refs"][emotion]["prompt_lang"] = body.prompt_lang
+
+    profile_json.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {"success": True, "profile": name, "emotion": emotion, "ref": data["emotion_refs"][emotion]}
+
+
 @router.post("/profiles/{name}/activate")
 async def activate_profile(name: str):
     """Set a voice profile as the active GPT-SoVITS voice"""
@@ -452,7 +531,8 @@ async def activate_profile(name: str):
         mgr = get_config_manager()
         cfg = mgr.load_config(GPTSoVITSConfig)
 
-        # Update paths
+        # Update voice_profile (new) + legacy path fields for compatibility
+        cfg.voice_profile = name
         cfg.ref_audio_dir = f"/app/static/voices/{name}"
         cfg.container_ref_dir = f"/workspace/GPT-SoVITS/references/{name}"
 

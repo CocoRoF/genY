@@ -954,7 +954,7 @@ export interface VoiceProfile {
   language?: string;
   prompt_text?: string;
   prompt_lang?: string;
-  emotion_refs?: Record<string, { file: string; text?: string }>;
+  emotion_refs?: Record<string, { file: string; prompt_text?: string; prompt_lang?: string }>;
   has_refs?: Record<string, boolean>;
   active?: boolean;
   gpt_sovits_settings?: Record<string, unknown>;
@@ -1025,11 +1025,12 @@ export const ttsApi = {
     }),
 
   /** POST /api/tts/profiles/{name}/ref — 레퍼런스 오디오 업로드 */
-  uploadRef: async (name: string, emotion: string, file: File, text?: string): Promise<{ success: boolean }> => {
+  uploadRef: async (name: string, emotion: string, file: File, text?: string, lang?: string): Promise<{ success: boolean }> => {
     const form = new FormData();
     form.append('file', file);
     form.append('emotion', emotion);
     if (text) form.append('text', text);
+    if (lang) form.append('lang', lang);
     const res = await fetch(`/api/tts/profiles/${encodeURIComponent(name)}/ref`, {
       method: 'POST',
       body: form,
@@ -1051,5 +1052,16 @@ export const ttsApi = {
   activateProfile: (name: string) =>
     apiCall<{ success: boolean }>(`/api/tts/profiles/${encodeURIComponent(name)}/activate`, {
       method: 'POST',
+    }),
+
+  /** GET /api/tts/profiles/{name}/ref/{emotion}/audio — 레퍼런스 오디오 URL */
+  getRefAudioUrl: (name: string, emotion: string): string =>
+    `/api/tts/profiles/${encodeURIComponent(name)}/ref/${encodeURIComponent(emotion)}/audio`,
+
+  /** PUT /api/tts/profiles/{name}/ref/{emotion} — 개별 emotion prompt 수정 */
+  updateEmotionRef: (name: string, emotion: string, body: { prompt_text?: string; prompt_lang?: string }) =>
+    apiCall<{ success: boolean }>(`/api/tts/profiles/${encodeURIComponent(name)}/ref/${encodeURIComponent(emotion)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
     }),
 };

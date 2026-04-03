@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft, Plus, Mic, Trash2, Upload, Check, ChevronRight,
-  Loader2, Star,
+  Loader2, Star, Play, Square,
 } from 'lucide-react';
 import { ttsApi, type VoiceProfile } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
@@ -321,10 +321,10 @@ function ProfileDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileKey]);
 
-  const handleUpload = useCallback(async (emotion: Emotion, file: File) => {
+  const handleUpload = useCallback(async (emotion: Emotion, file: File, text?: string, lang?: string) => {
     setUploading(emotion);
     try {
-      await ttsApi.uploadRef(profile.name, emotion, file);
+      await ttsApi.uploadRef(profile.name, emotion, file, text, lang);
       showMsg('success', `${emotion} ${t('ttsVoice.uploaded')}`);
       await onRefresh();
     } catch (e: unknown) {
@@ -337,6 +337,16 @@ function ProfileDetail({
     try {
       await ttsApi.deleteRef(profile.name, emotion);
       showMsg('success', `${emotion} ${t('ttsVoice.deleted')}`);
+      await onRefresh();
+    } catch (e: unknown) {
+      showMsg('error', e instanceof Error ? e.message : String(e));
+    }
+  }, [profile.name, onRefresh, showMsg, t]);
+
+  const handleUpdateEmotionRef = useCallback(async (emotion: string, body: { prompt_text?: string; prompt_lang?: string }) => {
+    try {
+      await ttsApi.updateEmotionRef(profile.name, emotion, body);
+      showMsg('success', t('ttsVoice.saved'));
       await onRefresh();
     } catch (e: unknown) {
       showMsg('error', e instanceof Error ? e.message : String(e));
@@ -364,11 +374,12 @@ function ProfileDetail({
         )}
       </div>
 
-      {/* ── Prompt Settings ── */}
+      {/* ── Fallback Prompt Settings ── */}
       <section>
-        <h3 className="text-[0.875rem] font-semibold mb-4 text-[var(--text-primary)]">
-          {t('ttsVoice.promptSettings')}
+        <h3 className="text-[0.875rem] font-semibold mb-1 text-[var(--text-primary)]">
+          {t('ttsVoice.fallbackPrompt')}
         </h3>
+        <p className="text-[0.6875rem] text-[var(--text-muted)] mb-3">{t('ttsVoice.fallbackPromptHint')}</p>
         <div className="space-y-3 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)]">
           <div>
             <label className="block text-[0.75rem] font-medium text-[var(--text-muted)] mb-1">
@@ -388,7 +399,6 @@ function ProfileDetail({
                 {t('ttsVoice.save')}
               </button>
             </div>
-            <p className="mt-1 text-[0.6875rem] text-[var(--text-muted)]">{t('ttsVoice.promptTextHint')}</p>
           </div>
           <div>
             <label className="block text-[0.75rem] font-medium text-[var(--text-muted)] mb-1">
@@ -410,18 +420,22 @@ function ProfileDetail({
 
       {/* ── Emotion Reference Audio ── */}
       <section>
-        <h3 className="text-[0.875rem] font-semibold mb-4 text-[var(--text-primary)]">
+        <h3 className="text-[0.875rem] font-semibold mb-1 text-[var(--text-primary)]">
           {t('ttsVoice.emotionRefs')}
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <p className="text-[0.6875rem] text-[var(--text-muted)] mb-3">{t('ttsVoice.emotionRefsHint')}</p>
+        <div className="grid grid-cols-1 gap-3">
           {EMOTIONS.map(emotion => (
             <EmotionRefCard
               key={emotion}
+              profileName={profile.name}
               emotion={emotion}
               hasRef={!!profile.has_refs?.[emotion]}
+              emotionRef={profile.emotion_refs?.[emotion]}
               uploading={uploading === emotion}
-              onUpload={(file) => handleUpload(emotion, file)}
+              onUpload={(file, text, lang) => handleUpload(emotion, file, text, lang)}
               onDelete={() => handleDeleteRef(emotion)}
+              onUpdatePrompt={(body) => handleUpdateEmotionRef(emotion, body)}
               t={t}
             />
           ))}
@@ -432,72 +446,164 @@ function ProfileDetail({
 }
 
 
-// ── Emotion Reference Card ──
+// ── Emotion Reference Card (redesigned: audio + prompt pair) ──
 function EmotionRefCard({
-  emotion, hasRef, uploading, onUpload, onDelete, t,
+  profileName, emotion, hasRef, emotionRef, uploading, onUpload, onDelete, onUpdatePrompt, t,
 }: {
+  profileName: string;
   emotion: Emotion;
   hasRef: boolean;
+  emotionRef?: { file: string; prompt_text?: string; prompt_lang?: string };
   uploading: boolean;
-  onUpload: (file: File) => void;
+  onUpload: (file: File, text?: string, lang?: string) => void;
   onDelete: () => void;
+  onUpdatePrompt: (body: { prompt_text?: string; prompt_lang?: string }) => void;
   t: (k: string) => string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [localPromptText, setLocalPromptText] = useState(emotionRef?.prompt_text || '');
+  const [localPromptLang, setLocalPromptLang] = useState(emotionRef?.prompt_lang || 'ko');
+
+  // Sync local state when parent data changes
+  const refKey = `${profileName}|${emotion}|${emotionRef?.prompt_text}|${emotionRef?.prompt_lang}`;
+  useEffect(() => {
+    setLocalPromptText(emotionRef?.prompt_text || '');
+    setLocalPromptLang(emotionRef?.prompt_lang || 'ko');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refKey]);
+
+  const togglePlay = useCallback(() => {
+    if (!hasRef) return;
+    if (playing && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setPlaying(false);
+      return;
+    }
+    const url = ttsApi.getRefAudioUrl(profileName, emotion);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.play();
+    setPlaying(true);
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => setPlaying(false);
+  }, [hasRef, playing, profileName, emotion]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+    <div className={`rounded-xl border transition-colors ${
       hasRef
         ? 'border-[rgba(34,197,94,0.3)] bg-[rgba(34,197,94,0.03)]'
         : 'border-[var(--border-color)] bg-[var(--bg-secondary)]'
     }`}>
-      {/* Emotion indicator */}
-      <span className={`w-3 h-3 rounded-full shrink-0 ${EMOTION_COLORS[emotion] || 'bg-gray-400'}`} />
-
-      {/* Label */}
-      <div className="flex-1 min-w-0">
-        <p className="text-[0.8125rem] font-medium capitalize">{emotion}</p>
-        <p className="text-[0.6875rem] text-[var(--text-muted)]">
-          {hasRef ? `ref_${emotion}.wav` : t('ttsVoice.noRef')}
-        </p>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1.5">
-        {uploading ? (
-          <Loader2 size={14} className="animate-spin text-[var(--primary-color)]" />
-        ) : (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".wav"
-              className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0];
-                if (f) onUpload(f);
-                e.target.value = '';
-              }}
-            />
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--primary-color)] hover:border-[var(--primary-color)] cursor-pointer transition-all"
-              title={t('ttsVoice.upload')}
-            >
-              <Upload size={12} />
-            </button>
-            {hasRef && (
+      {/* ── Top row: emotion label + action buttons ── */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className={`w-3 h-3 rounded-full shrink-0 ${EMOTION_COLORS[emotion] || 'bg-gray-400'}`} />
+        <div className="flex-1 min-w-0">
+          <p className="text-[0.8125rem] font-medium capitalize">{emotion}</p>
+          <p className="text-[0.6875rem] text-[var(--text-muted)]">
+            {hasRef ? `ref_${emotion}.wav` : t('ttsVoice.noRef')}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {uploading ? (
+            <Loader2 size={14} className="animate-spin text-[var(--primary-color)]" />
+          ) : (
+            <>
+              {hasRef && (
+                <button
+                  onClick={togglePlay}
+                  className={`flex items-center justify-center w-7 h-7 rounded-md border cursor-pointer transition-all ${
+                    playing
+                      ? 'bg-[var(--primary-color)] border-[var(--primary-color)] text-white'
+                      : 'bg-[var(--bg-tertiary)] border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--primary-color)] hover:border-[var(--primary-color)]'
+                  }`}
+                  title={playing ? t('ttsVoice.stop') : t('ttsVoice.play')}
+                >
+                  {playing ? <Square size={10} /> : <Play size={12} />}
+                </button>
+              )}
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".wav"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) onUpload(f, localPromptText || undefined, localPromptLang || undefined);
+                  e.target.value = '';
+                }}
+              />
               <button
-                onClick={onDelete}
-                className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--danger-color)] hover:border-[var(--danger-color)] cursor-pointer transition-all"
-                title={t('ttsVoice.delete')}
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--primary-color)] hover:border-[var(--primary-color)] cursor-pointer transition-all"
+                title={t('ttsVoice.upload')}
               >
-                <Trash2 size={12} />
+                <Upload size={12} />
               </button>
-            )}
-          </>
-        )}
+              {hasRef && (
+                <button
+                  onClick={onDelete}
+                  className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--danger-color)] hover:border-[var(--danger-color)] cursor-pointer transition-all"
+                  title={t('ttsVoice.delete')}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* ── Bottom row: per-emotion prompt text + language (shown when audio exists) ── */}
+      {hasRef && (
+        <div className="px-4 pb-3 pt-0 space-y-2 border-t border-[var(--border-color)] mt-0 pt-2">
+          <div className="flex gap-2 items-end">
+            <div className="flex-1">
+              <label className="block text-[0.6875rem] font-medium text-[var(--text-muted)] mb-0.5">
+                {t('ttsVoice.refPromptText')}
+              </label>
+              <input
+                value={localPromptText}
+                onChange={e => setLocalPromptText(e.target.value)}
+                onBlur={() => {
+                  if (localPromptText !== (emotionRef?.prompt_text || '')) {
+                    onUpdatePrompt({ prompt_text: localPromptText });
+                  }
+                }}
+                placeholder={t('ttsVoice.refPromptPlaceholder')}
+                className="w-full px-2.5 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-[0.75rem] outline-none focus:border-[var(--primary-color)]"
+              />
+            </div>
+            <div className="shrink-0">
+              <label className="block text-[0.6875rem] font-medium text-[var(--text-muted)] mb-0.5">
+                {t('ttsVoice.refLang')}
+              </label>
+              <select
+                value={localPromptLang}
+                onChange={e => {
+                  setLocalPromptLang(e.target.value);
+                  onUpdatePrompt({ prompt_lang: e.target.value });
+                }}
+                className="px-2 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-[0.75rem] outline-none focus:border-[var(--primary-color)]"
+              >
+                {LANGUAGES.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
