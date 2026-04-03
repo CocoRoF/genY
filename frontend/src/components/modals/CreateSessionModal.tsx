@@ -11,7 +11,7 @@ import InfoTooltip from '@/components/ui/InfoTooltip';
 import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useVTuberStore } from '@/store/useVTuberStore';
-import type { CreateAgentRequest, SessionInfo, ToolPresetDefinition, VoiceProfile } from '@/types';
+import type { CreateAgentRequest, SessionInfo, ToolPresetDefinition } from '@/types';
 import type { WorkflowDefinition } from '@/types/workflow';
 
 const selectArrow: React.CSSProperties = {
