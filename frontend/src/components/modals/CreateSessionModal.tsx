@@ -74,8 +74,8 @@ export default function CreateSessionModal({ onClose }: Props) {
     }
     if (formState.role === 'vtuber' && !ttsProfilesLoaded) {
       Promise.all([
-        ttsApi.engines().catch(() => ({ engines: [], default: '' })),
-        ttsApi.listProfiles().catch(() => ({ profiles: [] })),
+        ttsApi.engines().catch((): { engines: string[]; default: string } => ({ engines: [], default: '' })),
+        ttsApi.listProfiles().catch((): { profiles: VoiceProfile[] } => ({ profiles: [] })),
       ]).then(([enginesRes, profilesRes]) => {
         const hasGptSovits = enginesRes.engines.includes('gpt_sovits');
         setTtsEnabled(hasGptSovits);
