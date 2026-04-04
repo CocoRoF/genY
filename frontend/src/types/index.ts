@@ -98,6 +98,7 @@ export interface ChatRoomMessage {
   role?: string | null;
   duration_ms?: number | null;
   file_changes?: FileChanges[];
+  meta?: Record<string, unknown>;
 }
 
 export interface ChatRoomMessageListResponse {
@@ -137,7 +138,7 @@ export interface AgentProgressState {
   session_id: string;
   session_name: string;
   role: string;
-  status: 'pending' | 'executing' | 'completed' | 'failed';
+  status: 'pending' | 'executing' | 'completed' | 'failed' | 'queued';
   thinking_preview: string | null;
   elapsed_ms?: number;
   last_activity_ms?: number;

@@ -588,9 +588,16 @@ export default function ChatTab() {
           }
 
           // System message
+          const sysMeta = msg.meta;
+          const isQueued = sysMeta?.queued === true;
           return (
             <div key={msg.id} className="flex justify-center">
-              <span className="px-3 py-1 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)]">
+              <span className={`px-3 py-1 rounded-full border text-[0.6875rem] ${
+                isQueued
+                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                  : 'bg-[var(--bg-tertiary)] border-[var(--border-color)] text-[var(--text-muted)]'
+              }`}>
+                {isQueued && <Clock size={12} className="mr-1 inline text-amber-500" />}
                 {msg.content}
               </span>
             </div>
@@ -603,7 +610,7 @@ export default function ChatTab() {
             {/* Per-agent progress if available */}
             {agentProgress && agentProgress.length > 0 ? (
               agentProgress
-                .filter(a => a.status === 'pending' || a.status === 'executing')
+                .filter(a => a.status === 'pending' || a.status === 'executing' || a.status === 'queued')
                 .map(agent => {
                   const activityAge = agent.last_activity_ms ?? agent.elapsed_ms ?? 0;
                   const elapsedSec = Math.floor((agent.elapsed_ms ?? 0) / 1000);

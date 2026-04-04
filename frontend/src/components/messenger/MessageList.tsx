@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useMessengerStore } from '@/store/useMessengerStore';
 import { useAppStore } from '@/store/useAppStore';
 import { useI18n } from '@/lib/i18n';
-import { Bot, User, Loader2, MessageCircle, FileCode2, Plus, Minus } from 'lucide-react';
+import { Bot, User, Loader2, MessageCircle, FileCode2, Plus, Minus, Clock } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import type { ChatRoomMessage, FileChanges } from '@/types';
 
@@ -209,9 +209,17 @@ function AgentMessage({ msg }: { msg: ChatRoomMessage }) {
 }
 
 function SystemMessage({ msg }: { msg: ChatRoomMessage }) {
+  const meta = msg.meta;
+  const isQueued = meta?.queued === true;
+
   return (
     <div className="flex justify-center px-4 py-1.5">
-      <span className="px-3 py-1 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[0.6875rem] text-[var(--text-muted)] max-w-[80%] text-center">
+      <span className={`px-3 py-1 rounded-full border text-[0.6875rem] max-w-[80%] text-center ${
+        isQueued
+          ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+          : 'bg-[var(--bg-tertiary)] border-[var(--border-color)] text-[var(--text-muted)]'
+      }`}>
+        {isQueued && <Clock size={12} className="mr-1 inline text-amber-500" />}
         {msg.content}
       </span>
     </div>
@@ -276,8 +284,10 @@ function TypingIndicator({ name, role, sessionId, thinkingPreview, elapsedMs }: 
 
 // Per-agent progress indicator during broadcast
 function AgentProgressIndicator({ agents }: { agents: import('@/types').AgentProgressState[] }) {
-  // Only show agents that are still pending or executing
-  const activeAgents = agents.filter(a => a.status === 'pending' || a.status === 'executing');
+  // Show agents that are pending, executing, or queued (waiting for current task)
+  const activeAgents = agents.filter(a =>
+    a.status === 'pending' || a.status === 'executing' || a.status === 'queued'
+  );
 
   if (activeAgents.length === 0) return null;
 

@@ -22,9 +22,10 @@ Both ``agent_controller`` (command tab) and ``chat_controller``
 
 import asyncio
 import time
+import uuid
 from dataclasses import dataclass, asdict
 from logging import getLogger
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 logger = getLogger(__name__)
 
@@ -258,6 +259,9 @@ async def _notify_vtuber_cli_progress(session_id: str, status: str) -> None:
 _active_executions: Dict[str, dict] = {}
 """session_id → holder dict for every in-flight execution."""
 
+_draining_sessions: Set[str] = set()
+"""Sessions currently draining their inbox (prevents infinite recursion)."""
+
 
 def is_executing(session_id: str) -> bool:
     """Return True if *session_id* is currently running a command."""
@@ -265,14 +269,71 @@ def is_executing(session_id: str) -> bool:
     return holder is not None and not holder.get("done", True)
 
 
+def is_trigger_executing(session_id: str) -> bool:
+    """Return True if *session_id* is running a trigger (preemptible)."""
+    holder = _active_executions.get(session_id)
+    return (
+        holder is not None
+        and not holder.get("done", True)
+        and holder.get("is_trigger", False)
+    )
+
+
 def get_execution_holder(session_id: str) -> Optional[dict]:
     """Return the live holder dict, or None."""
     return _active_executions.get(session_id)
 
 
-def cleanup_execution(session_id: str) -> None:
-    """Remove the holder entry.  Safe to call even if missing."""
+def cleanup_execution(session_id: str, exec_id: Optional[str] = None) -> None:
+    """Remove the holder entry if *exec_id* matches (or is None).
+
+    When *exec_id* is given, only remove the holder if its ``exec_id``
+    matches — this prevents a finishing execution from accidentally
+    removing a *newer* holder registered by a different command.
+    """
+    if exec_id is not None:
+        holder = _active_executions.get(session_id)
+        if holder and holder.get("exec_id") != exec_id:
+            return  # Not our holder — leave it alone
     _active_executions.pop(session_id, None)
+
+
+async def abort_trigger_execution(session_id: str) -> bool:
+    """
+    Cancel a running trigger execution so a higher-priority command
+    (user message) can take over.
+
+    Returns True if a trigger was successfully aborted, False otherwise.
+    Only aborts executions tagged with ``is_trigger=True``.
+    """
+    holder = _active_executions.get(session_id)
+    if not holder or holder.get("done", True):
+        return False
+    if not holder.get("is_trigger", False):
+        return False
+
+    abort_exec_id = holder.get("exec_id")
+    task = holder.get("task")
+    if not task or task.done():
+        # No cancellable task — just clean up
+        cleanup_execution(session_id, exec_id=abort_exec_id)
+        return True
+
+    logger.info(
+        "Aborting trigger execution for %s (elapsed=%.1fs)",
+        session_id,
+        time.time() - holder.get("start_time", time.time()),
+    )
+
+    task.cancel()
+    try:
+        await task  # wait for CancelledError handling in _execute_core
+    except (asyncio.CancelledError, Exception):
+        pass
+
+    # Ensure cleanup (only our holder)
+    cleanup_execution(session_id, exec_id=abort_exec_id)
+    return True
 
 
 # ============================================================================
@@ -480,6 +541,7 @@ async def execute_command(
     timeout: Optional[float] = None,
     system_prompt: Optional[str] = None,
     max_turns: Optional[int] = None,
+    is_trigger: bool = False,
     **invoke_kwargs,
 ) -> ExecutionResult:
     """
@@ -488,6 +550,11 @@ async def execute_command(
     Used by:
       - ``POST /api/agents/{id}/execute``   (command tab, synchronous)
       - Messenger ``_run_broadcast``         (each agent in the room)
+      - Thinking trigger service             (is_trigger=True)
+
+    When *is_trigger* is True the execution is tagged as preemptible:
+    a subsequent user-initiated ``execute_command`` will automatically
+    cancel this trigger before proceeding.
 
     Extra ``invoke_kwargs`` are forwarded to ``agent.invoke()`` — e.g.
     ``is_chat_message=True`` for broadcast context.
@@ -501,27 +568,46 @@ async def execute_command(
     agent = await _resolve_agent(session_id)
 
     # 1b. Record activity for VTuber thinking trigger
-    if getattr(agent, '_session_type', None) == 'vtuber':
+    #     Skip for trigger executions (would break adaptive backoff)
+    if not is_trigger and getattr(agent, '_session_type', None) == 'vtuber':
         try:
             from service.vtuber.thinking_trigger import get_thinking_trigger_service
             get_thinking_trigger_service().record_activity(session_id)
         except Exception:
             pass  # best-effort
 
-    # 2. Double-execution guard
+    # 2. Double-execution guard — with trigger preemption
     if is_executing(session_id):
-        raise AlreadyExecutingError(
-            f"Execution already in progress for session {session_id}"
-        )
+        if not is_trigger and is_trigger_executing(session_id):
+            # User message takes priority over trigger — abort the trigger
+            logger.info(
+                "Preempting trigger for user message on session %s",
+                session_id,
+            )
+            aborted = await abort_trigger_execution(session_id)
+            if not aborted:
+                raise AlreadyExecutingError(
+                    f"Execution already in progress for session {session_id}"
+                )
+            # Small yield to let cleanup propagate
+            await asyncio.sleep(0)
+        else:
+            raise AlreadyExecutingError(
+                f"Execution already in progress for session {session_id}"
+            )
 
     # 3. Register
     session_logger = _get_session_logger(session_id, create_if_missing=True)
+    exec_id = uuid.uuid4().hex
     holder: dict = {
         "done": False,
         "result": None,
         "error": None,
         "start_time": time.time(),
         "cache_cursor": session_logger.get_cache_length() if session_logger else 0,
+        "is_trigger": is_trigger,
+        "task": None,
+        "exec_id": exec_id,
     }
     _active_executions[session_id] = holder
 
@@ -530,21 +616,150 @@ async def execute_command(
         # Notify linked VTuber that CLI is working (best-effort)
         await _notify_vtuber_cli_progress(session_id, "executing")
 
-        result = await _execute_core(
-            agent, session_id, prompt, holder,
-            timeout=timeout,
-            system_prompt=system_prompt,
-            max_turns=max_turns,
-            **invoke_kwargs,
+        exec_task = asyncio.create_task(
+            _execute_core(
+                agent, session_id, prompt, holder,
+                timeout=timeout,
+                system_prompt=system_prompt,
+                max_turns=max_turns,
+                **invoke_kwargs,
+            )
         )
+        holder["task"] = exec_task
+
+        result = await exec_task
+
         # 5. Emit avatar state (best-effort, never raises)
         await _emit_avatar_state(session_id, result)
         # 6. Notify linked VTuber if this is a CLI worker (best-effort)
         await _notify_linked_vtuber(session_id, result)
+
         return result
+    except asyncio.CancelledError:
+        # This execution was preempted by a higher-priority command
+        duration_ms = int((time.time() - holder["start_time"]) * 1000)
+        logger.info(
+            "Execution preempted for %s (is_trigger=%s, %dms)",
+            session_id, is_trigger, duration_ms,
+        )
+        return ExecutionResult(
+            success=False,
+            session_id=session_id,
+            error="Preempted by user message",
+            duration_ms=duration_ms,
+        )
     finally:
-        # Cleanup — holder is no longer needed for SSE streaming
-        cleanup_execution(session_id)
+        # Cleanup — only remove our own holder (exec_id guard prevents
+        # accidentally removing a newer execution's holder).
+        cleanup_execution(session_id, exec_id=exec_id)
+
+        # 7. Post-execution inbox drain (fire-and-forget, best-effort)
+        #    Only for non-trigger, non-drain executions to avoid recursion.
+        if not is_trigger and session_id not in _draining_sessions:
+            asyncio.create_task(_drain_inbox(session_id))
+
+
+# ============================================================================
+# Post-execution inbox drain
+# ============================================================================
+
+async def _drain_inbox(session_id: str) -> None:
+    """
+    After an execution completes, check for unread inbox messages
+    (e.g. CLI_RESULT that arrived while VTuber was busy, or queued
+    user messages) and process them.
+
+    Uses ``_draining_sessions`` to prevent infinite recursion:
+    drain → execute_command → drain → ...
+
+    NOT marked as ``is_trigger`` so it cannot be preempted mid-flight
+    (inbox messages must not be lost).
+    """
+    try:
+        from service.chat.inbox import get_inbox_manager
+        inbox = get_inbox_manager()
+
+        unread = inbox.read(session_id, unread_only=True)
+        if not unread:
+            return
+
+        # Build combined prompt from all unread messages
+        msg_ids = [m["id"] for m in unread]
+        parts = []
+        for m in unread:
+            sender = m.get("sender_name") or "Unknown"
+            parts.append(f"[INBOX from {sender}]\n{m['content']}")
+        combined = "\n\n---\n\n".join(parts)
+
+        logger.info(
+            "Draining inbox for %s: %d unread messages",
+            session_id, len(unread),
+        )
+
+        # Guard against recursion
+        _draining_sessions.add(session_id)
+        try:
+            result = await execute_command(session_id, combined)
+            # Mark read AFTER successful processing to prevent data loss
+            inbox.mark_read(session_id, msg_ids)
+            # Save result to chat room so user can see it
+            if result.success and result.output and result.output.strip():
+                _save_drain_to_chat_room(session_id, result)
+        finally:
+            _draining_sessions.discard(session_id)
+
+    except AlreadyExecutingError:
+        pass  # Another execution started — inbox will drain after it completes
+    except Exception:
+        logger.debug("Inbox drain failed for %s", session_id, exc_info=True)
+
+
+def _save_drain_to_chat_room(session_id: str, result: 'ExecutionResult') -> None:
+    """
+    Save an inbox-drain execution result to the session's chat room.
+    Similar to ThinkingTriggerService._save_to_chat_room but usable
+    from agent_executor without circular dependency.
+    """
+    try:
+        agent_manager = _get_agent_manager()
+        agent = agent_manager.get_agent(session_id)
+        if not agent:
+            return
+
+        chat_room_id = getattr(agent, '_chat_room_id', None)
+        if not chat_room_id:
+            return
+
+        from service.chat.conversation_store import get_chat_store
+        store = get_chat_store()
+
+        session_name = getattr(agent, '_session_name', None) or session_id
+        role_val = getattr(agent, '_role', None)
+        role = role_val.value if hasattr(role_val, 'value') else str(role_val or 'worker')
+
+        store.add_message(chat_room_id, {
+            "type": "agent",
+            "content": result.output.strip(),
+            "session_id": session_id,
+            "session_name": session_name,
+            "role": role,
+            "duration_ms": result.duration_ms,
+            "cost_usd": result.cost_usd,
+        })
+
+        # Notify SSE listeners
+        try:
+            from controller.chat_controller import _notify_room
+            _notify_room(chat_room_id)
+        except Exception:
+            pass
+
+        logger.info(
+            "Inbox drain result saved to chat room %s (len=%d)",
+            chat_room_id, len(result.output),
+        )
+    except Exception:
+        logger.debug("Failed to save drain result to chat room", exc_info=True)
 
 
 # ============================================================================
@@ -582,20 +797,40 @@ async def start_command_background(
     # 1. Resolve & revive
     agent = await _resolve_agent(session_id)
 
-    # 2. Double-execution guard
+    # 1b. Record activity for VTuber thinking trigger
+    if getattr(agent, '_session_type', None) == 'vtuber':
+        try:
+            from service.vtuber.thinking_trigger import get_thinking_trigger_service
+            get_thinking_trigger_service().record_activity(session_id)
+        except Exception:
+            pass
+
+    # 2. Double-execution guard — with trigger preemption
     if is_executing(session_id):
-        raise AlreadyExecutingError(
-            f"Execution already in progress for session {session_id}"
-        )
+        if is_trigger_executing(session_id):
+            aborted = await abort_trigger_execution(session_id)
+            if not aborted:
+                raise AlreadyExecutingError(
+                    f"Execution already in progress for session {session_id}"
+                )
+            await asyncio.sleep(0)
+        else:
+            raise AlreadyExecutingError(
+                f"Execution already in progress for session {session_id}"
+            )
 
     # 3. Register
     session_logger = _get_session_logger(session_id, create_if_missing=True)
+    exec_id = uuid.uuid4().hex
     holder: dict = {
         "done": False,
         "result": None,
         "error": None,
         "start_time": time.time(),
         "cache_cursor": session_logger.get_cache_length() if session_logger else 0,
+        "is_trigger": False,
+        "task": None,
+        "exec_id": exec_id,
     }
     _active_executions[session_id] = holder
 
@@ -610,15 +845,21 @@ async def start_command_background(
             )
             # Emit avatar state (best-effort)
             await _emit_avatar_state(session_id, result)
+            # Notify linked VTuber if this is a CLI worker (best-effort)
+            await _notify_linked_vtuber(session_id, result)
         finally:
             # Schedule deferred cleanup: keep the holder alive for a grace
             # period so a reconnecting frontend can pick up the final result,
             # then remove it to prevent memory leaks.
             async def _deferred_cleanup():
                 await asyncio.sleep(300)  # 5 minutes
-                cleanup_execution(session_id)
+                cleanup_execution(session_id, exec_id=exec_id)
 
             asyncio.create_task(_deferred_cleanup())
+
+            # Post-execution inbox drain
+            if session_id not in _draining_sessions:
+                asyncio.create_task(_drain_inbox(session_id))
 
     asyncio.create_task(_run())
     return holder

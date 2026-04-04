@@ -545,6 +545,8 @@ class ThinkingTriggerService:
                 await asyncio.sleep(30)
                 now = time.time()
 
+                # Fire triggers concurrently — each VTuber is independent
+                trigger_tasks = []
                 for sid, last in list(self._activity.items()):
                     # Skip disabled sessions
                     if sid in self._disabled_sessions:
@@ -555,10 +557,21 @@ class ThinkingTriggerService:
                     if idle < threshold:
                         continue
 
-                    # Fire a thinking trigger
-                    await self._fire_trigger(sid)
+                    trigger_tasks.append((sid, self._fire_trigger(sid)))
                     # Reset to avoid immediate re-fire
                     self._activity[sid] = now
+
+                # Await all triggers concurrently
+                if trigger_tasks:
+                    results = await asyncio.gather(
+                        *[coro for _, coro in trigger_tasks],
+                        return_exceptions=True,
+                    )
+                    for (sid, _), result in zip(trigger_tasks, results):
+                        if isinstance(result, Exception):
+                            logger.debug(
+                                "Trigger failed for %s: %s", sid, result
+                            )
 
             except asyncio.CancelledError:
                 break
@@ -585,7 +598,16 @@ class ThinkingTriggerService:
             # Extract category for logging (prompt always starts with [THINKING_TRIGGER])
             prompt_preview = prompt[20:60].strip().replace("\n", " ")
 
-            result = await execute_command(session_id, prompt)
+            # Activity triggers delegate to CLI  — allow more time (10 min).
+            # Thinking triggers are short reflections — 3 min is plenty.
+            is_activity = prompt.startswith("[ACTIVITY_TRIGGER]")
+            trigger_timeout = 600.0 if is_activity else 180.0
+
+            result = await execute_command(
+                session_id, prompt,
+                is_trigger=True,
+                timeout=trigger_timeout,
+            )
 
             # Increment consecutive count (drives adaptive backoff)
             self._consecutive_triggers[session_id] = (

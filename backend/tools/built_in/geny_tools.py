@@ -115,6 +115,15 @@ def _trigger_dm_response(
                 prompt=prompt,
             )
 
+            # Mark inbox message read — execution already handled the
+            # content.  Without this, _drain_inbox would find the same
+            # unread message and execute it a second time.
+            try:
+                from service.chat.inbox import get_inbox_manager
+                get_inbox_manager().mark_read(target_session_id, [message_id])
+            except Exception:
+                pass
+
             if result.success and result.output and result.output.strip():
                 logger.info(
                     "DM auto-response from %s completed (%dms): %s",
@@ -129,6 +138,8 @@ def _trigger_dm_response(
                 )
 
         except AlreadyExecutingError:
+            # Message stays unread in inbox — _drain_inbox will process
+            # it when the current execution completes.
             logger.info(
                 "DM trigger skipped — session %s is already executing. "
                 "Message %s will stay in inbox for later.",

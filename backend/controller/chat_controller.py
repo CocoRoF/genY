@@ -25,6 +25,8 @@ from service.chat.conversation_store import get_chat_store
 from service.langgraph import get_agent_session_manager
 from service.execution.agent_executor import (
     execute_command,
+    is_executing,
+    get_execution_holder,
     AlreadyExecutingError,
     AgentNotFoundError,
     AgentNotAliveError,
@@ -47,7 +49,7 @@ class AgentExecutionState:
     session_id: str
     session_name: str
     role: str
-    status: str = "pending"  # pending | executing | completed | failed
+    status: str = "pending"  # pending | executing | completed | failed | queued
     thinking_preview: Optional[str] = None  # Latest log message (1 line)
     started_at: Optional[float] = None
     last_activity_at: Optional[float] = None  # monotonic timestamp of last log entry
@@ -208,6 +210,7 @@ class MessageResponse(BaseModel):
     duration_ms: Optional[int] = None
     cost_usd: Optional[float] = None
     file_changes: Optional[List[Dict[str, Any]]] = None
+    meta: Optional[Dict[str, Any]] = None
 
 
 class MessageListResponse(BaseModel):
@@ -535,12 +538,38 @@ async def _run_broadcast(
                     agent_state.status = "completed"
 
         except AlreadyExecutingError:
-            store.add_message(room_id, {
-                "type": "system",
-                "content": f"{sname}: Currently busy with another execution",
-            })
-            if agent_state:
-                agent_state.status = "failed"
+            # Agent is busy with a real (non-trigger) execution.
+            # Triggers are auto-preempted by execute_command, so if we
+            # reach here the agent is handling real work.  Queue the
+            # user message in the inbox — it will be processed
+            # automatically after the current execution finishes
+            # (via post-execution inbox drain).
+            try:
+                from service.chat.inbox import get_inbox_manager
+                inbox = get_inbox_manager()
+                inbox.deliver(
+                    target_session_id=session_id,
+                    content=f"[USER_MESSAGE from chat room {room_id}]\n{message}",
+                    sender_name="User",
+                )
+                store.add_message(room_id, {
+                    "type": "system",
+                    "content": f"{sname}: 현재 작업 완료 후 처리합니다…",
+                    "meta": {"busy_reason": "executing", "queued": True},
+                })
+                if agent_state:
+                    agent_state.status = "queued"
+            except Exception as inbox_err:
+                logger.warning(
+                    "Failed to queue user message in inbox for %s: %s",
+                    session_id, inbox_err,
+                )
+                store.add_message(room_id, {
+                    "type": "system",
+                    "content": f"{sname}: Currently busy with another execution",
+                })
+                if agent_state:
+                    agent_state.status = "failed"
             _notify_room(room_id)
 
         except AgentNotFoundError:

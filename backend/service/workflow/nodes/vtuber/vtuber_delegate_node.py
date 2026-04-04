@@ -271,9 +271,16 @@ class VTuberDelegateNode(BaseNode):
                 )
                 try:
                     await execute_command(target_session_id, prompt)
+                    # Mark inbox message read — execution already processed
+                    # the content.  Prevents _drain_inbox from re-executing
+                    # the same delegation task.
+                    try:
+                        inbox.mark_read(target_session_id, [message_id])
+                    except Exception:
+                        pass
                 except AlreadyExecutingError:
-                    # CLI is busy — message is already in inbox, will be
-                    # picked up when the current execution finishes
+                    # CLI is busy — message stays unread in inbox and will
+                    # be picked up by _drain_inbox when current work ends.
                     logger.info(
                         f"CLI {target_session_id} busy — DM stored in inbox"
                     )
