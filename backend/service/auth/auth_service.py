@@ -101,7 +101,13 @@ class AuthService:
         """Find admin user by username."""
         try:
             users = self.app_db.find_by_condition(AdminUserModel, {"username": username})
-            return users[0] if users else None
+            if not users:
+                return None
+            user = users[0]
+            # find_by_condition returns model objects, convert to dict
+            if hasattr(user, 'to_dict'):
+                return user.to_dict()
+            return dict(user) if not isinstance(user, dict) else user
         except Exception as e:
             logger.error(f"Failed to find user: {e}")
             return None
