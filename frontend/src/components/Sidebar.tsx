@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { useAuthStore } from '@/store/useAuthStore';
 import { twMerge } from 'tailwind-merge';
 import { useI18n } from '@/lib/i18n';
 import type { SessionInfo } from '@/types';
@@ -90,7 +91,11 @@ function SidebarContent({ onSessionSelect }: { onSessionSelect?: () => void }) {
     toggleSidebar, deletedSectionOpen, toggleDeletedSection,
     permanentDeleteSession, restoreSession, mobileSidebarOpen, setMobileSidebarOpen,
   } = useAppStore();
+  const { isAuthenticated, hasUsers } = useAuthStore();
   const { t } = useI18n();
+
+  // Can modify sessions only if auth is not set up OR user is authenticated
+  const canModify = !hasUsers || isAuthenticated;
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<SessionInfo | null>(null);
@@ -127,12 +132,14 @@ function SidebarContent({ onSessionSelect }: { onSessionSelect?: () => void }) {
           {t('sidebar.sessions')}
         </h2>
         <div className="flex items-center gap-1.5">
-          <button
-            className="py-1.5 px-3 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={() => setShowCreateModal(true)}
-          >
-            {t('sidebar.newSession')}
-          </button>
+          {canModify && (
+            <button
+              className="py-1.5 px-3 bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white text-[0.75rem] font-medium rounded-[var(--border-radius)] cursor-pointer transition-all duration-150 border-none disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setShowCreateModal(true)}
+            >
+              {t('sidebar.newSession')}
+            </button>
+          )}
           {/* Desktop: collapse button, Mobile: close button */}
           <button
             className="hidden md:flex items-center justify-center w-8 h-8 rounded-[var(--border-radius)] bg-transparent border-none text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer transition-colors duration-150"
@@ -194,21 +201,23 @@ function SidebarContent({ onSessionSelect }: { onSessionSelect?: () => void }) {
                 cliSession={cliByVtuber.get(session.session_id)}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 md:group-hover:opacity-100 max-md:opacity-100 transition-opacity duration-150">
-                <button
-                  className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:text-[var(--danger-color)] cursor-pointer transition-colors duration-150"
-                  onClick={(e) => handleDeleteClick(e, session)}
-                  title={t('sidebar.deleteSession')}
-                >
-                  <Trash2 size={14} />
-                </button>
+                {canModify && (
+                  <button
+                    className="flex items-center justify-center w-7 h-7 rounded bg-transparent border-none text-[var(--text-muted)] hover:text-[var(--danger-color)] cursor-pointer transition-colors duration-150"
+                    onClick={(e) => handleDeleteClick(e, session)}
+                    title={t('sidebar.deleteSession')}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Deleted Sessions */}
-      {deletedSessions.length > 0 && (() => {
+      {/* Deleted Sessions — only visible when authenticated */}
+      {canModify && deletedSessions.length > 0 && (() => {
         // Hide CLI sessions paired with VTuber (same filter as active sessions)
         const visibleDeleted = deletedSessions.filter(s => !(s.session_type === 'cli' && s.linked_session_id));
         if (visibleDeleted.length === 0) return null;
@@ -286,8 +295,10 @@ export default function Sidebar() {
   const {
     sessions, sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen,
   } = useAppStore();
+  const { isAuthenticated, hasUsers } = useAuthStore();
   const { t } = useI18n();
 
+  const canModify = !hasUsers || isAuthenticated;
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Filter out CLI sessions paired with VTuber for collapsed counter
@@ -321,13 +332,15 @@ export default function Sidebar() {
             >
               <PanelLeftOpen size={18} />
             </button>
-            <button
-              className="flex items-center justify-center w-9 h-9 rounded-[var(--border-radius)] bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white border-none cursor-pointer transition-colors duration-150"
-              onClick={() => setShowCreateModal(true)}
-              title={t('sidebar.newSession')}
-            >
-              <Plus size={16} />
-            </button>
+            {canModify && (
+              <button
+                className="flex items-center justify-center w-9 h-9 rounded-[var(--border-radius)] bg-[var(--primary-color)] hover:bg-[var(--primary-hover)] text-white border-none cursor-pointer transition-colors duration-150"
+                onClick={() => setShowCreateModal(true)}
+                title={t('sidebar.newSession')}
+              >
+                <Plus size={16} />
+              </button>
+            )}
             <span
               className="text-[0.6875rem] font-semibold text-[var(--text-muted)]"
               title={t('sidebar.total')}

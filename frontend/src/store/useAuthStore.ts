@@ -53,7 +53,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (username, password) => {
     const res = await authApi.login({ username, password });
-    setToken(res.token);
+    setToken(res.access_token);
     set({
       isAuthenticated: true,
       username: res.username,
@@ -63,7 +63,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setup: async (username, password, displayName) => {
     const res = await authApi.setup({ username, password, display_name: displayName });
-    setToken(res.token);
+    setToken(res.access_token);
     set({
       isAuthenticated: true,
       hasUsers: true,

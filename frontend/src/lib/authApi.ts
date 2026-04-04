@@ -12,7 +12,8 @@ export interface AuthStatus {
 }
 
 export interface AuthTokenResponse {
-  token: string;
+  access_token: string;
+  token_type: string;
   username: string;
   display_name: string;
 }
