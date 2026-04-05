@@ -14,6 +14,7 @@ import {
   PanelRight,
   PanelRightClose,
   Loader2,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 export default function StatusBar({ onRefresh }: { onRefresh: () => void }) {
@@ -46,6 +47,14 @@ export default function StatusBar({ onRefresh }: { onRefresh: () => void }) {
     : () => obsidian.setRightPanelOpen(!obsidian.rightPanelOpen);
   const showViewMode = isUserMode || !!obsidian.selectedSessionId;
 
+  // Session info for sessions mode
+  const selectedSession = !isUserMode && obsidian.selectedSessionId
+    ? obsidian.sessions.find(s => s.session_id === obsidian.selectedSessionId)
+    : null;
+  const sessionLabel = selectedSession
+    ? (selectedSession.session_name || selectedSession.session_id.slice(0, 8))
+    : null;
+
   // Without hub context (standalone session page), hide when no session
   if (!hub && !obsidian.selectedSessionId) return null;
 
@@ -74,6 +83,17 @@ export default function StatusBar({ onRefresh }: { onRefresh: () => void }) {
           <Brain size={12} />
           GenY Obsidian
         </span>
+        {/* Session indicator in sessions mode */}
+        {!isUserMode && sessionLabel && (
+          <button
+            className="obs-sb-item obs-sb-session-btn"
+            onClick={() => obsidian.setSelectedSessionId(null)}
+            title={t('opsidian.changeSession')}
+          >
+            <ArrowLeftRight size={11} />
+            {sessionLabel}
+          </button>
+        )}
         <span className="obs-sb-item">
           <FileText size={11} />
           {totalFiles} files

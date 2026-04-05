@@ -939,6 +939,7 @@ const en = {
     content: 'Content',
     contentPlaceholder: 'Write your note in Markdown…',
     create: 'Create',
+    changeSession: 'Change session',
   },
 };
 

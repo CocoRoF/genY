@@ -1347,6 +1347,27 @@ html.light .obsidian-root {
   color: var(--obs-purple-bright);
   font-weight: 600;
 }
+.obs-sb-session-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--obs-border-subtle);
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.08);
+  color: var(--obs-purple-bright);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.obs-sb-session-btn:hover {
+  background: rgba(139, 92, 246, 0.18);
+}
 .obs-sb-file {
   font-family: var(--obs-font-mono);
   font-size: 10px;

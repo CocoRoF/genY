@@ -940,6 +940,7 @@ const ko: Translations = {
     content: '내용',
     contentPlaceholder: '마크다운으로 노트를 작성하세요…',
     create: '만들기',
+    changeSession: '세션 변경',
   },
 };
 
