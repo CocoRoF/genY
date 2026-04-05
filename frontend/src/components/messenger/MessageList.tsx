@@ -53,7 +53,7 @@ function UserMessage({ msg }: { msg: ChatRoomMessage }) {
             {formatTime(msg.timestamp)}
           </span>
         </div>
-        <div className="text-[0.8125rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-words">
+        <div className="text-[0.8125rem] text-[var(--text-primary)] leading-relaxed whitespace-pre-wrap break-keep">
           {msg.content}
         </div>
       </div>

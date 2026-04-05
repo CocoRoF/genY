@@ -65,7 +65,7 @@ function VTuberProgressPanel({ agents }: { agents: AgentProgressState[] }) {
     <div className="space-y-1">
       {active.map(agent => (
         <div key={agent.session_id} className="flex justify-start">
-          <div className="max-w-[80%] px-3 py-1.5 rounded-2xl rounded-bl-md bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
+          <div className="max-w-[85%] px-3 py-1.5 rounded-2xl rounded-bl-md bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
             <div className="flex items-center gap-1.5">
               <AgentBadge role={agent.role} />
               <span className="text-[0.75rem] text-[var(--text-muted)]">{agent.session_name}</span>
@@ -347,7 +347,9 @@ export default function VTuberChatPanel({
                     [{emotion}]
                   </span>
                 )}
-                {isUser ? text : (
+                {isUser ? (
+                  <span>{text}</span>
+                ) : (
                   <ChatMarkdown content={text} className="text-[0.875rem]" />
                 )}
                 {/* File changes */}

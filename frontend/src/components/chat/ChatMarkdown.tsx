@@ -143,7 +143,7 @@ export interface ChatMarkdownProps {
 
 function ChatMarkdownInner({ content, className }: ChatMarkdownProps) {
   return (
-    <div className={`chat-markdown text-[0.8125rem] text-[var(--text-primary)] leading-relaxed break-words ${className || ''}`}>
+    <div className={`chat-markdown text-[0.8125rem] text-[var(--text-primary)] leading-relaxed break-keep ${className || ''}`}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
         {content}
       </ReactMarkdown>
