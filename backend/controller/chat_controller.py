@@ -56,8 +56,6 @@ class AgentExecutionState:
     last_tool_name: Optional[str] = None  # tool name if last log was TOOL level
     recent_logs: List[Dict[str, Any]] = field(default_factory=list)  # ringbuffer of recent log entries
     log_cursor: int = 0  # total log entries seen (for client-side dedup)
-    recent_logs: List[Dict[str, Any]] = field(default_factory=list)  # ringbuffer of recent log entries
-    log_cursor: int = 0  # total log entries seen (for client-side dedup)
 
 
 @dataclass
@@ -75,9 +73,9 @@ class BroadcastState:
     agent_states: Dict[str, AgentExecutionState] = field(default_factory=dict)
 
 
-# room_id → BroadcastState for the currently active broadcast
+# room_id -> BroadcastState for the currently active broadcast
 _active_broadcasts: Dict[str, BroadcastState] = {}
-# room_id → asyncio.Event signalling "new message was saved"
+# room_id -> asyncio.Event signalling "new message was saved"
 _room_new_msg_events: Dict[str, asyncio.Event] = {}
 
 
@@ -94,38 +92,38 @@ def _extract_thinking_preview(entry) -> Optional[str]:
     if level in ("COMMAND", "RESPONSE"):
         return None
 
-    # GRAPH events — show node execution
+    # GRAPH events -- show node execution
     if level == "GRAPH":
         event_type = meta.get("event_type", "")
         node = meta.get("node_name", "")
         if event_type == "node_enter" and node:
-            return f"→ {node}"
+            return f"\u2192 {node}"
         if event_type == "node_exit" and node:
             preview = meta.get("output_preview", "")[:60]
             if preview:
-                return f"✓ {node}: {preview}"
-            return f"✓ {node}"
+                return f"\u2713 {node}: {preview}"
+            return f"\u2713 {node}"
         if event_type == "edge_decision":
             decision = meta.get("decision", "")
-            return f"⋯ {decision}" if decision else None
+            return f"\u22ef {decision}" if decision else None
         return None
 
-    # TOOL events — show tool invocation
+    # TOOL events -- show tool invocation
     if level == "TOOL":
         tool_name = meta.get("tool_name", "")
         if tool_name:
-            return f"🔧 {tool_name}"
+            return f"\U0001f527 {tool_name}"
         return None
 
-    # TOOL_RES — show brief result
+    # TOOL_RES -- show brief result
     if level == "TOOL_RES":
         tool_name = meta.get("tool_name", "")
         preview = meta.get("preview", "")[:50]
         if tool_name and preview:
-            return f"🔧 {tool_name}: {preview}"
+            return f"\U0001f527 {tool_name}: {preview}"
         return None
 
-    # INFO/DEBUG — use message directly (truncated)
+    # INFO/DEBUG -- use message directly (truncated)
     if level in ("INFO", "DEBUG"):
         msg = entry.message[:80] if entry.message else None
         return msg
@@ -156,11 +154,8 @@ def _build_agent_progress_data(astate: AgentExecutionState) -> dict:
     if astate.last_activity_at:
         data["last_activity_ms"] = int((now_mono - astate.last_activity_at) * 1000)
     elif astate.started_at:
-        # No log entries yet — use full elapsed as last_activity_ms
+        # No log entries yet -- use full elapsed as last_activity_ms
         data["last_activity_ms"] = int((now - astate.started_at) * 1000)
-    if astate.recent_logs:
-        data["recent_logs"] = astate.recent_logs
-        data["log_cursor"] = astate.log_cursor
     if astate.last_tool_name:
         data["last_tool_name"] = astate.last_tool_name
     if astate.recent_logs:
@@ -180,7 +175,7 @@ def _get_room_event(room_id: str) -> asyncio.Event:
 # Request / Response Models
 # ============================================================================
 
-# ── Room models ──
+# -- Room models --
 
 class CreateRoomRequest(BaseModel):
     name: str = Field(..., description="Chat room display name")
@@ -206,7 +201,7 @@ class RoomListResponse(BaseModel):
     total: int
 
 
-# ── Message models ──
+# -- Message models --
 
 class MessageResponse(BaseModel):
     model_config = {"extra": "ignore"}  # ignore unexpected keys from storage
@@ -231,7 +226,7 @@ class MessageListResponse(BaseModel):
     has_more: bool = False
 
 
-# ── Broadcast models ──
+# -- Broadcast models --
 
 class RoomBroadcastRequest(BaseModel):
     message: str = Field(..., description="Chat message to send")
@@ -311,7 +306,7 @@ async def get_room_messages(
 
     Args:
         limit: Max messages to return. 0 = all (backwards compat).
-        before: Message ID cursor — return only messages older than this.
+        before: Message ID cursor -- return only messages older than this.
     """
     store = get_chat_store()
     room = store.get_room(room_id)
@@ -369,13 +364,13 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
     """
     Send a message to all sessions in a chat room.
 
-    Core philosophy: **a chat room is just multi-command.**
+    Core philosophy: a chat room is just multi-command.
     Each agent in the room receives the same message and executes it
-    through the exact same ``execute_command`` path used by the
-    command tab.  This guarantees identical session logging, cost
-    tracking, auto-revival, and double-execution prevention.
+    through the exact same execute_command path used by the command tab.
+    This guarantees identical session logging, cost tracking,
+    auto-revival, and double-execution prevention.
 
-    Processing is fire-and-forget — agent results are persisted in the
+    Processing is fire-and-forget. Agent results are persisted in the
     background regardless of whether any client is connected.  Clients
     subscribe to live updates via GET /rooms/{room_id}/events.
 
@@ -394,12 +389,12 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
         })
     except Exception as e:
         logger.error("Failed to save user message: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="메시지 저장에 실패했습니다")
+        raise HTTPException(status_code=500, detail="\uba54\uc2dc\uc9c0 \uc800\uc7a5\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4")
 
     _notify_room(room_id)
 
     # 2. Resolve target session IDs and display info
-    #    Auto-revival & execution are handled by execute_command — no need here.
+    #    Auto-revival & execution are handled by execute_command -- no need here.
     room_session_ids = list(room["session_ids"])
     if not room_session_ids:
         store.add_message(room_id, {
@@ -449,7 +444,7 @@ async def broadcast_to_room(room_id: str, request: RoomBroadcastRequest):
     _notify_room(room_id)
 
     logger.info(
-        "Room %s: broadcast %s → %d sessions: %s",
+        "Room %s: broadcast %s -> %d sessions: %s",
         room_id, broadcast_id, len(room_session_ids), request.message[:80],
     )
 
@@ -515,10 +510,10 @@ async def _run_broadcast(
     store,
 ):
     """
-    Background task — runs one command per agent and persists results.
+    Background task: runs one command per agent and persists results.
 
     This is the concrete expression of "chat room = multi-command".
-    Each agent goes through the **exact same** ``execute_command`` path
+    Each agent goes through the exact same execute_command path
     as the command tab, inheriting:
       - session logging  (log_command / log_response)
       - cost persistence (increment_cost)
@@ -538,7 +533,7 @@ async def _run_broadcast(
         # Get per-agent state tracker
         agent_state = state.agent_states.get(session_id)
 
-        # ── Cancellation guard ──
+        # Cancellation guard
         if state.cancelled:
             if agent_state:
                 agent_state.status = "cancelled"
@@ -553,8 +548,14 @@ async def _run_broadcast(
 
         # Start log-polling task to capture thinking preview
         log_poll_task: Optional[asyncio.Task] = None
-        session_logger = get_session_logger(session_id, create_i + recent_logs."""
-                _MAX_RECENT_LOGS = 20
+        session_logger = get_session_logger(session_id, create_if_missing=False)
+        pre_exec_cursor = session_logger.get_cache_length() if session_logger else 0
+
+        if session_logger and agent_state:
+            _MAX_RECENT_LOGS = 20
+
+            async def _poll_logs():
+                """Poll session logs and update thinking_preview + recent_logs."""
                 cache_cursor = session_logger.get_cache_length()  # Start from current position
                 try:
                     while True:
@@ -589,28 +590,6 @@ async def _run_broadcast(
                                 # Keep only last N entries
                                 if len(agent_state.recent_logs) > _MAX_RECENT_LOGS:
                                     agent_state.recent_logs = agent_state.recent_logs[-_MAX_RECENT_LOGS:]
-                                agent_state.log_cursor += 1tion detection
-                            level = entry.level.value if hasattr(entry.level, "value") else str(entry.level)
-                            meta = entry.metadata or {}
-                            if level in ("TOOL", "TOOL_RES"):
-                                agent_state.last_tool_name = meta.get("tool_name")
-                            elif level not in ("DEBUG", "INFO"):
-                                agent_state.last_tool_name = None
-                            # Accumulate recent logs for client-side display
-                            if level not in ("DEBUG", "COMMAND", "RESPONSE"):
-                                log_entry = {
-                                    "level": level,
-                                    "message": (entry.message or "")[:120],
-                                    "ts": entry.timestamp if hasattr(entry, "timestamp") else None,
-                                }
-                                if meta.get("tool_name"):
-                                    log_entry["tool_name"] = meta["tool_name"]
-                                if meta.get("node_name"):
-                                    log_entry["node_name"] = meta["node_name"]
-                                agent_state.recent_logs.append(log_entry)
-                                # Keep only last N entries
-                                if len(agent_state.recent_logs) > _MAX_RECENT_LOGS:
-                                    agent_state.recent_logs = agent_state.recent_logs[-_MAX_RECENT_LOGS:]
                                 agent_state.log_cursor += 1
                 except asyncio.CancelledError:
                     pass
@@ -618,7 +597,7 @@ async def _run_broadcast(
             log_poll_task = asyncio.create_task(_poll_logs())
 
         try:
-            # ── THE core call — with broadcast context ──
+            # THE core call -- with broadcast context
             result = await execute_command(
                 session_id=session_id,
                 prompt=message,
@@ -646,7 +625,7 @@ async def _run_broadcast(
                     agent_state.status = "completed"
                 _notify_room(room_id)
             elif not result.success:
-                # Execution failed (timeout, error, etc.) — show in room
+                # Execution failed (timeout, error, etc.)
                 store.add_message(room_id, {
                     "type": "system",
                     "content": f"{sname}: {result.error or 'Unknown error'}",
@@ -663,9 +642,7 @@ async def _run_broadcast(
             # Agent is busy with a real (non-trigger) execution.
             # Triggers are auto-preempted by execute_command, so if we
             # reach here the agent is handling real work.  Queue the
-            # user message in the inbox — it will be processed
-            # automatically after the current execution finishes
-            # (via post-execution inbox drain).
+            # user message in the inbox.
             try:
                 from service.chat.inbox import get_inbox_manager
                 inbox = get_inbox_manager()
@@ -676,7 +653,7 @@ async def _run_broadcast(
                 )
                 store.add_message(room_id, {
                     "type": "system",
-                    "content": f"{sname}: 현재 작업 완료 후 처리합니다…",
+                    "content": f"{sname}: \ud604\uc7ac \uc791\uc5c5 \uc644\ub8cc \ud6c4 \ucc98\ub9ac\ud569\ub2c8\ub2e4\u2026",
                     "meta": {"busy_reason": "executing", "queued": True},
                 })
                 if agent_state:
@@ -699,7 +676,7 @@ async def _run_broadcast(
                     logger.error("DLQ fallback also failed for %s", session_id, exc_info=True)
                 store.add_message(room_id, {
                     "type": "system",
-                    "content": f"{sname}: 현재 다른 작업 중이며, 메시지 대기열 저장에 실패했습니다",
+                    "content": f"{sname}: \ud604\uc7ac \ub2e4\ub978 \uc791\uc5c5 \uc911\uc774\uba70, \uba54\uc2dc\uc9c0 \ub300\uae30\uc5f4 \uc800\uc7a5\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4",
                 })
                 if agent_state:
                     agent_state.status = "failed"
@@ -718,7 +695,7 @@ async def _run_broadcast(
             logger.warning("Agent not alive for session %s: %s", session_id, e)
             store.add_message(room_id, {
                 "type": "system",
-                "content": f"{sname}: 에이전트를 실행할 수 없습니다 (세션이 비활성 상태)",
+                "content": f"{sname}: \uc5d0\uc774\uc804\ud2b8\ub97c \uc2e4\ud589\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4 (\uc138\uc158\uc774 \ube44\ud65c\uc131 \uc0c1\ud0dc)",
             })
             if agent_state:
                 agent_state.status = "failed"
@@ -728,7 +705,7 @@ async def _run_broadcast(
             logger.error("Broadcast error for session %s: %s", session_id, e, exc_info=True)
             store.add_message(room_id, {
                 "type": "system",
-                "content": f"{sname}: 실행 중 오류가 발생했습니다",
+                "content": f"{sname}: \uc2e4\ud589 \uc911 \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4",
             })
             if agent_state:
                 agent_state.status = "failed"
@@ -744,7 +721,7 @@ async def _run_broadcast(
                 except asyncio.CancelledError:
                     pass
 
-    # Launch all concurrently — each is an independent command execution
+    # Launch all concurrently -- each is an independent command execution
     tasks = [asyncio.create_task(_invoke_one(sid)) for sid in session_ids]
     await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -783,16 +760,16 @@ async def _run_broadcast(
 @router.get("/rooms/{room_id}/events")
 async def room_event_stream(
     room_id: str,
-    after: Optional[str] = Query(None, description="Last seen message ID — only newer messages will be sent"),
+    after: Optional[str] = Query(None, description="Last seen message ID; only newer messages will be sent"),
 ):
     """
     SSE stream of new messages in a room.
 
-    - Reconnectable: pass `after=<last_msg_id>` to resume from where you left off.
-    - Sends `message` events for each new message (user, agent, system).
-    - Sends `broadcast_status` events with progress info.
-    - Sends `heartbeat` events every 5s to keep the connection alive.
-    - Sends `broadcast_done` when all agents have finished.
+    - Reconnectable: pass after=<last_msg_id> to resume from where you left off.
+    - Sends message events for each new message (user, agent, system).
+    - Sends broadcast_status events with progress info.
+    - Sends heartbeat events every 5 seconds to keep the connection alive.
+    - Sends broadcast_done when all agents have finished.
 
     The stream stays open until the client disconnects.
     """
@@ -808,7 +785,7 @@ async def room_event_stream(
         _chat_cfg = ChatConfig.get_default_instance()
         heartbeat_interval = float(_chat_cfg.sse_heartbeat_interval_s)
 
-        # On initial connect: send any messages newer than `after`
+        # On initial connect: send any messages newer than after
         if last_seen_id:
             missed = _get_messages_after(store, room_id, last_seen_id)
             for msg in missed:
@@ -858,7 +835,7 @@ async def room_event_stream(
             if last_seen_id is not None:
                 new_msgs = _get_messages_after(store, room_id, last_seen_id)
             else:
-                # No anchor yet (connected to empty room) — get all messages
+                # No anchor yet (connected to empty room)
                 new_msgs = store.get_messages(room_id)
             for msg in new_msgs:
                 yield _sse_event("message", msg)
@@ -894,7 +871,7 @@ async def room_event_stream(
                         "responded": bstate.responded,
                     })
             elif not new_msgs:
-                # No active broadcast, no new messages — just heartbeat
+                # No active broadcast, no new messages -- just heartbeat
                 yield _sse_event("heartbeat", {"ts": time.time()})
 
     return StreamingResponse(
@@ -912,7 +889,7 @@ def _get_messages_after(store, room_id: str, after_id: Optional[str]) -> List[di
     """Return messages in the room that come after the given message ID."""
     all_msgs = store.get_messages(room_id)
     if not after_id:
-        return []  # No reference point — return nothing (history was loaded separately)
+        return []  # No reference point
 
     # Find the index of after_id
     idx = -1
@@ -922,7 +899,7 @@ def _get_messages_after(store, room_id: str, after_id: Optional[str]) -> List[di
             break
 
     if idx == -1:
-        # after_id not found — return all messages (client may have stale reference)
+        # after_id not found -- return all messages (client may have stale reference)
         return all_msgs
 
     return all_msgs[idx + 1:]
