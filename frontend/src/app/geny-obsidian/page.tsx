@@ -1,11 +1,15 @@
 'use client';
 
-import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-const ObsidianView = dynamic(() => import('@/components/obsidian/ObsidianView'), {
-  ssr: false,
-  loading: () => (
+export default function GenyObsidianPage() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/opsidian');
+  }, [router]);
+
+  return (
     <div
       style={{
         width: '100vw',
@@ -18,15 +22,7 @@ const ObsidianView = dynamic(() => import('@/components/obsidian/ObsidianView'),
         fontSize: 14,
       }}
     >
-      Loading Obsidian View…
+      Redirecting…
     </div>
-  ),
-});
-
-export default function GenyObsidianPage() {
-  return (
-    <Suspense>
-      <ObsidianView />
-    </Suspense>
   );
 }

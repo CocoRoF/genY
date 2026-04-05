@@ -895,6 +895,9 @@ const en = {
   // ─── User Opsidian ───
   opsidian: {
     title: 'Opsidian',
+    home: 'Home',
+    userVault: 'User',
+    sessionsVault: 'Sessions',
     loginRequired: 'Login required to access your personal vault.',
     goHome: 'Go Home',
     editor: 'Editor',

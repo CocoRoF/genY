@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
 
-const UserOpsidianView = dynamic(() => import('@/components/user-opsidian/UserOpsidianView'), {
+const OpsidianHub = dynamic(() => import('@/components/OpsidianHub'), {
   ssr: false,
   loading: () => (
     <div
@@ -26,7 +26,7 @@ const UserOpsidianView = dynamic(() => import('@/components/user-opsidian/UserOp
 export default function OpsidianPage() {
   return (
     <Suspense>
-      <UserOpsidianView />
+      <OpsidianHub />
     </Suspense>
   );
 }

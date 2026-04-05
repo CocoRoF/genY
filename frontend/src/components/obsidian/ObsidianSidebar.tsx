@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useObsidianStore } from '@/store/useObsidianStore';
 import { memoryApi } from '@/lib/api';
 import {
@@ -63,7 +64,6 @@ export default function ObsidianSidebar() {
     setViewMode,
     openFile,
     setFileDetail,
-    setSelectedSessionId,
     setFiles,
     setMemoryIndex,
     setMemoryStats,
@@ -206,9 +206,9 @@ export default function ObsidianSidebar() {
     <div className="obs-sidebar">
       {/* Header */}
       <div className="obs-sb-header">
-        <button className="obs-sb-back" onClick={() => setSelectedSessionId(null)} title="Back to sessions">
+        <Link href="/" className="obs-sb-back" title="Home">
           <ArrowLeft size={14} />
-        </button>
+        </Link>
         <span className="obs-sb-brand">GenY Vault</span>
         <div className="obs-sb-header-actions">
           <button className="obs-sb-icon-btn" onClick={handleRefresh} title="Refresh">
