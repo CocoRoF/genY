@@ -37,7 +37,6 @@ import {
   Edit3,
   Eye,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 import '../obsidian/obsidian.css';
 
@@ -206,7 +205,6 @@ export default function CuratedKnowledgeView() {
     return (
       <div className="obsidian-root" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: 'var(--obs-text-muted)' }}>
-          <Sparkles size={48} strokeWidth={1.2} style={{ marginBottom: 16, color: 'var(--obs-purple)' }} />
           <h2 style={{ margin: '0 0 8px', color: 'var(--obs-text)', fontSize: 20 }}>{t('opsidian.curatedVault')}</h2>
           <p style={{ fontSize: 14 }}>{t('opsidian.loginRequired')}</p>
           <Link
@@ -393,7 +391,6 @@ function CuratedSidebar({
           <ArrowLeft size={14} />
         </Link>
         <span className="obs-sb-brand">
-          <Sparkles size={12} style={{ color: 'var(--obs-purple-bright)' }} />
           {t('opsidian.curatedVault')}
         </span>
         <div className="obs-sb-header-actions">
@@ -648,7 +645,6 @@ function CuratedNoteEditor({
         height: '100%', color: 'var(--obs-text-muted)', fontSize: 14,
         flexDirection: 'column', gap: 12,
       }}>
-        <Sparkles size={40} strokeWidth={1.2} style={{ color: 'var(--obs-purple)', opacity: 0.5 }} />
         <span>{t('opsidian.selectOrCreate')}</span>
       </div>
     );

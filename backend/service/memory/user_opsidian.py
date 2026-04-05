@@ -58,7 +58,7 @@ class UserOpsidianManager:
             from service.memory.index import MemoryIndexManager
 
             self._index = MemoryIndexManager(self.memory_dir)
-            self._index.load()
+            self._index.load_or_rebuild()
             self._writer = StructuredMemoryWriter(
                 self.memory_dir, self._index, session_id=f"user:{self.username}",
             )
