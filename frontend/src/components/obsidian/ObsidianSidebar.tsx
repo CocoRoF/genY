@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useObsidianStore } from '@/store/useObsidianStore';
+import { useI18n } from '@/lib/i18n';
 import { memoryApi } from '@/lib/api';
 import {
   FolderOpen,
@@ -70,6 +71,7 @@ export default function ObsidianSidebar() {
     setGraphData,
     setLoading,
   } = useObsidianStore();
+  const { t } = useI18n();
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(['daily', 'topics', 'entities', 'projects', 'insights', 'root'])
@@ -155,28 +157,28 @@ export default function ObsidianSidebar() {
   if (sidebarCollapsed) {
     return (
       <div className="obs-sidebar obs-sidebar-collapsed">
-        <button className="obs-sb-toggle" onClick={() => setSidebarCollapsed(false)} title="Expand sidebar">
+        <button className="obs-sb-toggle" onClick={() => setSidebarCollapsed(false)} title={t('opsidian.files')}>
           <PanelLeftOpen size={16} />
         </button>
         <div className="obs-sb-collapsed-icons">
           <button
             className={`obs-sb-icon-btn ${sidebarPanel === 'files' ? 'active' : ''}`}
             onClick={() => { setSidebarPanel('files'); setSidebarCollapsed(false); }}
-            title="Files"
+            title={t('opsidian.files')}
           >
             <FolderOpen size={16} />
           </button>
           <button
             className={`obs-sb-icon-btn ${sidebarPanel === 'tags' ? 'active' : ''}`}
             onClick={() => { setSidebarPanel('tags'); setSidebarCollapsed(false); }}
-            title="Tags"
+            title={t('opsidian.tags')}
           >
             <Tag size={16} />
           </button>
           <button
             className={`obs-sb-icon-btn ${sidebarPanel === 'backlinks' ? 'active' : ''}`}
             onClick={() => { setSidebarPanel('backlinks'); setSidebarCollapsed(false); }}
-            title="Backlinks"
+            title={t('opsidian.links')}
           >
             <Link2 size={16} />
           </button>
@@ -185,14 +187,14 @@ export default function ObsidianSidebar() {
           <button
             className={`obs-sb-icon-btn ${viewMode === 'graph' ? 'active' : ''}`}
             onClick={() => setViewMode(viewMode === 'graph' ? 'editor' : 'graph')}
-            title="Graph View"
+            title={t('opsidian.graph')}
           >
             <GitGraph size={16} />
           </button>
           <button
             className={`obs-sb-icon-btn ${viewMode === 'search' ? 'active' : ''}`}
             onClick={() => setViewMode(viewMode === 'search' ? 'editor' : 'search')}
-            title="Search"
+            title={t('opsidian.search')}
           >
             <Search size={16} />
           </button>
@@ -206,12 +208,12 @@ export default function ObsidianSidebar() {
     <div className="obs-sidebar">
       {/* Header */}
       <div className="obs-sb-header">
-        <Link href="/" className="obs-sb-back" title="Home">
+        <Link href="/" className="obs-sb-back" title={t('opsidian.goHome')}>
           <ArrowLeft size={14} />
         </Link>
-        <span className="obs-sb-brand">GenY Vault</span>
+        <span className="obs-sb-brand">{t('opsidian.title')}</span>
         <div className="obs-sb-header-actions">
-          <button className="obs-sb-icon-btn" onClick={handleRefresh} title="Refresh">
+          <button className="obs-sb-icon-btn" onClick={handleRefresh} title={t('opsidian.refresh')}>
             <RefreshCw size={13} />
           </button>
           <button className="obs-sb-toggle" onClick={() => setSidebarCollapsed(true)}>
@@ -223,10 +225,10 @@ export default function ObsidianSidebar() {
       {/* Panel switcher */}
       <div className="obs-sb-tabs">
         {([
-          ['files', FolderOpen, 'Files'],
-          ['tags', Tag, 'Tags'],
-          ['backlinks', Link2, 'Links'],
-        ] as const).map(([key, Icon, label]) => (
+          ['files', FolderOpen, t('opsidian.files')],
+          ['tags', Tag, t('opsidian.tags')],
+          ['backlinks', Link2, t('opsidian.links')],
+        ] as [string, typeof FolderOpen, string][]).map(([key, Icon, label]) => (
           <button
             key={key}
             className={`obs-sb-tab ${sidebarPanel === key ? 'active' : ''}`}
@@ -244,19 +246,19 @@ export default function ObsidianSidebar() {
           className={`obs-sb-view-btn ${viewMode === 'editor' ? 'active' : ''}`}
           onClick={() => setViewMode('editor')}
         >
-          <FileText size={13} /> Editor
+          <FileText size={13} /> {t('opsidian.editor')}
         </button>
         <button
           className={`obs-sb-view-btn ${viewMode === 'graph' ? 'active' : ''}`}
           onClick={() => setViewMode('graph')}
         >
-          <GitGraph size={13} /> Graph
+          <GitGraph size={13} /> {t('opsidian.graph')}
         </button>
         <button
           className={`obs-sb-view-btn ${viewMode === 'search' ? 'active' : ''}`}
           onClick={() => setViewMode('search')}
         >
-          <Search size={13} /> Search
+          <Search size={13} /> {t('opsidian.search')}
         </button>
       </div>
 
@@ -269,7 +271,7 @@ export default function ObsidianSidebar() {
               <Search size={12} className="obs-sb-filter-icon" />
               <input
                 type="text"
-                placeholder="Filter files…"
+                placeholder={t('opsidian.filterPlaceholder')}
                 value={filterText}
                 onChange={(e) => setFilterText(e.target.value)}
                 className="obs-sb-filter-input"
@@ -320,7 +322,7 @@ export default function ObsidianSidebar() {
         {sidebarPanel === 'tags' && (
           <div className="obs-sb-tags">
             {sortedTags.length === 0 ? (
-              <p className="obs-sb-muted">No tags found</p>
+              <p className="obs-sb-muted">{t('opsidian.noTags')}</p>
             ) : (
               sortedTags.map(([tag, fns]) => (
                 <button
@@ -343,9 +345,9 @@ export default function ObsidianSidebar() {
         {sidebarPanel === 'backlinks' && (
           <div className="obs-sb-backlinks">
             {!selectedFile ? (
-              <p className="obs-sb-muted">Select a file to see backlinks</p>
+              <p className="obs-sb-muted">{t('opsidian.selectNote')}</p>
             ) : backlinks.length === 0 ? (
-              <p className="obs-sb-muted">No backlinks for this file</p>
+              <p className="obs-sb-muted">{t('opsidian.selectNote')}</p>
             ) : (
               backlinks.map((fn) => {
                 const info = files[fn];
@@ -365,7 +367,7 @@ export default function ObsidianSidebar() {
             {/* Forward links */}
             {selectedFile && files[selectedFile]?.links_to?.length > 0 && (
               <>
-                <div className="obs-sb-section-title">Outgoing Links</div>
+                <div className="obs-sb-section-title">{t('opsidian.outlinksLabel')}</div>
                 {files[selectedFile].links_to.map((target) => {
                   const targetFile = Object.values(files).find(
                     (f) => f.filename.toLowerCase().includes(target.toLowerCase())

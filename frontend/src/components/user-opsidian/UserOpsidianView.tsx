@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { userOpsidianApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { useHubMode } from '@/components/OpsidianHubContext';
+import RightPanel from '../obsidian/RightPanel';
 import Link from 'next/link';
 import {
   Brain,
@@ -247,9 +248,7 @@ export default function UserOpsidianView() {
       </div>
 
       {/* Right panel */}
-      {rightPanelOpen && fileDetail && (
-        <RightInfoPanel fileDetail={fileDetail} files={files} onSelectFile={handleSelectFile} />
-      )}
+      {rightPanelOpen && <RightPanel />}
 
 
 
@@ -935,126 +934,6 @@ function SearchView({
     </div>
   );
 }
-
-// ─── Right Info Panel ─────────────────────────────────────────
-function RightInfoPanel({
-  fileDetail, files, onSelectFile,
-}: {
-  fileDetail: import('@/types').MemoryFileDetail;
-  files: Record<string, import('@/types').MemoryFileInfo>;
-  onSelectFile: (fn: string) => void;
-}) {
-  const { t } = useI18n();
-  const meta = fileDetail.metadata || {};
-  const info = files[fileDetail.filename];
-
-  return (
-    <div style={{
-      position: 'fixed', right: 0, top: 0, bottom: 24, width: 280,
-      background: 'var(--obs-bg-panel)', borderLeft: '1px solid var(--obs-border-subtle)',
-      overflowY: 'auto', padding: '16px 14px', fontSize: 12,
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--obs-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>
-        {t('opsidian.properties')}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div>
-          <span style={{ color: 'var(--obs-text-muted)' }}>{t('opsidian.category')}: </span>
-          <span style={{ color: CATEGORY_COLORS[String(meta.category)] || 'var(--obs-text)' }}>{String(meta.category || '-')}</span>
-        </div>
-        <div>
-          <span style={{ color: 'var(--obs-text-muted)' }}>{t('opsidian.importance')}: </span>
-          <span style={{ color: IMPORTANCE_STYLES[String(meta.importance)]?.color || 'var(--obs-text)' }}>
-            {IMPORTANCE_STYLES[String(meta.importance)]?.label || String(meta.importance || '-')}
-          </span>
-        </div>
-        {!!meta.created && (
-          <div>
-            <span style={{ color: 'var(--obs-text-muted)' }}>{t('opsidian.created')}: </span>
-            <span>{String(meta.created)}</span>
-          </div>
-        )}
-        {!!meta.modified && (
-          <div>
-            <span style={{ color: 'var(--obs-text-muted)' }}>{t('opsidian.modified')}: </span>
-            <span>{String(meta.modified)}</span>
-          </div>
-        )}
-        {!!meta.source && (
-          <div>
-            <span style={{ color: 'var(--obs-text-muted)' }}>{t('opsidian.source')}: </span>
-            <span>{String(meta.source)}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Tags */}
-      {Array.isArray(meta.tags) && meta.tags.length > 0 && (
-        <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--obs-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 20, marginBottom: 8 }}>
-            {t('opsidian.tags')}
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {meta.tags.map((tag) => (
-              <span key={String(tag)} style={{
-                padding: '2px 8px', borderRadius: 10, background: 'var(--obs-purple-dim)',
-                color: 'var(--obs-purple-bright)', fontSize: 11,
-              }}>
-                #{String(tag)}
-              </span>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Backlinks */}
-      {info && info.linked_from.length > 0 && (
-        <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--obs-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 20, marginBottom: 8 }}>
-            {t('opsidian.backlinksLabel')}
-          </div>
-          {info.linked_from.map((bl) => (
-            <button
-              key={bl}
-              onClick={() => onSelectFile(bl)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px',
-                fontSize: 12, background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--obs-purple-bright)', borderRadius: 4,
-              }}
-            >
-              ← {files[bl]?.title || bl}
-            </button>
-          ))}
-        </>
-      )}
-
-      {/* Outgoing links */}
-      {info && info.links_to.length > 0 && (
-        <>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--obs-text-dim)', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 20, marginBottom: 8 }}>
-            {t('opsidian.outlinksLabel')}
-          </div>
-          {info.links_to.map((ol) => (
-            <button
-              key={ol}
-              onClick={() => onSelectFile(ol)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '6px 8px',
-                fontSize: 12, background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--obs-purple-bright)', borderRadius: 4,
-              }}
-            >
-              → {files[ol]?.title || ol}
-            </button>
-          ))}
-        </>
-      )}
-    </div>
-  );
-}
-
-
 
 // ─── Create Note Modal ────────────────────────────────────────
 function CreateNoteModal({ onCreated }: { onCreated: () => void }) {

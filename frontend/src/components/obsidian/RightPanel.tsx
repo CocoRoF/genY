@@ -2,7 +2,10 @@
 
 import { useMemo } from 'react';
 import { useObsidianStore } from '@/store/useObsidianStore';
-import { memoryApi } from '@/lib/api';
+import { useUserOpsidianStore } from '@/store/useUserOpsidianStore';
+import { useHubMode } from '@/components/OpsidianHubContext';
+import { useI18n } from '@/lib/i18n';
+import { memoryApi, userOpsidianApi } from '@/lib/api';
 import {
   Tag,
   Link2,
@@ -21,22 +24,23 @@ const IMPORTANCE_COLORS: Record<string, string> = {
 };
 
 export default function RightPanel() {
-  const {
-    selectedFile,
-    fileDetail,
-    files,
-    memoryStats,
-    memoryIndex,
-    selectedSessionId,
-    openFile,
-    setFileDetail,
-    setViewMode,
-  } = useObsidianStore();
+  const hub = useHubMode();
+  const { t } = useI18n();
+  const isUserMode = hub?.mode === 'user';
+
+  const obsidian = useObsidianStore();
+  const userStore = useUserOpsidianStore();
+
+  // Pick data source based on mode
+  const selectedFile = isUserMode ? userStore.selectedFile : obsidian.selectedFile;
+  const fileDetail = isUserMode ? userStore.fileDetail : obsidian.fileDetail;
+  const files = isUserMode ? userStore.files : obsidian.files;
+  const memoryStats = isUserMode ? null : obsidian.memoryStats;
+  const memoryIndex = isUserMode ? userStore.memoryIndex : obsidian.memoryIndex;
+  const userStats = isUserMode ? userStore.stats : null;
 
   const fileInfo = selectedFile ? files[selectedFile] : null;
-  // metadata accessed via fileInfo
 
-  // Build outline from body headings
   const fileBody = fileDetail?.body ?? '';
   const headings = useMemo(() => {
     if (!fileBody) return [];
@@ -52,46 +56,55 @@ export default function RightPanel() {
   }, [fileBody]);
 
   const handleFileNavigate = async (filename: string) => {
-    openFile(filename);
-    if (selectedSessionId) {
+    if (isUserMode) {
+      userStore.openFile(filename);
       try {
-        const detail = await memoryApi.readFile(selectedSessionId, filename);
-        setFileDetail(detail);
-        setViewMode('editor');
+        const detail = await userOpsidianApi.readFile(filename);
+        userStore.setFileDetail(detail);
+        userStore.setViewMode('editor');
       } catch (e) {
         console.error(e);
+      }
+    } else {
+      obsidian.openFile(filename);
+      if (obsidian.selectedSessionId) {
+        try {
+          const detail = await memoryApi.readFile(obsidian.selectedSessionId, filename);
+          obsidian.setFileDetail(detail);
+          obsidian.setViewMode('editor');
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
   };
 
-  // Stats overview when no file is selected
+  // Stats for vault overview
   const stats = memoryStats;
-  const categories = stats?.categories || {};
+  const categories = stats?.categories || userStats?.categories || {};
 
   return (
     <div className="obs-rpanel">
-      {/* When file is selected: show metadata */}
       {fileInfo ? (
         <>
-          {/* Properties section */}
           <div className="obs-rp-section">
             <div className="obs-rp-section-title">
-              <BoxSelect size={12} /> Properties
+              <BoxSelect size={12} /> {t('opsidian.properties')}
             </div>
             <div className="obs-rp-props">
               <div className="obs-rp-prop">
-                <span className="obs-rp-prop-key">Category</span>
+                <span className="obs-rp-prop-key">{t('opsidian.category')}</span>
                 <span className="obs-rp-prop-val obs-rp-capitalize">{fileInfo.category}</span>
               </div>
               <div className="obs-rp-prop">
-                <span className="obs-rp-prop-key">Importance</span>
+                <span className="obs-rp-prop-key">{t('opsidian.importance')}</span>
                 <span className="obs-rp-prop-val" style={{ color: IMPORTANCE_COLORS[fileInfo.importance] }}>
                   <AlertCircle size={10} />
                   {fileInfo.importance}
                 </span>
               </div>
               <div className="obs-rp-prop">
-                <span className="obs-rp-prop-key">Source</span>
+                <span className="obs-rp-prop-key">{t('opsidian.source')}</span>
                 <span className="obs-rp-prop-val">{fileInfo.source}</span>
               </div>
               <div className="obs-rp-prop">
@@ -99,13 +112,13 @@ export default function RightPanel() {
                 <span className="obs-rp-prop-val">{fileInfo.char_count.toLocaleString()} chars</span>
               </div>
               <div className="obs-rp-prop">
-                <span className="obs-rp-prop-key">Created</span>
+                <span className="obs-rp-prop-key">{t('opsidian.created')}</span>
                 <span className="obs-rp-prop-val">
                   {fileInfo.created ? new Date(fileInfo.created).toLocaleString('ko-KR') : '—'}
                 </span>
               </div>
               <div className="obs-rp-prop">
-                <span className="obs-rp-prop-key">Modified</span>
+                <span className="obs-rp-prop-key">{t('opsidian.modified')}</span>
                 <span className="obs-rp-prop-val">
                   {fileInfo.modified ? new Date(fileInfo.modified).toLocaleString('ko-KR') : '—'}
                 </span>
@@ -113,11 +126,10 @@ export default function RightPanel() {
             </div>
           </div>
 
-          {/* Tags */}
           {fileInfo.tags.length > 0 && (
             <div className="obs-rp-section">
               <div className="obs-rp-section-title">
-                <Tag size={12} /> Tags
+                <Tag size={12} /> {t('opsidian.tags')}
               </div>
               <div className="obs-rp-tags">
                 {fileInfo.tags.map((tag) => (
@@ -127,11 +139,10 @@ export default function RightPanel() {
             </div>
           )}
 
-          {/* Outgoing links */}
           {fileInfo.links_to.length > 0 && (
             <div className="obs-rp-section">
               <div className="obs-rp-section-title">
-                <ChevronRight size={12} /> Outgoing Links ({fileInfo.links_to.length})
+                <ChevronRight size={12} /> {t('opsidian.outlinksLabel')} ({fileInfo.links_to.length})
               </div>
               <div className="obs-rp-links">
                 {fileInfo.links_to.map((target) => {
@@ -153,11 +164,10 @@ export default function RightPanel() {
             </div>
           )}
 
-          {/* Backlinks */}
           {fileInfo.linked_from.length > 0 && (
             <div className="obs-rp-section">
               <div className="obs-rp-section-title">
-                <Link2 size={12} /> Backlinks ({fileInfo.linked_from.length})
+                <Link2 size={12} /> {t('opsidian.backlinksLabel')} ({fileInfo.linked_from.length})
               </div>
               <div className="obs-rp-links">
                 {fileInfo.linked_from.map((fn) => {
@@ -177,7 +187,6 @@ export default function RightPanel() {
             </div>
           )}
 
-          {/* Outline */}
           {headings.length > 0 && (
             <div className="obs-rp-section">
               <div className="obs-rp-section-title">
@@ -198,7 +207,6 @@ export default function RightPanel() {
           )}
         </>
       ) : (
-        /* Vault stats when no file selected */
         <div className="obs-rp-section">
           <div className="obs-rp-section-title">
             <BoxSelect size={12} /> Vault Stats
@@ -206,23 +214,27 @@ export default function RightPanel() {
           <div className="obs-rp-props">
             <div className="obs-rp-prop">
               <span className="obs-rp-prop-key">Total Files</span>
-              <span className="obs-rp-prop-val">{stats?.total_files ?? 0}</span>
+              <span className="obs-rp-prop-val">{isUserMode ? (userStats?.total_files ?? 0) : (stats?.total_files ?? 0)}</span>
             </div>
             <div className="obs-rp-prop">
               <span className="obs-rp-prop-key">Total Characters</span>
-              <span className="obs-rp-prop-val">{(memoryIndex?.total_chars ?? 0).toLocaleString()}</span>
+              <span className="obs-rp-prop-val">{(isUserMode ? (userStats?.total_chars ?? 0) : (memoryIndex?.total_chars ?? 0)).toLocaleString()}</span>
             </div>
-            <div className="obs-rp-prop">
-              <span className="obs-rp-prop-key">LTM Entries</span>
-              <span className="obs-rp-prop-val">{stats?.long_term_entries ?? 0}</span>
-            </div>
-            <div className="obs-rp-prop">
-              <span className="obs-rp-prop-key">STM Entries</span>
-              <span className="obs-rp-prop-val">{stats?.short_term_entries ?? 0}</span>
-            </div>
+            {!isUserMode && (
+              <>
+                <div className="obs-rp-prop">
+                  <span className="obs-rp-prop-key">LTM Entries</span>
+                  <span className="obs-rp-prop-val">{stats?.long_term_entries ?? 0}</span>
+                </div>
+                <div className="obs-rp-prop">
+                  <span className="obs-rp-prop-key">STM Entries</span>
+                  <span className="obs-rp-prop-val">{stats?.short_term_entries ?? 0}</span>
+                </div>
+              </>
+            )}
             <div className="obs-rp-prop">
               <span className="obs-rp-prop-key">Total Tags</span>
-              <span className="obs-rp-prop-val">{stats?.total_tags ?? 0}</span>
+              <span className="obs-rp-prop-val">{isUserMode ? (userStats?.total_tags ?? 0) : (stats?.total_tags ?? 0)}</span>
             </div>
             <div className="obs-rp-prop">
               <span className="obs-rp-prop-key">Total Links</span>
@@ -238,7 +250,6 @@ export default function RightPanel() {
             )}
           </div>
 
-          {/* Categories breakdown */}
           {Object.keys(categories).length > 0 && (
             <div className="obs-rp-cats">
               <div className="obs-rp-section-title" style={{ marginTop: 16 }}>

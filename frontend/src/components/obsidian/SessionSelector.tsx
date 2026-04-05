@@ -13,6 +13,11 @@ export default function SessionSelector() {
 
   const activeSessions = sessions.filter((s) => !s.is_deleted);
 
+  // Hide CLI sessions that are bound to a VTuber session (they share memory)
+  const visibleSessions = activeSessions.filter(
+    (s) => !(s.session_type === 'cli' && s.linked_session_id),
+  );
+
   return (
     <div className="session-selector">
       <div className="session-selector-inner">
@@ -33,13 +38,13 @@ export default function SessionSelector() {
             <Loader2 size={20} className="spin" />
             <span>Loading sessions…</span>
           </div>
-        ) : activeSessions.length === 0 ? (
+        ) : visibleSessions.length === 0 ? (
           <div className="ss-empty">
             No active sessions found. Create one from the main dashboard.
           </div>
         ) : (
           <div className="ss-list">
-            {activeSessions.map((s) => (
+            {visibleSessions.map((s) => (
               <button
                 key={s.session_id}
                 className="ss-card"
