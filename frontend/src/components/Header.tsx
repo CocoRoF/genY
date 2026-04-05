@@ -7,7 +7,7 @@ import { useI18n } from '@/lib/i18n';
 import type { Locale } from '@/lib/i18n';
 import { useTheme } from '@/lib/theme';
 import { configApi } from '@/lib/api';
-import { Menu, Sun, Moon, Code2, User, BookOpen, Mic, AudioLines, LogIn, LogOut } from 'lucide-react';
+import { Menu, Sun, Moon, Code2, User, BookOpen, Mic, AudioLines, LogIn, LogOut, Brain } from 'lucide-react';
 import Link from 'next/link';
 import LoginModal from '@/components/auth/LoginModal';
 
@@ -136,6 +136,18 @@ export default function Header() {
             KOR
           </button>
         </div>
+
+        {/* ── Memory (User Opsidian) Button — requires auth ── */}
+        {isAuthenticated && (
+          <Link
+            href="/opsidian"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-[0.6875rem] font-medium rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] cursor-pointer transition-all duration-150 no-underline"
+            title={t('header.memory')}
+          >
+            <Brain size={13} />
+            <span className="hidden md:inline">{t('header.memory')}</span>
+          </Link>
+        )}
 
         {/* ── Login / Logout Button ── */}
         {hasUsers && (

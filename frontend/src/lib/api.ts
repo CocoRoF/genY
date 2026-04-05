@@ -947,6 +947,96 @@ export const vtuberApi = {
   },
 };
 
+// ==================== User Opsidian API ====================
+
+export const userOpsidianApi = {
+  /** GET /api/opsidian — index + stats */
+  getIndex: () =>
+    apiCall<import('@/types').MemoryIndexResponse & { username: string }>('/api/opsidian'),
+
+  /** GET /api/opsidian/stats */
+  getStats: () =>
+    apiCall<{ total_files: number; total_chars: number; categories: Record<string, number>; total_tags: number }>('/api/opsidian/stats'),
+
+  /** GET /api/opsidian/graph */
+  getGraph: () =>
+    apiCall<import('@/types').MemoryGraphResponse>('/api/opsidian/graph'),
+
+  /** GET /api/opsidian/tags */
+  getTags: () =>
+    apiCall<{ tags: Record<string, string[]> }>('/api/opsidian/tags'),
+
+  /** GET /api/opsidian/files */
+  listFiles: (params?: { category?: string; tag?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.tag) qs.set('tag', params.tag);
+    const q = qs.toString();
+    return apiCall<{ files: Array<Record<string, unknown>>; total: number }>(
+      `/api/opsidian/files${q ? `?${q}` : ''}`
+    );
+  },
+
+  /** GET /api/opsidian/files/{filename} */
+  readFile: (filename: string) =>
+    apiCall<import('@/types').MemoryFileDetail>(`/api/opsidian/files/${filename}`),
+
+  /** POST /api/opsidian/files */
+  createFile: (data: {
+    title: string;
+    content: string;
+    category?: string;
+    tags?: string[];
+    importance?: string;
+    source?: string;
+    links_to?: string[];
+  }) =>
+    apiCall<{ filename: string; message: string }>('/api/opsidian/files', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** PUT /api/opsidian/files/{filename} */
+  updateFile: (filename: string, data: {
+    content?: string;
+    tags?: string[];
+    importance?: string;
+  }) =>
+    apiCall<{ filename: string; message: string }>(
+      `/api/opsidian/files/${filename}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+
+  /** DELETE /api/opsidian/files/{filename} */
+  deleteFile: (filename: string) =>
+    apiCall<{ message: string }>(
+      `/api/opsidian/files/${filename}`,
+      { method: 'DELETE' },
+    ),
+
+  /** GET /api/opsidian/search?q=... */
+  search: (query: string, maxResults?: number) => {
+    const qs = new URLSearchParams({ q: query });
+    if (maxResults) qs.set('max_results', String(maxResults));
+    return apiCall<{ query: string; results: Array<Record<string, unknown>>; total: number }>(
+      `/api/opsidian/search?${qs.toString()}`
+    );
+  },
+
+  /** POST /api/opsidian/links */
+  createLink: (sourceFilename: string, targetFilename: string) =>
+    apiCall<{ message: string }>('/api/opsidian/links', {
+      method: 'POST',
+      body: JSON.stringify({ source_filename: sourceFilename, target_filename: targetFilename }),
+    }),
+
+  /** POST /api/opsidian/reindex */
+  reindex: () =>
+    apiCall<{ message: string; total_files: number }>('/api/opsidian/reindex', {
+      method: 'POST',
+    }),
+};
+
 // ==================== TTS API ====================
 
 export interface VoiceInfo {
