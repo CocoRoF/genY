@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useObsidianStore } from '@/store/useObsidianStore';
+import { useObsidianStore, type SidebarPanel } from '@/store/useObsidianStore';
 import { useI18n } from '@/lib/i18n';
 import { memoryApi } from '@/lib/api';
 import {
@@ -228,7 +228,7 @@ export default function ObsidianSidebar() {
           ['files', FolderOpen, t('opsidian.files')],
           ['tags', Tag, t('opsidian.tags')],
           ['backlinks', Link2, t('opsidian.links')],
-        ] as [string, typeof FolderOpen, string][]).map(([key, Icon, label]) => (
+        ] as [SidebarPanel, typeof FolderOpen, string][]).map(([key, Icon, label]) => (
           <button
             key={key}
             className={`obs-sb-tab ${sidebarPanel === key ? 'active' : ''}`}
