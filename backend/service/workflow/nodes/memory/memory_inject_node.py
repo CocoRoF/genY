@@ -415,6 +415,54 @@ class MemoryInjectNode(BaseNode):
                 except Exception:
                     pass
 
+            # 6. Curated Knowledge — quality-verified notes from user vault
+            remaining = budget - total_chars
+            if remaining > 200 and context.curated_knowledge_manager:
+                try:
+                    from service.config.sub_config.general.ltm_config import LTMConfig
+                    from service.config import get_config_manager
+
+                    ltm_cfg = get_config_manager().load_config(LTMConfig)
+                    if ltm_cfg and ltm_cfg.curated_knowledge_enabled:
+                        ck = context.curated_knowledge_manager
+                        ck_budget = min(
+                            remaining,
+                            ltm_cfg.curated_inject_budget,
+                        )
+                        ck_max = ltm_cfg.curated_max_results
+
+                        # 6a. Vector search if enabled
+                        ck_text = ""
+                        if ltm_cfg.curated_vector_enabled and ck.vector_enabled:
+                            ck_text = await ck.vector_inject_context(
+                                query, max_chars=ck_budget, top_k=ck_max,
+                            )
+
+                        # 6b. Keyword fallback
+                        if not ck_text:
+                            ck_text = ck.inject_context(
+                                query, max_chars=ck_budget,
+                            )
+
+                        if ck_text:
+                            parts.append(ck_text)
+                            total_chars += len(ck_text)
+                            refs.append({
+                                "filename": "curated_knowledge",
+                                "source": "curated_knowledge",
+                                "char_count": len(ck_text),
+                                "injected_at_turn": 0,
+                            })
+                            logger.info(
+                                f"[{context.session_id}] memory_inject: "
+                                f"injected {len(ck_text)} chars from curated knowledge"
+                            )
+                except Exception as ck_err:
+                    logger.debug(
+                        f"[{context.session_id}] memory_inject: "
+                        f"curated knowledge injection failed: {ck_err}"
+                    )
+
             # ── Assemble results ──────────────────────────────────────
             result: Dict[str, Any] = {}
             result.update(gate_cost)

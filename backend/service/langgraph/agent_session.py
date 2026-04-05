@@ -107,6 +107,7 @@ class AgentSession:
         workflow_id: Optional[str] = None,
         graph_name: Optional[str] = None,
         tool_preset_id: Optional[str] = None,
+        owner_username: Optional[str] = None,
     ):
         """Initialize AgentSession.
 
@@ -148,6 +149,7 @@ class AgentSession:
         self._workflow_id = workflow_id
         self._graph_name = graph_name
         self._tool_preset_id = tool_preset_id
+        self._owner_username = owner_username
         self._workflow: Optional[WorkflowDefinition] = None
 
         # Internal components
@@ -335,6 +337,10 @@ class AgentSession:
     @property
     def session_name(self) -> Optional[str]:
         return self._session_name
+
+    @property
+    def owner_username(self) -> Optional[str]:
+        return self._owner_username
 
     @property
     def status(self) -> SessionStatus:
@@ -893,7 +899,30 @@ class AgentSession:
             model_name=self._model_name,
             memory_model=memory_chat_model,
             memory_model_name=memory_model_name,
+            owner_username=self._owner_username,
         )
+
+        # Wire user-scoped knowledge managers if owner_username is set
+        if self._owner_username:
+            try:
+                from service.memory.curated_knowledge import get_curated_knowledge_manager
+                from service.memory.user_opsidian import get_user_opsidian_manager
+
+                context.curated_knowledge_manager = get_curated_knowledge_manager(
+                    self._owner_username
+                )
+                context.user_opsidian_manager = get_user_opsidian_manager(
+                    self._owner_username
+                )
+                logger.info(
+                    f"[{self._session_id}] Curated knowledge + user opsidian "
+                    f"managers wired for user '{self._owner_username}'"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"[{self._session_id}] Failed to wire user knowledge "
+                    f"managers: {e}"
+                )
 
         # Compile via WorkflowExecutor
         executor = WorkflowExecutor(self._workflow, context)

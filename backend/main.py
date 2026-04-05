@@ -26,6 +26,7 @@ from controller.vtuber_controller import router as vtuber_router
 from controller.tts_controller import router as tts_router
 from controller.auth_controller import router as auth_router
 from controller.user_opsidian_controller import router as user_opsidian_router
+from controller.curated_knowledge_controller import router as curated_knowledge_router
 from service.config import get_config_manager
 from service.mcp_loader import MCPLoader, get_global_mcp_config
 import uvicorn
@@ -453,6 +454,7 @@ app.include_router(global_memory_router)  # Global memory API
 app.include_router(vtuber_router)  # VTuber Live2D API
 app.include_router(tts_router)  # TTS (Text-to-Speech) API
 app.include_router(user_opsidian_router)  # User Opsidian (personal knowledge vault)
+app.include_router(curated_knowledge_router)  # Curated Knowledge (refined knowledge layer)
 
 # Mount static files for Web UI Dashboard
 static_dir = Path(__file__).parent / "static"

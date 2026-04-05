@@ -3,9 +3,10 @@
 import { useMemo } from 'react';
 import { useObsidianStore } from '@/store/useObsidianStore';
 import { useUserOpsidianStore } from '@/store/useUserOpsidianStore';
+import { useCuratedKnowledgeStore } from '@/store/useCuratedKnowledgeStore';
 import { useHubMode } from '@/components/OpsidianHubContext';
 import { useI18n } from '@/lib/i18n';
-import { memoryApi, userOpsidianApi } from '@/lib/api';
+import { memoryApi, userOpsidianApi, curatedKnowledgeApi } from '@/lib/api';
 import {
   Tag,
   Link2,
@@ -27,17 +28,27 @@ export default function RightPanel() {
   const hub = useHubMode();
   const { t } = useI18n();
   const isUserMode = hub?.mode === 'user';
+  const isCuratorMode = hub?.mode === 'curator';
 
   const obsidian = useObsidianStore();
   const userStore = useUserOpsidianStore();
+  const curatedStore = useCuratedKnowledgeStore();
 
   // Pick data source based on mode
-  const selectedFile = isUserMode ? userStore.selectedFile : obsidian.selectedFile;
-  const fileDetail = isUserMode ? userStore.fileDetail : obsidian.fileDetail;
-  const files = isUserMode ? userStore.files : obsidian.files;
-  const memoryStats = isUserMode ? null : obsidian.memoryStats;
-  const memoryIndex = isUserMode ? userStore.memoryIndex : obsidian.memoryIndex;
-  const userStats = isUserMode ? userStore.stats : null;
+  const selectedFile = isCuratorMode
+    ? curatedStore.selectedFile
+    : isUserMode ? userStore.selectedFile : obsidian.selectedFile;
+  const fileDetail = isCuratorMode
+    ? curatedStore.fileDetail
+    : isUserMode ? userStore.fileDetail : obsidian.fileDetail;
+  const files = isCuratorMode
+    ? curatedStore.files
+    : isUserMode ? userStore.files : obsidian.files;
+  const memoryStats = (isUserMode || isCuratorMode) ? null : obsidian.memoryStats;
+  const memoryIndex = isCuratorMode
+    ? curatedStore.memoryIndex
+    : isUserMode ? userStore.memoryIndex : obsidian.memoryIndex;
+  const userStats = isUserMode ? userStore.stats : isCuratorMode ? curatedStore.stats : null;
 
   const fileInfo = selectedFile ? files[selectedFile] : null;
 

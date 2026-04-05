@@ -29,6 +29,7 @@ from service.memory.structured_writer import StructuredMemoryWriter
 from service.memory.index import MemoryIndexManager
 from service.memory.types import MemoryEntry, MemorySearchResult, MemoryStats
 from service.memory.global_memory import GlobalMemoryManager, get_global_memory_manager
+from service.memory.curated_knowledge import CuratedKnowledgeManager, get_curated_knowledge_manager
 
 __all__ = [
     "SessionMemoryManager",
@@ -40,4 +41,6 @@ __all__ = [
     "MemoryEntry",
     "MemorySearchResult",
     "MemoryStats",
+    "CuratedKnowledgeManager",
+    "get_curated_knowledge_manager",
 ]

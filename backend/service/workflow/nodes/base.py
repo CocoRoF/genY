@@ -196,6 +196,11 @@ class ExecutionContext:
     memory_model: Any = None
     memory_model_name: Optional[str] = None
 
+    # User-scoped knowledge managers (Curated Knowledge integration)
+    curated_knowledge_manager: Any = None
+    user_opsidian_manager: Any = None
+    owner_username: Optional[str] = None
+
     async def resilient_invoke(
         self,
         messages: list,

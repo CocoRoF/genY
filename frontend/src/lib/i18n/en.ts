@@ -900,6 +900,7 @@ const en = {
     title: 'Opsidian',
     home: 'Home',
     userVault: 'User',
+    curatedVault: 'Curated',
     sessionsVault: 'Sessions',
     loginRequired: 'Login required to access your personal vault.',
     goHome: 'Go Home',

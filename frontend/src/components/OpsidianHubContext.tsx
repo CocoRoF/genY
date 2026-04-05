@@ -2,7 +2,7 @@
 
 import { createContext, useContext, type MutableRefObject } from 'react';
 
-export type HubMode = 'user' | 'sessions';
+export type HubMode = 'user' | 'sessions' | 'curator';
 
 interface HubContextValue {
   mode: HubMode;

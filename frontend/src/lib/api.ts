@@ -888,6 +888,131 @@ export const userOpsidianApi = {
     }),
 };
 
+// ==================== Curated Knowledge API ====================
+
+export const curatedKnowledgeApi = {
+  /** GET /api/curated — index + stats */
+  getIndex: () =>
+    apiCall<import('@/types').MemoryIndexResponse & { username: string }>('/api/curated'),
+
+  /** GET /api/curated/stats */
+  getStats: () =>
+    apiCall<{ total_files: number; total_chars: number; categories: Record<string, number>; total_tags: number; vector_enabled: boolean }>('/api/curated/stats'),
+
+  /** GET /api/curated/graph */
+  getGraph: () =>
+    apiCall<import('@/types').MemoryGraphResponse>('/api/curated/graph'),
+
+  /** GET /api/curated/tags */
+  getTags: () =>
+    apiCall<{ tags: Record<string, string[]> }>('/api/curated/tags'),
+
+  /** GET /api/curated/files */
+  listFiles: (params?: { category?: string; tag?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set('category', params.category);
+    if (params?.tag) qs.set('tag', params.tag);
+    const q = qs.toString();
+    return apiCall<{ files: Array<Record<string, unknown>>; total: number }>(
+      `/api/curated/files${q ? `?${q}` : ''}`
+    );
+  },
+
+  /** GET /api/curated/files/{filename} */
+  readFile: (filename: string) =>
+    apiCall<import('@/types').MemoryFileDetail>(`/api/curated/files/${filename}`),
+
+  /** POST /api/curated/files */
+  createFile: (data: {
+    title: string;
+    content: string;
+    category?: string;
+    tags?: string[];
+    importance?: string;
+    source?: string;
+    links_to?: string[];
+  }) =>
+    apiCall<{ filename: string; message: string }>('/api/curated/files', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** PUT /api/curated/files/{filename} */
+  updateFile: (filename: string, data: {
+    content?: string;
+    tags?: string[];
+    importance?: string;
+  }) =>
+    apiCall<{ filename: string; message: string }>(
+      `/api/curated/files/${filename}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+
+  /** DELETE /api/curated/files/{filename} */
+  deleteFile: (filename: string) =>
+    apiCall<{ message: string }>(
+      `/api/curated/files/${filename}`,
+      { method: 'DELETE' },
+    ),
+
+  /** GET /api/curated/search?q=... */
+  search: (query: string, maxResults?: number) => {
+    const qs = new URLSearchParams({ q: query });
+    if (maxResults) qs.set('max_results', String(maxResults));
+    return apiCall<{ query: string; results: Array<Record<string, unknown>>; total: number }>(
+      `/api/curated/search?${qs.toString()}`
+    );
+  },
+
+  /** POST /api/curated/links */
+  createLink: (sourceFilename: string, targetFilename: string) =>
+    apiCall<{ message: string }>('/api/curated/links', {
+      method: 'POST',
+      body: JSON.stringify({ source_filename: sourceFilename, target_filename: targetFilename }),
+    }),
+
+  /** POST /api/curated/reindex */
+  reindex: () =>
+    apiCall<{ message: string; total_files: number }>('/api/curated/reindex', {
+      method: 'POST',
+    }),
+
+  /** POST /api/curated/curate — run 5-stage curation pipeline */
+  curateNote: (data: {
+    source_filename: string;
+    method?: string;
+    extra_tags?: string[];
+    use_llm?: boolean;
+  }) =>
+    apiCall<{
+      success: boolean;
+      curated_filename?: string;
+      method_used?: string;
+      quality_score?: number;
+      reason?: string;
+    }>('/api/curated/curate', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** POST /api/curated/curate/batch — batch curation */
+  curateBatch: (data: { filenames: string[]; use_llm?: boolean }) =>
+    apiCall<{
+      total: number;
+      success_count: number;
+      results: Array<{
+        success: boolean;
+        curated_filename?: string;
+        method_used?: string;
+        quality_score?: number;
+        reason?: string;
+      }>;
+    }>('/api/curated/curate/batch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+};
+
 // ==================== TTS API ====================
 
 export interface VoiceInfo {

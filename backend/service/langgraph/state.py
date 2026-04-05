@@ -88,7 +88,7 @@ class MemoryRef(TypedDict, total=False):
     memory has already been injected (avoid double-loading).
     """
     filename: str
-    source: str            # "long_term" | "short_term" | "bootstrap"
+    source: str            # "long_term" | "short_term" | "bootstrap" | "vector" | "curated_knowledge"
     char_count: int
     injected_at_turn: int  # which iteration the chunk was first included
 

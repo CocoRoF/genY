@@ -138,9 +138,11 @@ async def create_agent_session(request: CreateAgentRequest, auth: dict = Depends
     provides LangGraph's state management capabilities.
     """
     try:
+        owner_username = auth.get("sub", "anonymous")
         agent = await agent_manager.create_agent_session(
             request=request,
             enable_checkpointing=request.enable_checkpointing,
+            owner_username=owner_username,
         )
 
         session_info = agent.get_session_info()

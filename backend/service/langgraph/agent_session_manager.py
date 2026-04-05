@@ -282,6 +282,7 @@ class AgentSessionManager(SessionManager):
         request: CreateSessionRequest,
         enable_checkpointing: bool = False,
         session_id: Optional[str] = None,
+        owner_username: Optional[str] = None,
     ) -> AgentSession:
         """
         Create a new AgentSession.
@@ -442,6 +443,7 @@ class AgentSessionManager(SessionManager):
             workflow_id=workflow_id,
             graph_name=graph_name,
             tool_preset_id=preset_id,
+            owner_username=owner_username,
         )
 
         session_id = agent.session_id

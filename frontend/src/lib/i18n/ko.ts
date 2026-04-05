@@ -901,6 +901,7 @@ const ko: Translations = {
     title: 'Opsidian',
     home: '홈',
     userVault: '사용자',
+    curatedVault: '큐레이션',
     sessionsVault: '세션',
     loginRequired: '개인 볼트에 접근하려면 로그인이 필요합니다.',
     goHome: '홈으로',

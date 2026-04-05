@@ -220,6 +220,43 @@ class MemoryReflectNode(BaseNode):
                 f"[{context.session_id}] memory_reflect: "
                 f"saved {saved}/{len(parsed.learned)} insights"
             )
+
+            # ── Auto-promote high-importance insights to curated knowledge ──
+            if saved > 0 and context.curated_knowledge_manager:
+                try:
+                    from service.config.sub_config.general.ltm_config import LTMConfig
+                    from service.config import get_config_manager
+
+                    ltm_cfg = get_config_manager().load_config(LTMConfig)
+                    if ltm_cfg and ltm_cfg.curated_knowledge_enabled and ltm_cfg.auto_curation_enabled:
+                        ck = context.curated_knowledge_manager
+                        promoted = 0
+                        for item in parsed.learned[:max_insights]:
+                            if item.importance in ("high", "critical"):
+                                try:
+                                    fn = ck.write_note(
+                                        title=item.title,
+                                        content=item.content,
+                                        category=item.category or "insights",
+                                        tags=(item.tags or []) + ["auto-promoted"],
+                                        importance=item.importance,
+                                        source="promoted",
+                                    )
+                                    if fn:
+                                        promoted += 1
+                                except Exception:
+                                    pass
+                        if promoted:
+                            logger.info(
+                                f"[{context.session_id}] memory_reflect: "
+                                f"auto-promoted {promoted} insights to curated knowledge"
+                            )
+                except Exception as ck_err:
+                    logger.debug(
+                        f"[{context.session_id}] memory_reflect: "
+                        f"auto-promotion failed: {ck_err}"
+                    )
+
             return cost_updates
 
         except Exception as e:
