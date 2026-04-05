@@ -7,7 +7,9 @@ import { useUserOpsidianStore } from '@/store/useUserOpsidianStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { userOpsidianApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
+import { useHubMode } from '@/components/OpsidianHubContext';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Brain,
   FolderOpen,
@@ -1068,6 +1070,8 @@ function StatusBar({
   onRefresh: () => void;
 }) {
   const { t } = useI18n();
+  const hub = useHubMode();
+  const router = useRouter();
 
   return (
     <div style={{
@@ -1077,6 +1081,27 @@ function StatusBar({
       fontSize: 11, color: 'var(--obs-text-muted)', zIndex: 30,
       transition: 'left 200ms ease',
     }}>
+      {/* Hub navigation */}
+      {hub && (
+        <div className="obs-hub-nav">
+          <button className="obs-hub-nav-btn" onClick={() => router.push('/')} title={t('opsidian.home')}>
+            {t('opsidian.home')}
+          </button>
+          <button
+            className={`obs-hub-nav-btn ${hub.mode === 'user' ? 'obs-hub-nav-active' : ''}`}
+            onClick={() => hub.setMode('user')}
+          >
+            {t('opsidian.userVault')}
+          </button>
+          <button
+            className={`obs-hub-nav-btn ${hub.mode === 'sessions' ? 'obs-hub-nav-active' : ''}`}
+            onClick={() => hub.setMode('sessions')}
+          >
+            {t('opsidian.sessionsVault')}
+          </button>
+          <span className="obs-hub-nav-sep" />
+        </div>
+      )}
       {loading && <Loader2 size={11} className="spin" style={{ color: 'var(--obs-purple)' }} />}
       <span>{stats?.total_files ?? 0} {t('opsidian.notes')}</span>
       <span>{stats?.total_tags ?? 0} {t('opsidian.tagsCount')}</span>

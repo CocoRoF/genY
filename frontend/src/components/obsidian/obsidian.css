@@ -1491,80 +1491,49 @@ html.light .obsidian-root {
 .opsidian-hub .session-selector {
   height: 100% !important;
 }
-
-/* ── Bottom Navigation Bar ──────────────────────────────────── */
-.opsidian-bottom-nav {
-  display: flex;
-  align-items: stretch;
-  height: 52px;
-  background: #111114;
-  border-top: 1px solid #2a2a32;
-  flex-shrink: 0;
+/* StatusBar inside Hub: un-fix it so it stays above the bottom nav */
+.opsidian-hub .obs-statusbar {
   position: relative;
-  z-index: 200;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  z-index: 10;
 }
-.obn-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+
+/* ── Hub Navigation inside StatusBar ────────────────────────── */
+.obs-hub-nav {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 2px;
+  margin-right: 4px;
+}
+.obs-hub-nav-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 3px;
+  padding: 2px 7px;
   background: none;
   border: none;
-  color: #6b6b76;
+  border-radius: 3px;
+  color: var(--obs-text-muted);
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 150ms ease, background 150ms ease;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0;
+  transition: all 120ms ease;
+  white-space: nowrap;
 }
-.obn-item:hover {
-  color: #a1a1aa;
-  background: rgba(255, 255, 255, 0.03);
+.obs-hub-nav-btn:hover {
+  background: var(--obs-bg-hover);
+  color: var(--obs-text-dim);
 }
-.obn-item.obn-active {
-  color: #a78bfa;
-  position: relative;
+.obs-hub-nav-btn.obs-hub-nav-active {
+  background: var(--obs-purple-dim);
+  color: var(--obs-purple-bright);
 }
-.obn-item.obn-active::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 20%;
-  right: 20%;
-  height: 2px;
-  background: #a78bfa;
-  border-radius: 0 0 2px 2px;
-}
-.obn-item.obn-home {
-  flex: 0.7;
-  border-right: 1px solid #222228;
-}
-
-/* ── Light theme for bottom nav ─────────────────────────────── */
-html.light .opsidian-hub {
-  background: #f8fafc;
-}
-html.light .opsidian-bottom-nav {
-  background: #ffffff;
-  border-top-color: #e2e8f0;
-}
-html.light .obn-item {
-  color: #94a3b8;
-}
-html.light .obn-item:hover {
-  color: #475569;
-  background: rgba(0, 0, 0, 0.03);
-}
-html.light .obn-item.obn-active {
-  color: #7c3aed;
-}
-html.light .obn-item.obn-active::after {
-  background: #7c3aed;
-}
-html.light .obn-item.obn-home {
-  border-right-color: #e2e8f0;
+.obs-hub-nav-sep {
+  display: inline-block;
+  width: 1px;
+  height: 12px;
+  background: var(--obs-border);
+  margin: 0 6px;
 }

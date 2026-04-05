@@ -80,7 +80,12 @@ export default function ObsidianView() {
   }, [selectedSessionId, loadSessionMemory]);
 
   if (!selectedSessionId) {
-    return <SessionSelector />;
+    return (
+      <>
+        <SessionSelector />
+        <StatusBar onRefresh={() => {}} />
+      </>
+    );
   }
 
   return (
