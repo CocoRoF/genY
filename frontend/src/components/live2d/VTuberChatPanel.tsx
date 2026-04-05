@@ -5,7 +5,7 @@ import { chatApi } from '@/lib/api';
 import { useVTuberStore } from '@/store/useVTuberStore';
 import { useI18n } from '@/lib/i18n';
 import { parseEmotion, ChatMarkdown, FileChangeSummary, AgentBadge, ExecutionMeta, MessageBubble } from '@/components/chat';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, XCircle } from 'lucide-react';
 import type { ChatRoomMessage, FileChanges, AgentProgressState, AgentLogEntry } from '@/types';
 
 interface ChatMessage {
@@ -117,6 +117,7 @@ export default function VTuberChatPanel({
   const [sending, setSending] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [agentProgress, setAgentProgress] = useState<AgentProgressState[] | null>(null);
+  const [broadcastActive, setBroadcastActive] = useState(false);
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -198,8 +199,12 @@ export default function VTuberChatPanel({
             } else if (eventType === 'agent_progress') {
               const progress = eventData as unknown as { agents: AgentProgressState[] };
               setAgentProgress(progress.agents);
+            } else if (eventType === 'broadcast_status') {
+              const status = eventData as unknown as { finished: boolean };
+              setBroadcastActive(!status.finished);
             } else if (eventType === 'broadcast_done') {
               setAgentProgress(null);
+              setBroadcastActive(false);
             }
           },
           () => lastMsgIdRef.current,
@@ -259,6 +264,15 @@ export default function VTuberChatPanel({
       inputRef.current?.focus();
     }
   }, [input, sending, roomId, toDisplayMessage]);
+
+  const handleCancelBroadcast = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      await chatApi.cancelBroadcast(roomId);
+    } catch (e) {
+      console.error('[VTuberChatPanel] Failed to cancel broadcast:', e);
+    }
+  }, [roomId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -368,6 +382,18 @@ export default function VTuberChatPanel({
         {/* Agent progress during broadcast */}
         {agentProgress && agentProgress.length > 0 && (
           <VTuberProgressPanel agents={agentProgress} />
+        )}
+        {/* Cancel broadcast button */}
+        {broadcastActive && (
+          <div className="flex justify-center py-1">
+            <button
+              className="flex items-center gap-1 text-[0.6875rem] text-red-400 hover:text-red-300 transition-colors bg-transparent border-none cursor-pointer p-0"
+              onClick={handleCancelBroadcast}
+            >
+              <XCircle size={14} />
+              <span>{t('messenger.cancelBroadcast')}</span>
+            </button>
+          </div>
         )}
         {sending && (
           <div className="flex justify-start">
