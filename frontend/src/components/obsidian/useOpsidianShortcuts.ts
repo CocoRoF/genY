@@ -5,9 +5,14 @@ import { useEffect, useCallback, useRef } from 'react';
 /**
  * Opsidian keyboard shortcut definitions.
  * Each shortcut has a key combo string and metadata for the help modal.
+ *
+ * ⚠ Web-safe shortcuts only — browser-reserved combos like Ctrl+W, Ctrl+Tab,
+ *   Ctrl+1/2/3 CANNOT be intercepted by web pages (the browser handles them
+ *   before the keydown event reaches JavaScript).  We use Alt-based combos
+ *   for those actions instead.
  */
 export interface ShortcutDef {
-  key: string;          // e.g. "ctrl+p", "ctrl+shift+k"
+  key: string;          // e.g. "ctrl+p", "alt+w"
   label: string;        // i18n key suffix
   category: 'nav' | 'view' | 'note' | 'edit';
 }
@@ -15,17 +20,17 @@ export interface ShortcutDef {
 export const SHORTCUT_MAP: ShortcutDef[] = [
   // Navigation
   { key: 'ctrl+p',           label: 'quickSearch',      category: 'nav' },
-  { key: 'ctrl+tab',         label: 'nextTab',          category: 'nav' },
-  { key: 'ctrl+shift+tab',   label: 'prevTab',          category: 'nav' },
-  { key: 'ctrl+w',           label: 'closeTab',         category: 'nav' },
+  { key: 'alt+]',            label: 'nextTab',          category: 'nav' },
+  { key: 'alt+[',            label: 'prevTab',          category: 'nav' },
+  { key: 'alt+w',            label: 'closeTab',         category: 'nav' },
   { key: 'ctrl+\\',          label: 'toggleSidebar',    category: 'nav' },
   { key: 'ctrl+shift+\\',    label: 'toggleRightPanel', category: 'nav' },
   // View modes
-  { key: 'ctrl+1',           label: 'editorView',       category: 'view' },
-  { key: 'ctrl+2',           label: 'graphView',        category: 'view' },
-  { key: 'ctrl+3',           label: 'searchView',       category: 'view' },
+  { key: 'alt+1',            label: 'editorView',       category: 'view' },
+  { key: 'alt+2',            label: 'graphView',        category: 'view' },
+  { key: 'alt+3',            label: 'searchView',       category: 'view' },
   // Note actions
-  { key: 'ctrl+n',           label: 'newNote',          category: 'note' },
+  { key: 'alt+n',            label: 'newNote',          category: 'note' },
   { key: 'ctrl+e',           label: 'toggleEdit',       category: 'note' },
   { key: 'ctrl+s',           label: 'saveNote',         category: 'note' },
   { key: 'ctrl+shift+d',     label: 'deleteNote',       category: 'note' },
@@ -56,8 +61,6 @@ interface ShortcutActions {
   onGraphView?: () => void;
   onSearchView?: () => void;
   onShowShortcuts?: () => void;
-  /** true when user is in a text input / textarea */
-  isEditing?: boolean;
 }
 
 function matchesCombo(e: KeyboardEvent, combo: string): boolean {
@@ -73,10 +76,11 @@ function matchesCombo(e: KeyboardEvent, combo: string): boolean {
   if (needAlt !== e.altKey) return false;
 
   // Special key names
-  if (key === 'tab' && e.key === 'Tab') return true;
   if (key === 'escape' && e.key === 'Escape') return true;
   if (key === '\\' && e.key === '\\') return true;
   if (key === '/' && e.key === '/') return true;
+  if (key === ']' && e.key === ']') return true;
+  if (key === '[' && e.key === '[') return true;
 
   return e.key.toLowerCase() === key;
 }
@@ -91,31 +95,32 @@ export function useOpsidianShortcuts(actions: ShortcutActions) {
 
   const handler = useCallback((e: KeyboardEvent) => {
     const a = actionsRef.current;
-    // Don't intercept shortcuts when typing in non-opsidian inputs
     const target = e.target as HTMLElement;
     const inInput = target.tagName === 'INPUT' || target.tagName === 'SELECT';
     const inTextarea = target.tagName === 'TEXTAREA';
 
-    // These shortcuts always work
+    // ── Global shortcuts — always work, even inside text fields ──
     if (matchesCombo(e, 'ctrl+p'))           { e.preventDefault(); a.onQuickSearch?.(); return; }
     if (matchesCombo(e, 'ctrl+/'))           { e.preventDefault(); a.onShowShortcuts?.(); return; }
+    if (matchesCombo(e, 'ctrl+s'))           { e.preventDefault(); a.onSave?.(); return; }
     if (matchesCombo(e, 'escape'))           { a.onCancel?.(); return; }
 
-    // These shortcuts are suppressed when in text input
+    // Alt-based shortcuts — safe from browser interception, work everywhere
+    if (matchesCombo(e, 'alt+]'))            { e.preventDefault(); a.onNextTab?.(); return; }
+    if (matchesCombo(e, 'alt+['))            { e.preventDefault(); a.onPrevTab?.(); return; }
+    if (matchesCombo(e, 'alt+w'))            { e.preventDefault(); a.onCloseTab?.(); return; }
+    if (matchesCombo(e, 'alt+n'))            { e.preventDefault(); a.onNewNote?.(); return; }
+    if (matchesCombo(e, 'alt+1'))            { e.preventDefault(); a.onEditorView?.(); return; }
+    if (matchesCombo(e, 'alt+2'))            { e.preventDefault(); a.onGraphView?.(); return; }
+    if (matchesCombo(e, 'alt+3'))            { e.preventDefault(); a.onSearchView?.(); return; }
+
+    // ── Suppressed when typing in text fields ──
     if (inInput || inTextarea) return;
 
-    if (matchesCombo(e, 'ctrl+n'))           { e.preventDefault(); a.onNewNote?.(); return; }
     if (matchesCombo(e, 'ctrl+e'))           { e.preventDefault(); a.onToggleEdit?.(); return; }
-    if (matchesCombo(e, 'ctrl+s'))           { e.preventDefault(); a.onSave?.(); return; }
     if (matchesCombo(e, 'ctrl+shift+d'))     { e.preventDefault(); a.onDelete?.(); return; }
     if (matchesCombo(e, 'ctrl+\\'))          { e.preventDefault(); a.onToggleSidebar?.(); return; }
     if (matchesCombo(e, 'ctrl+shift+\\'))    { e.preventDefault(); a.onToggleRightPanel?.(); return; }
-    if (matchesCombo(e, 'ctrl+tab'))         { e.preventDefault(); a.onNextTab?.(); return; }
-    if (matchesCombo(e, 'ctrl+shift+tab'))   { e.preventDefault(); a.onPrevTab?.(); return; }
-    if (matchesCombo(e, 'ctrl+w'))           { e.preventDefault(); a.onCloseTab?.(); return; }
-    if (matchesCombo(e, 'ctrl+1'))           { e.preventDefault(); a.onEditorView?.(); return; }
-    if (matchesCombo(e, 'ctrl+2'))           { e.preventDefault(); a.onGraphView?.(); return; }
-    if (matchesCombo(e, 'ctrl+3'))           { e.preventDefault(); a.onSearchView?.(); return; }
   }, []);
 
   useEffect(() => {

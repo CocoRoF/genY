@@ -1,10 +1,12 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { useObsidianStore } from '@/store/useObsidianStore';
 import { useUserOpsidianStore } from '@/store/useUserOpsidianStore';
 import { useCuratedKnowledgeStore } from '@/store/useCuratedKnowledgeStore';
 import { useHubMode } from '@/components/OpsidianHubContext';
 import { useI18n } from '@/lib/i18n';
+import ShortcutHelp from './ShortcutHelp';
 import {
   RefreshCw,
   FileText,
@@ -16,11 +18,25 @@ import {
   PanelRightClose,
   Loader2,
   ArrowLeftRight,
+  Keyboard,
 } from 'lucide-react';
 
 export default function StatusBar({ onRefresh }: { onRefresh: () => void }) {
   const hub = useHubMode();
   const { t } = useI18n();
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Global Ctrl+/ shortcut to open/close help modal
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault();
+        setShowShortcuts(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   // Always read all three stores — pick data based on hub mode
   const obsidian = useObsidianStore();
@@ -159,7 +175,15 @@ export default function StatusBar({ onRefresh }: { onRefresh: () => void }) {
         >
           {rightPanelOpen ? <PanelRightClose size={11} /> : <PanelRight size={11} />}
         </button>
+        <button
+          className="obs-sb-btn"
+          onClick={() => setShowShortcuts(true)}
+          title={`${t('opsidian.keyboardShortcuts')} (Ctrl+/)`}
+        >
+          <Keyboard size={11} />
+        </button>
       </div>
+      {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }
