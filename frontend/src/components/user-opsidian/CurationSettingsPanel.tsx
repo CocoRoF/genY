@@ -7,7 +7,6 @@ import { useI18n } from '@/lib/i18n';
 import {
   X,
   Sparkles,
-  Clock,
   Play,
   Loader2,
   CheckCircle,
@@ -15,10 +14,6 @@ import {
   Save,
   ToggleLeft,
   ToggleRight,
-  Zap,
-  Brain,
-  Timer,
-  Hash,
 } from 'lucide-react';
 
 interface CurationScheduleConfig {
@@ -239,7 +234,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
               }}>
                 {/* Enable Auto-Curation */}
                 <SettingRow
-                  icon={<Zap size={13} style={{ color: '#f59e0b' }} />}
                   label={t('opsidian.enableAutoCuration')}
                   description={t('opsidian.enableAutoCurationDesc')}
                 >
@@ -248,7 +242,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
 
                 {/* Use LLM */}
                 <SettingRow
-                  icon={<Brain size={13} style={{ color: '#8b5cf6' }} />}
                   label={t('opsidian.useLlm')}
                   description={t('opsidian.useLlmDesc')}
                 >
@@ -257,7 +250,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
 
                 {/* Quality Threshold */}
                 <SettingRow
-                  icon={<Sparkles size={13} style={{ color: '#10b981' }} />}
                   label={t('opsidian.qualityThreshold')}
                   description={t('opsidian.qualityThresholdDesc')}
                 >
@@ -293,7 +285,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
               }}>
                 {/* Enable Schedule */}
                 <SettingRow
-                  icon={<Clock size={13} style={{ color: '#3b82f6' }} />}
                   label={t('opsidian.enableSchedule')}
                   description={t('opsidian.enableScheduleDesc')}
                 >
@@ -302,7 +293,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
 
                 {/* Interval Hours */}
                 <SettingRow
-                  icon={<Timer size={13} style={{ color: '#6366f1' }} />}
                   label={t('opsidian.intervalHours')}
                   description={t('opsidian.intervalHoursDesc')}
                 >
@@ -322,7 +312,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
 
                 {/* Max Notes Per Run */}
                 <SettingRow
-                  icon={<Hash size={13} style={{ color: '#ec4899' }} />}
                   label={t('opsidian.maxNotesPerRun')}
                   description={t('opsidian.maxNotesPerRunDesc')}
                 >
@@ -343,7 +332,6 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
                 {/* Last Run */}
                 {config.auto_curation_last_run && (
                   <SettingRow
-                    icon={<CheckCircle size={13} style={{ color: '#10b981' }} />}
                     label={t('opsidian.lastRun')}
                   >
                     <span style={{ fontSize: 11, color: 'var(--obs-text-muted)' }}>
@@ -389,9 +377,8 @@ export default function CurationSettingsPanel({ onClose }: { onClose: () => void
 
 /* ─── Setting Row sub-component ─── */
 function SettingRow({
-  icon, label, description, children,
+  label, description, children,
 }: {
-  icon: React.ReactNode;
   label: string;
   description?: string;
   children: React.ReactNode;
@@ -401,7 +388,6 @@ function SettingRow({
       display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
       borderBottom: '1px solid var(--obs-border-subtle)',
     }}>
-      {icon}
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--obs-text)' }}>{label}</div>
         {description && (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useCallback, useState, useMemo } from 'react';
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useCuratedKnowledgeStore } from '@/store/useCuratedKnowledgeStore';
@@ -36,8 +36,16 @@ import {
   Home,
   Edit3,
   Loader2,
+  Copy,
 } from 'lucide-react';
 import UnifiedGraphView from '../knowledge-graph/UnifiedGraphView';
+import { useOpsidianShortcuts } from '../obsidian/useOpsidianShortcuts';
+import MarkdownToolbar, { useMarkdownEditorKeys } from '../obsidian/MarkdownToolbar';
+import QuickSwitcher from '../obsidian/QuickSwitcher';
+import TagInput from '../obsidian/TagInput';
+import WikilinkPicker from '../obsidian/WikilinkPicker';
+import ShortcutHelp from '../obsidian/ShortcutHelp';
+import ContextMenu from '../obsidian/ContextMenu';
 import '../obsidian/obsidian.css';
 
 // ─── Constants ────────────────────────────────────────────────
@@ -151,10 +159,16 @@ export default function CuratedKnowledgeView() {
     }
   }, [hub, loadData]);
 
+  // ─── Modals & overlays ──
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
+  const [showWikilinkPicker, setShowWikilinkPicker] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; filename: string } | null>(null);
+
   // ─── Draft note for inline creation ──
   const [draftNote, setDraftNote] = useState<{
     title: string; content: string; category: string;
-    importance: string; tags: string;
+    importance: string; tags: string[];
   } | null>(null);
 
   // ─── File selection handler ──
@@ -173,7 +187,7 @@ export default function CuratedKnowledgeView() {
   );
 
   const handleNewNote = useCallback(() => {
-    setDraftNote({ title: '', content: '', category: 'topics', importance: 'medium', tags: '' });
+    setDraftNote({ title: '', content: '', category: 'topics', importance: 'medium', tags: [] });
     useCuratedKnowledgeStore.getState().setSelectedFile(null);
     useCuratedKnowledgeStore.getState().setFileDetail(null);
     setViewMode('editor');
@@ -181,15 +195,14 @@ export default function CuratedKnowledgeView() {
 
   const handleSaveDraft = useCallback(async (draft: {
     title: string; content: string; category: string;
-    importance: string; tags: string;
+    importance: string; tags: string[];
   }) => {
-    const tags = draft.tags.split(',').map((s) => s.trim()).filter(Boolean);
     try {
       const res = await curatedKnowledgeApi.createFile({
         title: draft.title || t('opsidian.untitled'),
         content: draft.content || '',
         category: draft.category,
-        tags,
+        tags: draft.tags,
         importance: draft.importance,
       });
       setDraftNote(null);
@@ -199,6 +212,36 @@ export default function CuratedKnowledgeView() {
       console.error('Create failed:', e);
     }
   }, [loadData, handleSelectFile, t]);
+
+  // ─── Keyboard shortcuts ──
+  useOpsidianShortcuts({
+    onQuickSearch: () => setShowQuickSwitcher(true),
+    onShowShortcuts: () => setShowShortcutHelp(true),
+    onNewNote: () => handleNewNote(),
+    onToggleEdit: () => { /* handled inside CuratedNoteEditor */ },
+    onSave: () => { /* handled inside CuratedNoteEditor */ },
+    onCancel: () => {
+      if (showQuickSwitcher) setShowQuickSwitcher(false);
+      else if (showShortcutHelp) setShowShortcutHelp(false);
+      else if (showWikilinkPicker) setShowWikilinkPicker(false);
+    },
+    onToggleSidebar: () => setSidebarCollapsed(!sidebarCollapsed),
+    onToggleRightPanel: () => useCuratedKnowledgeStore.getState().setRightPanelOpen(!rightPanelOpen),
+    onNextTab: () => {
+      if (openFiles.length < 2 || !selectedFile) return;
+      const idx = openFiles.indexOf(selectedFile);
+      handleSelectFile(openFiles[(idx + 1) % openFiles.length]);
+    },
+    onPrevTab: () => {
+      if (openFiles.length < 2 || !selectedFile) return;
+      const idx = openFiles.indexOf(selectedFile);
+      handleSelectFile(openFiles[(idx - 1 + openFiles.length) % openFiles.length]);
+    },
+    onCloseTab: () => { if (selectedFile) closeFile(selectedFile); },
+    onEditorView: () => setViewMode('editor'),
+    onGraphView: () => setViewMode('graph'),
+    onSearchView: () => setViewMode('search'),
+  });
 
   // ─── Auth guard ──
   if (!isAuthenticated) {
@@ -224,6 +267,42 @@ export default function CuratedKnowledgeView() {
 
   return (
     <div className="obsidian-root">
+      {/* Modals & Overlays */}
+      {showQuickSwitcher && (
+        <QuickSwitcher
+          files={files}
+          onSelect={handleSelectFile}
+          onClose={() => setShowQuickSwitcher(false)}
+          onCreateNote={handleNewNote}
+        />
+      )}
+      {showShortcutHelp && (
+        <ShortcutHelp onClose={() => setShowShortcutHelp(false)} />
+      )}
+      {showWikilinkPicker && (
+        <WikilinkPicker
+          files={files}
+          onSelect={(filename, alias) => {
+            console.log('Wikilink selected:', filename, alias);
+            setShowWikilinkPicker(false);
+          }}
+          onClose={() => setShowWikilinkPicker(false)}
+        />
+      )}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={[
+            { label: t('opsidian.openInNewTab'), icon: <FileText size={12} />, onClick: () => handleSelectFile(contextMenu.filename) },
+            { label: t('opsidian.copyWikilink'), icon: <Copy size={12} />, onClick: () => navigator.clipboard.writeText(`[[${contextMenu.filename.replace(/\.md$/, '')}]]`) },
+            { label: '', onClick: () => {}, divider: true },
+            { label: t('opsidian.confirmDelete').replace('?', ''), icon: <Trash2 size={12} />, danger: true, onClick: async () => { if (confirm(t('opsidian.confirmDelete'))) { await curatedKnowledgeApi.deleteFile(contextMenu.filename); loadData(); } } },
+          ]}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
       {/* Left sidebar */}
       <CuratedSidebar
         files={files}
@@ -266,12 +345,14 @@ export default function CuratedKnowledgeView() {
                   onUpdate={setDraftNote}
                   onSave={handleSaveDraft}
                   onDiscard={() => setDraftNote(null)}
+                  allFiles={files}
                 />
               : <CuratedNoteEditor
                   fileDetail={fileDetail}
                   selectedFile={selectedFile}
                   onSelectFile={handleSelectFile}
                   onRefresh={loadData}
+                  allFiles={files}
                 />
           )}
           {viewMode === 'graph' && (
@@ -594,20 +675,30 @@ function CuratedTabs({
 
 // ─── Note Editor ──────────────────────────────────────────────
 function CuratedNoteEditor({
-  fileDetail, selectedFile, onSelectFile, onRefresh,
+  fileDetail, selectedFile, onSelectFile, onRefresh, allFiles,
 }: {
   fileDetail: import('@/types').MemoryFileDetail | null;
   selectedFile: string | null;
   onSelectFile: (fn: string) => void;
   onRefresh: () => void;
+  allFiles: Record<string, import('@/types').MemoryFileInfo>;
 }) {
   const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editImportance, setEditImportance] = useState('');
-  const [editTags, setEditTags] = useState('');
+  const [editTagsList, setEditTagsList] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [showEditorWikilink, setShowEditorWikilink] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // All existing tags for autocomplete
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    Object.values(allFiles).forEach(f => f.tags.forEach(t => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [allFiles]);
 
   useEffect(() => {
     if (fileDetail) {
@@ -615,21 +706,39 @@ function CuratedNoteEditor({
       const m = fileDetail.metadata || {};
       setEditCategory(String(m.category || 'topics'));
       setEditImportance(String(m.importance || 'medium'));
-      setEditTags(Array.isArray(m.tags) ? m.tags.join(', ') : '');
+      setEditTagsList(Array.isArray(m.tags) ? m.tags.map(String) : []);
     }
     setEditing(false);
   }, [fileDetail]);
+
+  // Markdown editor keyboard handler
+  const handleEditorKeyDown = useMarkdownEditorKeys(
+    textareaRef,
+    (v) => setEditContent(v),
+    () => setShowEditorWikilink(true),
+  );
+
+  // Insert wikilink at cursor
+  const insertWikilink = useCallback((filename: string, alias?: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const stem = filename.replace(/\.md$/, '').replace(/^[^/]+\//, '');
+    const link = alias ? `[[${stem}|${alias}]]` : `[[${stem}]]`;
+    const { selectionStart: start, selectionEnd: end, value } = ta;
+    const newValue = value.slice(0, start) + link + value.slice(end);
+    setEditContent(newValue);
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(start + link.length, start + link.length); });
+  }, []);
 
   const handleSave = async () => {
     if (!selectedFile || !editContent) return;
     setSaving(true);
     try {
-      const tags = editTags.split(',').map((s) => s.trim()).filter(Boolean);
       await curatedKnowledgeApi.updateFile(selectedFile, {
         content: editContent,
         category: editCategory,
         importance: editImportance,
-        tags,
+        tags: editTagsList,
       });
       setEditing(false);
       await onRefresh();
@@ -681,14 +790,14 @@ function CuratedNoteEditor({
     setEditContent(fileDetail?.body ?? '');
     setEditCategory(String(m.category || 'topics'));
     setEditImportance(String(m.importance || 'medium'));
-    setEditTags(Array.isArray(m.tags) ? m.tags.join(', ') : '');
+    setEditTagsList(Array.isArray(m.tags) ? m.tags.map(String) : []);
     setEditing(true);
   };
 
   if (editing) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Toolbar — matches CuratedDraftEditor */}
+        {/* Toolbar */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
           borderBottom: '1px solid var(--obs-border-subtle)',
@@ -724,15 +833,11 @@ function CuratedNoteEditor({
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <input
-            value={editTags}
-            onChange={(e) => setEditTags(e.target.value)}
+          <TagInput
+            tags={editTagsList}
+            onChange={setEditTagsList}
+            availableTags={allTags}
             placeholder={t('opsidian.tagsPlaceholder')}
-            style={{
-              flex: 1, padding: '4px 8px', fontSize: 11, background: 'var(--obs-bg-surface)',
-              border: '1px solid var(--obs-border)', borderRadius: 4,
-              color: 'var(--obs-text)', outline: 'none', minWidth: 100,
-            }}
           />
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button
@@ -781,11 +886,22 @@ function CuratedNoteEditor({
           </h1>
         </div>
 
-        {/* Content textarea — matches DraftEditor */}
+        {/* Markdown toolbar */}
+        <div style={{ padding: '0 32px', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+          <MarkdownToolbar
+            textareaRef={textareaRef}
+            onChange={setEditContent}
+            onRequestWikilink={() => setShowEditorWikilink(true)}
+          />
+        </div>
+
+        {/* Content textarea */}
         <div style={{ flex: 1, padding: '0 32px 16px', maxWidth: 900, margin: '0 auto', width: '100%' }}>
           <textarea
+            ref={textareaRef}
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             autoFocus
             style={{
               width: '100%', height: '100%', minHeight: 300, padding: 0,
@@ -795,6 +911,15 @@ function CuratedNoteEditor({
             }}
           />
         </div>
+
+        {/* Editor-level wikilink picker */}
+        {showEditorWikilink && (
+          <WikilinkPicker
+            files={allFiles}
+            onSelect={insertWikilink}
+            onClose={() => setShowEditorWikilink(false)}
+          />
+        )}
       </div>
     );
   }
@@ -1004,15 +1129,22 @@ function CuratedSearchView({
 
 // ─── Draft Editor (IDE-style inline creation) ────────────────
 function CuratedDraftEditor({
-  draft, onUpdate, onSave, onDiscard,
+  draft, onUpdate, onSave, onDiscard, allFiles,
 }: {
-  draft: { title: string; content: string; category: string; importance: string; tags: string };
+  draft: { title: string; content: string; category: string; importance: string; tags: string[] };
   onUpdate: (d: typeof draft) => void;
   onSave: (d: typeof draft) => void;
   onDiscard: () => void;
+  allFiles: Record<string, import('@/types').MemoryFileInfo>;
 }) {
   const { t } = useI18n();
   const [saving, setSaving] = useState(false);
+
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    Object.values(allFiles).forEach(f => f.tags.forEach(t => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [allFiles]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1061,15 +1193,11 @@ function CuratedDraftEditor({
           <option value="medium">Medium</option>
           <option value="low">Low</option>
         </select>
-        <input
-          value={draft.tags}
-          onChange={(e) => onUpdate({ ...draft, tags: e.target.value })}
+        <TagInput
+          tags={draft.tags}
+          onChange={(tags) => onUpdate({ ...draft, tags })}
+          availableTags={allTags}
           placeholder={t('opsidian.tagsPlaceholder')}
-          style={{
-            flex: 1, padding: '4px 8px', fontSize: 11, background: 'var(--obs-bg-surface)',
-            border: '1px solid var(--obs-border)', borderRadius: 4,
-            color: 'var(--obs-text)', outline: 'none', minWidth: 100,
-          }}
         />
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
           <button
