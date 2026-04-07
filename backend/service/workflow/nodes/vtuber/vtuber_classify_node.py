@@ -27,7 +27,7 @@ from service.workflow.workflow_state import NodeStateUsage
 logger = getLogger(__name__)
 
 _CLASSIFY_PROMPT = """\
-You are a VTuber persona's task router. Classify the user's input to decide \
+You are a VTuber persona's task router. Classify the incoming input to decide \
 how to handle it.
 
 ## Categories
@@ -51,8 +51,9 @@ Delegate to the paired CLI worker — requires tools or sustained work.
 - Any task that benefits from autonomous tool usage
 
 ### thinking
-Self-initiated thought — only when the input starts with [THINKING_TRIGGER] \
-or [CLI_RESULT].
+Autonomous self-initiated process — ONLY when the input starts with \
+[THINKING_TRIGGER] or [CLI_RESULT]. These are internal system signals, \
+NOT user messages.
 
 ## Input
 {input}
@@ -117,7 +118,7 @@ class VTuberClassifyNode(BaseNode):
         user_input = state.get("input", "")
 
         # Fast-path: system thinking triggers bypass LLM classification
-        if user_input.strip().startswith("[THINKING_TRIGGER]"):
+        if user_input.strip().startswith("[THINKING_TRIGGER"):
             return {
                 "vtuber_route": "thinking",
                 "current_step": "vtuber_classify_complete",

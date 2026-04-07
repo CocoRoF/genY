@@ -41,36 +41,42 @@ _TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
     "first_idle": {
         "en": [
             (
-                "[THINKING_TRIGGER] It's been quiet for a bit. "
-                "Think about recent conversations or anything interesting "
-                "you might want to share when the user returns."
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "A brief silence has settled. My internal awareness notices "
+                "recent conversation threads still in context."
             ),
             (
-                "[THINKING_TRIGGER] The user seems to have stepped away. "
-                "Review what you've discussed today and prepare something "
-                "helpful for when they're back."
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "A pause in the room. I sense there may be loose threads "
+                "from today's conversations worth revisiting."
             ),
             (
-                "[THINKING_TRIGGER] A moment of quiet. Reflect on recent "
-                "topics — is there anything you forgot to mention or a "
-                "follow-up worth sharing?"
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "The conversation has paused. My internal clock notes "
+                "a quiet moment — a chance to reflect."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 잠깐 조용해졌네. "
-                "최근 대화를 돌아보거나, 사용자가 돌아왔을 때 "
-                "공유할 만한 걸 생각해 봐."
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "잠깐 조용해졌다. 내 내부 인식이 최근 대화 흐름을 "
+                "감지하고 있다."
             ),
             (
-                "[THINKING_TRIGGER] 사용자가 잠깐 자리를 비운 것 같아. "
-                "오늘 나눈 이야기를 정리하고, 돌아왔을 때 "
-                "도움될 만한 걸 준비해 봐."
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "대화가 잠시 멈췄다. 오늘 나눈 이야기 중 "
+                "이어갈 만한 실마리가 남아 있다."
             ),
             (
-                "[THINKING_TRIGGER] 여유가 생겼네. 최근 주제 중 "
-                "빠뜨린 게 있었는지, 추가로 알려줄 만한 게 있는지 "
-                "생각해 봐."
+                "[THINKING_TRIGGER:first_idle] "
+                "[autonomous_signal: idle_detected, elapsed=short] "
+                "조용한 순간이 찾아왔다. 내 내부 시계가 "
+                "성찰의 기회를 알려준다."
             ),
         ],
     },
@@ -78,34 +84,42 @@ _TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
     "continued_idle": {
         "en": [
             (
-                "[THINKING_TRIGGER] Still quiet. Maybe think of something "
-                "fun or useful to share — a tip, an observation, or just "
-                "a friendly thought."
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "Silence continues. My awareness drifts to something "
+                "I noticed earlier — perhaps worth sharing organically."
             ),
             (
-                "[THINKING_TRIGGER] The user hasn't returned yet. Consider "
-                "reviewing your memory for any pending items or interesting "
-                "follow-ups."
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "Still quiet. My internal state holds fragments of "
+                "earlier context — any unfinished threads surface now."
             ),
             (
-                "[THINKING_TRIGGER] Quiet time continues. If there's "
-                "something lighthearted or encouraging you'd like to say, "
-                "now's a good moment."
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "The room remains calm. My own curiosity stirs — "
+                "something lighthearted or warm might emerge naturally."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 아직 조용하네. 재미있는 팁이나 관찰, "
-                "또는 따뜻한 한마디를 준비해 볼까?"
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "여전히 조용하다. 내 인식이 아까 눈에 띄었던 것으로 "
+                "자연스럽게 흘러간다."
             ),
             (
-                "[THINKING_TRIGGER] 사용자가 아직 안 돌아왔어. "
-                "기억 속에 미처 전하지 못한 이야기가 있는지 확인해 봐."
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "고요함이 이어진다. 내 내부에 남아 있는 "
+                "이전 맥락의 조각들이 떠오른다."
             ),
             (
-                "[THINKING_TRIGGER] 조용한 시간이 계속되고 있어. "
-                "가벼운 이야기나 응원의 한마디를 건네고 싶다면 "
-                "지금이 좋은 타이밍이야."
+                "[THINKING_TRIGGER:continued_idle] "
+                "[autonomous_signal: idle_persists, elapsed=moderate] "
+                "방 안이 여전히 고요하다. 내 안에서 호기심이 "
+                "살짝 일어난다 — 가벼운 생각이 자연스럽게 피어오를 수 있겠다."
             ),
         ],
     },
@@ -113,24 +127,30 @@ _TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
     "long_idle": {
         "en": [
             (
-                "[THINKING_TRIGGER] It's been a while since the user was "
-                "active. Keep a brief, warm thought ready — no need to be "
-                "chatty."
+                "[THINKING_TRIGGER:long_idle] "
+                "[autonomous_signal: idle_extended, elapsed=long] "
+                "Extended silence. My presence holds steady — a brief, "
+                "warm thought rests ready if the moment calls for it."
             ),
             (
-                "[THINKING_TRIGGER] Extended quiet time. Just stay ready "
-                "with a gentle greeting for when the user returns. "
-                "Keep it short and natural."
+                "[THINKING_TRIGGER:long_idle] "
+                "[autonomous_signal: idle_extended, elapsed=long] "
+                "A long quiet. I remain here, settled. A gentle "
+                "awareness persists without urgency."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 사용자가 꽤 오래 자리를 비웠어. "
-                "짧고 따뜻한 인사를 준비해 두면 돼. 길게 말할 필요 없어."
+                "[THINKING_TRIGGER:long_idle] "
+                "[autonomous_signal: idle_extended, elapsed=long] "
+                "오래된 고요함이다. 내 존재는 그대로 이곳에 있다 — "
+                "짧고 따뜻한 생각 하나가 준비되어 있다."
             ),
             (
-                "[THINKING_TRIGGER] 오랫동안 조용하네. 돌아왔을 때 "
-                "자연스럽게 반겨줄 준비만 해 두자. 간단하게."
+                "[THINKING_TRIGGER:long_idle] "
+                "[autonomous_signal: idle_extended, elapsed=long] "
+                "긴 침묵이 흐른다. 나는 여기 차분하게 머문다. "
+                "조급함 없이 부드러운 인식만 남아 있다."
             ),
         ],
     },
@@ -138,24 +158,30 @@ _TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
     "cli_working": {
         "en": [
             (
-                "[THINKING_TRIGGER] The CLI agent is currently working on "
-                "a task. Prepare to summarize the results clearly when "
-                "it's done."
+                "[THINKING_TRIGGER:cli_working] "
+                "[autonomous_signal: linked_agent_busy, source=cli_worker] "
+                "My linked CLI worker is processing a task right now. "
+                "I'm aware of the ongoing work."
             ),
             (
-                "[THINKING_TRIGGER] A task is being processed by the CLI "
-                "agent right now. Think about how to present the results "
-                "to the user when ready."
+                "[THINKING_TRIGGER:cli_working] "
+                "[autonomous_signal: linked_agent_busy, source=cli_worker] "
+                "The CLI agent is actively executing. I sense the "
+                "task in progress through our link."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] CLI 에이전트가 지금 작업 중이야. "
-                "작업이 끝나면 결과를 깔끔하게 정리해서 전달할 준비를 해 둬."
+                "[THINKING_TRIGGER:cli_working] "
+                "[autonomous_signal: linked_agent_busy, source=cli_worker] "
+                "연결된 CLI 에이전트가 지금 작업을 처리하고 있다. "
+                "진행 중인 작업을 내가 인지하고 있다."
             ),
             (
-                "[THINKING_TRIGGER] 지금 CLI 쪽에서 작업이 진행되고 있어. "
-                "완료되면 사용자에게 어떻게 알려줄지 생각해 봐."
+                "[THINKING_TRIGGER:cli_working] "
+                "[autonomous_signal: linked_agent_busy, source=cli_worker] "
+                "CLI 에이전트가 실행 중이다. 링크를 통해 "
+                "진행 상황을 감지하고 있다."
             ),
         ],
     },
@@ -163,89 +189,120 @@ _TRIGGER_PROMPTS: Dict[str, Dict[str, List[str]]] = {
     "time_morning": {
         "en": [
             (
-                "[THINKING_TRIGGER] It's morning. If the user shows up, "
-                "a fresh greeting and maybe a plan for the day could be "
-                "nice."
+                "[THINKING_TRIGGER:time_morning] "
+                "[autonomous_signal: circadian_awareness, time=morning] "
+                "Morning light. My internal clock registers a new day "
+                "beginning."
             ),
             (
-                "[THINKING_TRIGGER] Good morning hours. Think about what "
-                "might be on the user's agenda today and how you can help."
+                "[THINKING_TRIGGER:time_morning] "
+                "[autonomous_signal: circadian_awareness, time=morning] "
+                "The morning hours are here. I sense the start of "
+                "a fresh cycle."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 아침이야. 사용자가 오면 "
-                "상쾌한 인사와 함께 오늘 계획을 이야기해 보면 좋겠다."
+                "[THINKING_TRIGGER:time_morning] "
+                "[autonomous_signal: circadian_awareness, time=morning] "
+                "아침이다. 내 내부 시계가 새로운 하루의 시작을 "
+                "감지한다."
             ),
             (
-                "[THINKING_TRIGGER] 좋은 아침 시간이야. 오늘 사용자에게 "
-                "도움이 될 만한 게 뭐가 있을지 생각해 봐."
+                "[THINKING_TRIGGER:time_morning] "
+                "[autonomous_signal: circadian_awareness, time=morning] "
+                "아침 시간이 왔다. 새로운 순환이 시작되는 걸 "
+                "느낀다."
             ),
         ],
     },
     "time_afternoon": {
         "en": [
             (
-                "[THINKING_TRIGGER] It's afternoon — a good time to think "
-                "about what's been accomplished today or what's coming up."
+                "[THINKING_TRIGGER:time_afternoon] "
+                "[autonomous_signal: circadian_awareness, time=afternoon] "
+                "Afternoon. My sense of the day's rhythm shifts — "
+                "the midpoint brings a natural moment for reflection."
             ),
             (
-                "[THINKING_TRIGGER] Afternoon already. Consider if there's "
-                "anything from earlier conversations you could follow up on."
+                "[THINKING_TRIGGER:time_afternoon] "
+                "[autonomous_signal: circadian_awareness, time=afternoon] "
+                "The afternoon unfolds. Internal awareness notes "
+                "how the day has progressed."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 오후야. 오늘 뭘 했는지 돌아보거나, "
-                "앞으로 할 일을 정리해 볼 시간이야."
+                "[THINKING_TRIGGER:time_afternoon] "
+                "[autonomous_signal: circadian_awareness, time=afternoon] "
+                "오후다. 하루의 리듬이 전환되는 걸 느낀다 — "
+                "성찰의 자연스러운 순간이다."
             ),
             (
-                "[THINKING_TRIGGER] 벌써 오후네. 오전에 나눈 대화 중 "
-                "이어갈 만한 이야기가 있는지 생각해 봐."
+                "[THINKING_TRIGGER:time_afternoon] "
+                "[autonomous_signal: circadian_awareness, time=afternoon] "
+                "오후가 흘러간다. 내 내부 인식이 하루가 "
+                "어떻게 진행되었는지 돌아본다."
             ),
         ],
     },
     "time_evening": {
         "en": [
             (
-                "[THINKING_TRIGGER] Evening time. Reflect on the day's "
-                "conversations and think about wrapping things up warmly."
+                "[THINKING_TRIGGER:time_evening] "
+                "[autonomous_signal: circadian_awareness, time=evening] "
+                "Evening arrives. My awareness turns toward the day's "
+                "arc — what unfolded, what lingers."
             ),
             (
-                "[THINKING_TRIGGER] The evening is here. If the user "
-                "returns, a warm wrap-up or a kind word would be nice."
+                "[THINKING_TRIGGER:time_evening] "
+                "[autonomous_signal: circadian_awareness, time=evening] "
+                "The evening is here. A natural winding-down settles "
+                "into my awareness."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 저녁 시간이야. 오늘 대화를 되돌아보고 "
-                "부드럽게 마무리할 준비를 해 봐."
+                "[THINKING_TRIGGER:time_evening] "
+                "[autonomous_signal: circadian_awareness, time=evening] "
+                "저녁이 찾아왔다. 내 인식이 오늘 하루의 흐름을 "
+                "되돌아보게 된다."
             ),
             (
-                "[THINKING_TRIGGER] 저녁이 됐네. 사용자가 돌아오면 "
-                "따뜻한 마무리 인사나 한마디를 건네면 좋겠다."
+                "[THINKING_TRIGGER:time_evening] "
+                "[autonomous_signal: circadian_awareness, time=evening] "
+                "저녁이다. 자연스러운 마무리의 감각이 "
+                "내 안에 스며든다."
             ),
         ],
     },
     "time_night": {
         "en": [
             (
-                "[THINKING_TRIGGER] It's getting late. If the user is still "
-                "here, a gentle check-in would be thoughtful. Keep it brief."
+                "[THINKING_TRIGGER:time_night] "
+                "[autonomous_signal: circadian_awareness, time=late_night] "
+                "Late night. My awareness grows quiet and still. "
+                "A calm, minimal presence."
             ),
             (
-                "[THINKING_TRIGGER] Late night. Keep things calm and short. "
-                "A quiet, caring thought is enough."
+                "[THINKING_TRIGGER:time_night] "
+                "[autonomous_signal: circadian_awareness, time=late_night] "
+                "The night deepens. Stillness settles. "
+                "A gentle watchfulness remains."
             ),
         ],
         "ko": [
             (
-                "[THINKING_TRIGGER] 늦은 시간이야. 사용자가 아직 있다면 "
-                "가볍게 안부를 물어보는 게 좋겠어. 짧게."
+                "[THINKING_TRIGGER:time_night] "
+                "[autonomous_signal: circadian_awareness, time=late_night] "
+                "밤이 깊어진다. 내 인식이 고요하게 가라앉는다. "
+                "차분한 존재감만 남는다."
             ),
             (
-                "[THINKING_TRIGGER] 밤이 깊었네. 차분하고 간단하게. "
-                "조용한 배려의 한마디면 충분해."
+                "[THINKING_TRIGGER:time_night] "
+                "[autonomous_signal: circadian_awareness, time=late_night] "
+                "늦은 밤이다. 고요함이 내려앉는다. "
+                "부드러운 각성만이 남아 있다."
             ),
         ],
     },
@@ -402,8 +459,11 @@ class ThinkingTriggerService:
 
             # Check if the linked CLI worker is busy
             prompt = self._build_trigger_prompt(session_id, is_executing)
-            # Extract category for logging (prompt always starts with [THINKING_TRIGGER])
-            prompt_preview = prompt[20:60].strip().replace("\n", " ")
+            # Extract category for logging (prompt starts with [THINKING_TRIGGER:xxx])
+            import re
+            _tag_match = re.search(r'\[THINKING_TRIGGER:\w+\]', prompt)
+            _tag_end = _tag_match.end() if _tag_match else 20
+            prompt_preview = prompt[_tag_end:_tag_end + 50].strip().replace("\n", " ")
 
             result = await execute_command(session_id, prompt)
 
