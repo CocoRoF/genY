@@ -6,7 +6,7 @@
       "description": "기본 VTuber 캐릭터 (Niziiro Mao PRO)",
       "url": "/static/live2d-models/mao_pro/runtime/mao_pro.model3.json",
       "thumbnail": null,
-      "kScale": 0.5,
+      "kScale": 0.85,
       "initialXshift": 0,
       "initialYshift": 0,
       "idleMotionGroupName": "Idle",
@@ -39,6 +39,48 @@
         "neutral": 0
       },
       "tapMotions": {}
+    },
+    {
+      "name": "hiyori_pro",
+      "display_name": "Hiyori Pro",
+      "description": "AIRI 프리셋 — Hiyori Pro (Live2D Cubism 공식 샘플 캐릭터)",
+      "url": "/static/live2d-models/hiyori_pro/runtime/hiyori_pro_t11.model3.json",
+      "thumbnail": null,
+      "kScale": 0.7,
+      "initialXshift": 0,
+      "initialYshift": 50,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": 0,
+        "joy": 0,
+        "sadness": 0,
+        "anger": 0,
+        "surprise": 0,
+        "fear": 0,
+        "disgust": 0
+      },
+      "tapMotions": {
+        "HitAreaBody": { "Tap": 0 },
+        "HitAreaHead": { "Tap": 1 }
+      }
+    },
+    {
+      "name": "hiyori_free",
+      "display_name": "Hiyori Free",
+      "description": "AIRI 프리셋 — Hiyori Free (경량 버전, 표정 없음)",
+      "url": "/static/live2d-models/hiyori_free/runtime/hiyori_free_t08.model3.json",
+      "thumbnail": null,
+      "kScale": 0.7,
+      "initialXshift": 0,
+      "initialYshift": 50,
+      "idleMotionGroupName": "Idle",
+      "emotionMap": {
+        "neutral": 0
+      },
+      "tapMotions": {
+        "HitAreaBody": { "Tap@Body": 0 },
+        "HitAreaHead": { "Tap": 0 }
+      }
     }
   ],
   "default_model": "mao_pro",

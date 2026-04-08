@@ -143,6 +143,11 @@ export class AudioManager {
     return this._volume;
   }
 
+  /** AudioContext 접근 (Enhanced LipSync 초기화용) */
+  getAudioContext(): AudioContext | null {
+    return this.audioContext;
+  }
+
   /** 현재 재생 중지 */
   stop(): void {
     this.stopAmplitudeTracking();
