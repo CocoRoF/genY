@@ -83,6 +83,7 @@ const ko: Translations = {
     chat: '채팅',
     memory: '메모리',
     vtuber: 'VTuber',
+    playground2d: '플레이그라운드 2D',
   },
 
   // ─── Sidebar ───

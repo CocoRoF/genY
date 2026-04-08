@@ -1,0 +1,16 @@
+{
+  "id": "template-vtuber-tools",
+  "name": "VTuber Tools",
+  "description": "Lightweight tool set for VTuber personas. Includes web search and page fetch for conversational info lookup. Excludes browser automation and bulk fetch.",
+  "icon": "🎤",
+  "custom_tools": [
+    "web_search",
+    "news_search",
+    "web_fetch"
+  ],
+  "mcp_servers": [],
+  "created_at": "2026-04-07T08:01:45.125729+00:00",
+  "updated_at": "2026-04-07T08:01:45.125729+00:00",
+  "is_template": true,
+  "template_name": "vtuber-tools"
+}

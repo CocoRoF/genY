@@ -4,6 +4,23 @@ import asyncio
 from logging import basicConfig, getLogger, INFO
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+# Load .env BEFORE any other imports so that modules reading os.getenv()
+# at import time (e.g. database_config → POSTGRES_PORT) pick up the
+# correct values.
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).parent / ".env"
+    if _env_path.exists():
+        load_dotenv(_env_path)
+        print(f"[OK] Loaded environment from {_env_path}")
+    else:
+        _example_path = Path(__file__).parent / ".env.example"
+        if _example_path.exists():
+            print("[INFO] No .env file found. Copy .env.example to .env and configure it.")
+except ImportError:
+    print("[WARN] python-dotenv not installed. Environment variables must be set manually.")
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -27,25 +44,12 @@ from controller.tts_controller import router as tts_router
 from controller.auth_controller import router as auth_router
 from controller.user_opsidian_controller import router as user_opsidian_router
 from controller.curated_knowledge_controller import router as curated_knowledge_router
+from routers.playground2d import router as playground2d_router
 from service.config import get_config_manager
 from service.mcp_loader import MCPLoader, get_global_mcp_config
 import uvicorn
 
-# Load .env file
-try:
-    from dotenv import load_dotenv
-    # Load .env file from project root
-    env_path = Path(__file__).parent / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
-        print(f"[OK] Loaded environment from {env_path}")
-    else:
-        # Show info message if .env.example exists
-        example_path = Path(__file__).parent / ".env.example"
-        if example_path.exists():
-            print("[INFO] No .env file found. Copy .env.example to .env and configure it.")
-except ImportError:
-    print("[WARN] python-dotenv not installed. Environment variables must be set manually.")
+# (.env already loaded at top of file, before controller imports)
 
 # Configure GitHub CLI authentication from GITHUB_TOKEN
 # This allows gh CLI to work without interactive login
@@ -465,6 +469,7 @@ app.include_router(vtuber_router)  # VTuber Live2D API
 app.include_router(tts_router)  # TTS (Text-to-Speech) API
 app.include_router(user_opsidian_router)  # User Opsidian (personal knowledge vault)
 app.include_router(curated_knowledge_router)  # Curated Knowledge (refined knowledge layer)
+app.include_router(playground2d_router)  # Playground 2D world layout & state
 
 # Mount static files for Web UI Dashboard
 static_dir = Path(__file__).parent / "static"

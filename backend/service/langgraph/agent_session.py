@@ -484,8 +484,11 @@ class AgentSession:
             - STALE_IDLE → auto-revive (reset timestamps, restart process
               if needed).  The session continues — the user never sees an
               error.
-            - STALE_RESET → truly unrecoverable (extreme age, runaway
-              iterations, repeated revival failures).  Mark ERROR.
+            - STALE_RESET (age limit) → auto-renew: reset session clock
+              and flag for full process restart.  The session identity is
+              preserved; only the age counter resets.
+            - STALE_RESET (runaway iterations / repeated revival failures)
+              → truly unrecoverable.  Mark ERROR.
         """
         result = self._freshness.evaluate(
             created_at=self._created_at,
@@ -504,6 +507,39 @@ class AgentSession:
             return
 
         if result.should_reset:
+            # Distinguish age-based reset (recoverable) from
+            # iteration/revival-failure reset (unrecoverable).
+            is_age_based = result.session_age_seconds >= self._freshness.config.max_session_age_seconds
+            is_iteration_limit = result.iteration_count >= self._freshness.config.max_iterations
+            is_revival_exhausted = self._freshness.revive_count >= self._freshness.config.max_revive_attempts
+
+            if is_age_based and not is_iteration_limit and not is_revival_exhausted:
+                # Age-based staleness: auto-renew the session clock
+                # and flag for a full process restart.  The session
+                # remains usable — the user never sees an error.
+                logger.info(
+                    f"[{self._session_id}] Session age limit reached: "
+                    f"{result.reason}. Auto-renewing session clock..."
+                )
+                self._created_at = datetime.now()
+                self._execution_start_time = datetime.now()
+                self._current_iteration = 0
+                self._freshness.reset_revive_counter()
+
+                if self._status in (SessionStatus.IDLE, SessionStatus.ERROR, SessionStatus.STOPPED):
+                    self._status = SessionStatus.RUNNING
+                    self._error_message = None
+
+                # Flag for full process restart in _ensure_alive()
+                self._needs_process_restart = True
+                logger.info(
+                    f"[{self._session_id}] Session clock renewed — "
+                    f"full process restart will follow."
+                )
+                return
+
+            # Truly unrecoverable (runaway iterations or repeated
+            # revival failures) — hard error.
             self._status = SessionStatus.ERROR
             self._error_message = f"Session stale: {result.reason}"
             raise RuntimeError(

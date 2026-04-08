@@ -34,6 +34,7 @@ dependencies = [
     "playwright>=1.49.0",
     # MCP (Model Context Protocol) — proxy MCP server
     "mcp>=1.0.0",
+    "bcrypt>=5.0.0",
 ]
 
 [project.optional-dependencies]

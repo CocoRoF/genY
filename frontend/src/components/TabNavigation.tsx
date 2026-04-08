@@ -12,7 +12,7 @@ function cn(...classes: (string | boolean | undefined | null)[]) {
   return twMerge(classes.filter(Boolean).join(' '));
 }
 
-const GLOBAL_TAB_IDS = ['main', 'playground', 'workflows', 'toolSets', 'sharedFolder', 'settings'] as const;
+const GLOBAL_TAB_IDS = ['main', 'playground', 'playground2d', 'workflows', 'toolSets', 'sharedFolder', 'settings'] as const;
 const SESSION_TAB_DEFS = [
   { id: 'command', accent: true },
   { id: 'vtuber' },

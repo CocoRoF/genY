@@ -1,0 +1,3120 @@
+{
+  "version": 2,
+  "buildings": [
+    {
+      "id": "home_nw",
+      "name": "Architect Studio",
+      "type": "house",
+      "x": 4,
+      "y": 4,
+      "w": 5,
+      "h": 6
+    },
+    {
+      "id": "office",
+      "name": "CEO Office",
+      "type": "tower",
+      "x": 12,
+      "y": 4,
+      "w": 4,
+      "h": 4
+    },
+    {
+      "id": "town_hall",
+      "name": "Town Hall",
+      "type": "large",
+      "x": 4,
+      "y": 14,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "art_gallery",
+      "name": "Art Gallery",
+      "type": "house.green",
+      "x": 20,
+      "y": 4,
+      "w": 5,
+      "h": 5
+    },
+    {
+      "id": "workshop",
+      "name": "Workshop",
+      "type": "house2",
+      "x": 20,
+      "y": 12,
+      "w": 6,
+      "h": 4
+    },
+    {
+      "id": "home_ne",
+      "name": "QA Lab",
+      "type": "house2",
+      "x": 44,
+      "y": 4,
+      "w": 6,
+      "h": 4
+    },
+    {
+      "id": "research_lab",
+      "name": "Research Lab",
+      "type": "large",
+      "x": 34,
+      "y": 3,
+      "w": 8,
+      "h": 6
+    },
+    {
+      "id": "data_center",
+      "name": "Data Center",
+      "type": "tower",
+      "x": 52,
+      "y": 4,
+      "w": 4,
+      "h": 6
+    },
+    {
+      "id": "training_center",
+      "name": "Training Center",
+      "type": "house",
+      "x": 40,
+      "y": 14,
+      "w": 5,
+      "h": 5
+    },
+    {
+      "id": "home_sw",
+      "name": "Security HQ",
+      "type": "house.green",
+      "x": 4,
+      "y": 40,
+      "w": 5,
+      "h": 6
+    },
+    {
+      "id": "store",
+      "name": "Deploy Center",
+      "type": "house.green2",
+      "x": 4,
+      "y": 50,
+      "w": 5,
+      "h": 4
+    },
+    {
+      "id": "barracks",
+      "name": "Barracks",
+      "type": "house2",
+      "x": 14,
+      "y": 40,
+      "w": 6,
+      "h": 5
+    },
+    {
+      "id": "armory",
+      "name": "Armory",
+      "type": "house.gray",
+      "x": 14,
+      "y": 50,
+      "w": 5,
+      "h": 4
+    },
+    {
+      "id": "library",
+      "name": "Docs Archive",
+      "type": "house.gray",
+      "x": 44,
+      "y": 40,
+      "w": 6,
+      "h": 5
+    },
+    {
+      "id": "cafe",
+      "name": "Agent Lounge",
+      "type": "shop",
+      "x": 36,
+      "y": 28,
+      "w": 5,
+      "h": 5
+    },
+    {
+      "id": "market",
+      "name": "Market",
+      "type": "large",
+      "x": 44,
+      "y": 50,
+      "w": 8,
+      "h": 5
+    },
+    {
+      "id": "inn",
+      "name": "Inn",
+      "type": "house.green2",
+      "x": 36,
+      "y": 50,
+      "w": 5,
+      "h": 5
+    },
+    {
+      "id": "ed_mnpqif1y_5hdn0g",
+      "name": "house",
+      "type": "house",
+      "x": 34,
+      "y": 13,
+      "w": 5,
+      "h": 4
+    }
+  ],
+  "indoorStations": [
+    {
+      "id": "nw_w1",
+      "locationId": "home_nw",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 0,
+      "label": "refs",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_w2",
+      "locationId": "home_nw",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 2,
+      "dy": 0,
+      "label": "archive",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_plant",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "plant.purple",
+      "dx": 3,
+      "dy": 0,
+      "label": "studio plant",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_chair",
+      "locationId": "home_nw",
+      "kind": "work",
+      "type": "chair",
+      "dx": 1,
+      "dy": 1,
+      "label": "design chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_desk",
+      "locationId": "home_nw",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 2,
+      "dy": 1,
+      "label": "drafting desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_bed",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "bed.wide.pink",
+      "dx": 1,
+      "dy": 2,
+      "label": "bed",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_wardrobe",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "cabinet.wood.alt",
+      "dx": 3,
+      "dy": 2,
+      "label": "wardrobe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_dresser",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "dresser",
+      "dx": 1,
+      "dy": 3,
+      "label": "dresser",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_nightstand",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "nightstand",
+      "dx": 2,
+      "dy": 3,
+      "label": "nightstand",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_sofa",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 3,
+      "dy": 3,
+      "label": "reading sofa",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_table",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "table.tiny",
+      "dx": 2,
+      "dy": 4,
+      "label": "side table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nw_chair2",
+      "locationId": "home_nw",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 4,
+      "label": "accent chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_w1",
+      "locationId": "office",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 1,
+      "dy": 0,
+      "label": "private library",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_safe",
+      "locationId": "office",
+      "kind": "work",
+      "type": "safe",
+      "dx": 2,
+      "dy": 0,
+      "label": "CEO safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_desk",
+      "locationId": "office",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "CEO desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_chair",
+      "locationId": "office",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "CEO chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_sofa",
+      "locationId": "office",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 1,
+      "dy": 2,
+      "label": "guest sofa",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ceo_table",
+      "locationId": "office",
+      "kind": "rest",
+      "type": "table.tiny",
+      "dx": 2,
+      "dy": 2,
+      "label": "coffee table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_podium",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "counter",
+      "dx": 3,
+      "dy": 0,
+      "label": "podium",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_desk1",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 0,
+      "label": "clerk desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_chair1",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 0,
+      "label": "clerk chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_records",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "cabinet.books",
+      "dx": 5,
+      "dy": 0,
+      "label": "records",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_safe",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "safe",
+      "dx": 6,
+      "dy": 0,
+      "label": "town vault",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_bench1",
+      "locationId": "town_hall",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 1,
+      "dy": 1,
+      "label": "council bench L",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_bench2",
+      "locationId": "town_hall",
+      "kind": "rest",
+      "type": "sofa.alt",
+      "dx": 5,
+      "dy": 1,
+      "label": "council bench R",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_table",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "table",
+      "dx": 3,
+      "dy": 1,
+      "label": "council table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_flag",
+      "locationId": "town_hall",
+      "kind": "rest",
+      "type": "plant.purple",
+      "dx": 6,
+      "dy": 1,
+      "label": "banner",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_shelf",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 3,
+      "label": "law books",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_shelf2",
+      "locationId": "town_hall",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 2,
+      "dy": 3,
+      "label": "archives",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "th_chair2",
+      "locationId": "town_hall",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 5,
+      "dy": 3,
+      "label": "waiting chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_display1",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 0,
+      "label": "exhibit A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_display2",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "display.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "exhibit B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_display3",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "display",
+      "dx": 3,
+      "dy": 0,
+      "label": "exhibit C",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_easel",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "easel",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_chair",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "artist stool",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_plant",
+      "locationId": "art_gallery",
+      "kind": "rest",
+      "type": "plant.pink",
+      "dx": 3,
+      "dy": 1,
+      "label": "gallery fern",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_case",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 1,
+      "dy": 2,
+      "label": "sculpture case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_bench",
+      "locationId": "art_gallery",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 2,
+      "dy": 2,
+      "label": "viewing bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_counter",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "counter",
+      "dx": 1,
+      "dy": 3,
+      "label": "gift counter",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ag_shelf",
+      "locationId": "art_gallery",
+      "kind": "work",
+      "type": "bookshelf.scroll",
+      "dx": 3,
+      "dy": 3,
+      "label": "print rack",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_anvil",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "counter",
+      "dx": 1,
+      "dy": 0,
+      "label": "anvil",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_stove",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "stove",
+      "dx": 2,
+      "dy": 0,
+      "label": "furnace",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_tools",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "cabinet.wood",
+      "dx": 3,
+      "dy": 0,
+      "label": "tool rack",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_metal",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 4,
+      "dy": 0,
+      "label": "metal stock",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_bench",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "work bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_chair",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "stool",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_vice",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 3,
+      "dy": 1,
+      "label": "vice station",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_crate",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "cabinet.drawer",
+      "dx": 4,
+      "dy": 1,
+      "label": "parts crate",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_shelf",
+      "locationId": "workshop",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 2,
+      "label": "manuals",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ws_sofa",
+      "locationId": "workshop",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 3,
+      "dy": 2,
+      "label": "break bench",
+      "flipX": false,
+      "flipY": null
+    },
+    {
+      "id": "ne_mon1",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "dresser.beer",
+      "dx": 1,
+      "dy": 0,
+      "label": "monitor 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_chair1",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 0,
+      "label": "analyst 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_mon2",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "dresser.alt",
+      "dx": 3,
+      "dy": 0,
+      "label": "monitor 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_bench",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "prep bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_chair2",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "chair.alt",
+      "dx": 2,
+      "dy": 1,
+      "label": "analyst 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_safe",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "safe",
+      "dx": 3,
+      "dy": 1,
+      "label": "sample safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_docs",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "bookshelf.scroll",
+      "dx": 1,
+      "dy": 2,
+      "label": "test docs",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_display",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "display",
+      "dx": 2,
+      "dy": 2,
+      "label": "test display",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_sofa",
+      "locationId": "home_ne",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 3,
+      "dy": 2,
+      "label": "break seat",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_rack",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 4,
+      "dy": 0,
+      "label": "rack A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_rack2",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 4,
+      "dy": 1,
+      "label": "rack B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ne_case",
+      "locationId": "home_ne",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 4,
+      "dy": 2,
+      "label": "sample case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_micro",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 0,
+      "label": "microscope",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_desk1",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 2,
+      "dy": 0,
+      "label": "lab bench A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_chair1",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "chair",
+      "dx": 3,
+      "dy": 0,
+      "label": "researcher 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_cab1",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 1,
+      "dy": 1,
+      "label": "specimen case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_stove",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "stove",
+      "dx": 2,
+      "dy": 1,
+      "label": "bunsen burner",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_safe",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "safe",
+      "dx": 3,
+      "dy": 1,
+      "label": "reagent safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_shelf",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 3,
+      "label": "journal shelf",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_shelf2",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 2,
+      "dy": 3,
+      "label": "reference shelf",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_desk2",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 5,
+      "dy": 0,
+      "label": "lab bench B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_chair2",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "chair.alt",
+      "dx": 6,
+      "dy": 0,
+      "label": "researcher 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_rack",
+      "locationId": "research_lab",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 5,
+      "dy": 1,
+      "label": "server rack",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "rl_sofa",
+      "locationId": "research_lab",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 5,
+      "dy": 3,
+      "label": "break couch",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_rack1",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 1,
+      "dy": 0,
+      "label": "rack 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_rack2",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "rack 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_rack3",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 1,
+      "dy": 1,
+      "label": "rack 3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_rack4",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 2,
+      "dy": 1,
+      "label": "rack 4",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_desk",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 2,
+      "label": "ops terminal",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_chair",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 2,
+      "label": "ops chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_display",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 3,
+      "label": "status board",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_safe",
+      "locationId": "data_center",
+      "kind": "work",
+      "type": "safe",
+      "dx": 2,
+      "dy": 3,
+      "label": "key safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "dc_stool",
+      "locationId": "data_center",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 1,
+      "dy": 4,
+      "label": "break stool",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "tc_sim",
+      "locationId": "training_center",
+      "kind": "work",
+      "type": "display.alt",
+      "dx": 0,
+      "dy": 2,
+      "label": "simulator",
+      "flipX": false,
+      "flipY": false
+    },
+    {
+      "id": "tc_chair2",
+      "locationId": "training_center",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 4,
+      "dy": 2,
+      "label": "student chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_w1",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 1,
+      "dy": 0,
+      "label": "evidence",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_w2",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "armory",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_w3",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "cabinet.wood.alt",
+      "dx": 3,
+      "dy": 0,
+      "label": "gear locker",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_mon1",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 1,
+      "label": "monitor 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_mon2",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "display.alt",
+      "dx": 2,
+      "dy": 1,
+      "label": "monitor 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_safe",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "safe",
+      "dx": 3,
+      "dy": 1,
+      "label": "safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_console",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 2,
+      "label": "console",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_chair",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 2,
+      "label": "operator",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_records",
+      "locationId": "home_sw",
+      "kind": "work",
+      "type": "cabinet.books",
+      "dx": 3,
+      "dy": 2,
+      "label": "records",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_nightst",
+      "locationId": "home_sw",
+      "kind": "rest",
+      "type": "nightstand",
+      "dx": 1,
+      "dy": 3,
+      "label": "nightstand",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_bunk",
+      "locationId": "home_sw",
+      "kind": "rest",
+      "type": "bed.wide.blue",
+      "dx": 2,
+      "dy": 3,
+      "label": "on-call bunk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_dresser",
+      "locationId": "home_sw",
+      "kind": "rest",
+      "type": "dresser",
+      "dx": 1,
+      "dy": 4,
+      "label": "dresser",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_chair2",
+      "locationId": "home_sw",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 2,
+      "dy": 4,
+      "label": "duty chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "sw_table",
+      "locationId": "home_sw",
+      "kind": "rest",
+      "type": "table.tiny",
+      "dx": 3,
+      "dy": 4,
+      "label": "side table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_r1",
+      "locationId": "store",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 1,
+      "dy": 0,
+      "label": "rack A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_r2",
+      "locationId": "store",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "rack B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_vault",
+      "locationId": "store",
+      "kind": "work",
+      "type": "safe",
+      "dx": 3,
+      "dy": 0,
+      "label": "vault",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_counter",
+      "locationId": "store",
+      "kind": "work",
+      "type": "counter",
+      "dx": 1,
+      "dy": 1,
+      "label": "staging",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_drawer",
+      "locationId": "store",
+      "kind": "work",
+      "type": "cabinet.drawer",
+      "dx": 2,
+      "dy": 1,
+      "label": "parts drawer",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_tools",
+      "locationId": "store",
+      "kind": "work",
+      "type": "cabinet.wood",
+      "dx": 3,
+      "dy": 1,
+      "label": "tools",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_desk",
+      "locationId": "store",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 2,
+      "label": "ops desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_chair",
+      "locationId": "store",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 2,
+      "label": "ops chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "store_case",
+      "locationId": "store",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 3,
+      "dy": 2,
+      "label": "sample case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_bunk1",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "bed.wide.blue",
+      "dx": 1,
+      "dy": 0,
+      "label": "bunk 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_bunk2",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "bed.wide.blue",
+      "dx": 3,
+      "dy": 0,
+      "label": "bunk 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_locker1",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "cabinet.wood",
+      "dx": 4,
+      "dy": 0,
+      "label": "locker 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_locker2",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "cabinet.wood.alt",
+      "dx": 1,
+      "dy": 1,
+      "label": "locker 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_dresser",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "dresser",
+      "dx": 2,
+      "dy": 1,
+      "label": "dresser",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_nightst",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "nightstand",
+      "dx": 3,
+      "dy": 1,
+      "label": "nightstand",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_table",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "table",
+      "dx": 1,
+      "dy": 2,
+      "label": "mess table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_chair1",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "chair",
+      "dx": 2,
+      "dy": 2,
+      "label": "mess chair 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_chair2",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 2,
+      "label": "mess chair 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_stove",
+      "locationId": "barracks",
+      "kind": "work",
+      "type": "stove",
+      "dx": 4,
+      "dy": 2,
+      "label": "mess stove",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_sofa",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 1,
+      "dy": 3,
+      "label": "day room sofa",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bk_plant",
+      "locationId": "barracks",
+      "kind": "rest",
+      "type": "plant.purple",
+      "dx": 4,
+      "dy": 3,
+      "label": "barracks plant",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_rack1",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 1,
+      "dy": 0,
+      "label": "weapons rack A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_rack2",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "cabinet.metal.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "weapons rack B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_safe",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "safe",
+      "dx": 3,
+      "dy": 0,
+      "label": "ammo vault",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_bench",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "repair bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_chair",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "armorer seat",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_tools",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "cabinet.wood",
+      "dx": 3,
+      "dy": 1,
+      "label": "tool cabinet",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_display",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 2,
+      "label": "inventory display",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_drawer",
+      "locationId": "armory",
+      "kind": "work",
+      "type": "cabinet.drawer",
+      "dx": 2,
+      "dy": 2,
+      "label": "parts drawer",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "arm_stool",
+      "locationId": "armory",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 2,
+      "label": "break stool",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_w1",
+      "locationId": "library",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 0,
+      "dy": 0,
+      "label": "shelf A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_w2",
+      "locationId": "library",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 1,
+      "dy": 0,
+      "label": "shelf B",
+      "flipX": null,
+      "flipY": true
+    },
+    {
+      "id": "lib_w3",
+      "locationId": "library",
+      "kind": "work",
+      "type": "bookshelf.scroll",
+      "dx": 0,
+      "dy": 1,
+      "label": "scrolls",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_cab",
+      "locationId": "library",
+      "kind": "work",
+      "type": "cabinet.books",
+      "dx": 2,
+      "dy": 1,
+      "label": "catalog",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_w4",
+      "locationId": "library",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 3,
+      "label": "shelf C",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_w5",
+      "locationId": "library",
+      "kind": "work",
+      "type": "bookshelf.full",
+      "dx": 2,
+      "dy": 0,
+      "label": "shelf D",
+      "flipX": null,
+      "flipY": true
+    },
+    {
+      "id": "lib_desk",
+      "locationId": "library",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 4,
+      "dy": 0,
+      "label": "study desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_chair1",
+      "locationId": "library",
+      "kind": "work",
+      "type": "chair",
+      "dx": 5,
+      "dy": 0,
+      "label": "study chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_plant",
+      "locationId": "library",
+      "kind": "rest",
+      "type": "plant.purple",
+      "dx": 4,
+      "dy": 1,
+      "label": "corner plant",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_sofa",
+      "locationId": "library",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 5,
+      "dy": 1,
+      "label": "reading sofa",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_table",
+      "locationId": "library",
+      "kind": "rest",
+      "type": "table.tiny",
+      "dx": 4,
+      "dy": 3,
+      "label": "side table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "lib_chair2",
+      "locationId": "library",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 5,
+      "dy": 3,
+      "label": "lounge chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_case",
+      "locationId": "cafe",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 1,
+      "dy": 0,
+      "label": "pastry case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_stove",
+      "locationId": "cafe",
+      "kind": "work",
+      "type": "stove",
+      "dx": 2,
+      "dy": 0,
+      "label": "main stove",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_plant",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "plant.pink",
+      "dx": 3,
+      "dy": 0,
+      "label": "cafe plant",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_stove2",
+      "locationId": "cafe",
+      "kind": "work",
+      "type": "stove.alt",
+      "dx": 1,
+      "dy": 1,
+      "label": "grill",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_counter",
+      "locationId": "cafe",
+      "kind": "work",
+      "type": "counter",
+      "dx": 2,
+      "dy": 1,
+      "label": "prep counter",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_sofa1",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 1,
+      "dy": 2,
+      "label": "corner booth",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_sofa2",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "sofa.alt",
+      "dx": 3,
+      "dy": 2,
+      "label": "window booth",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_chair1",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "chair",
+      "dx": 1,
+      "dy": 3,
+      "label": "diner 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_table",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "table",
+      "dx": 2,
+      "dy": 3,
+      "label": "dining table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_chair2",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 3,
+      "label": "diner 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_sofa3",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "sofa.alt2",
+      "dx": 1,
+      "dy": 4,
+      "label": "lounge sofa",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "cafe_ns",
+      "locationId": "cafe",
+      "kind": "rest",
+      "type": "nightstand.alt",
+      "dx": 3,
+      "dy": 4,
+      "label": "side stand",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_stall1",
+      "locationId": "market",
+      "kind": "work",
+      "type": "counter",
+      "dx": 1,
+      "dy": 0,
+      "label": "produce stall",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_stall2",
+      "locationId": "market",
+      "kind": "work",
+      "type": "counter",
+      "dx": 2,
+      "dy": 0,
+      "label": "goods stall",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_case",
+      "locationId": "market",
+      "kind": "work",
+      "type": "cabinet.glass",
+      "dx": 3,
+      "dy": 0,
+      "label": "display case",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_chair1",
+      "locationId": "market",
+      "kind": "work",
+      "type": "chair",
+      "dx": 1,
+      "dy": 1,
+      "label": "vendor seat 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_drawer",
+      "locationId": "market",
+      "kind": "work",
+      "type": "cabinet.drawer",
+      "dx": 2,
+      "dy": 1,
+      "label": "coin drawer",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_chair2",
+      "locationId": "market",
+      "kind": "work",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 1,
+      "label": "vendor seat 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_crate1",
+      "locationId": "market",
+      "kind": "work",
+      "type": "cabinet.wood",
+      "dx": 1,
+      "dy": 3,
+      "label": "crate A",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_crate2",
+      "locationId": "market",
+      "kind": "work",
+      "type": "cabinet.wood.alt",
+      "dx": 2,
+      "dy": 3,
+      "label": "crate B",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_rack",
+      "locationId": "market",
+      "kind": "work",
+      "type": "cabinet.metal",
+      "dx": 5,
+      "dy": 0,
+      "label": "storage rack",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_desk",
+      "locationId": "market",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 5,
+      "dy": 1,
+      "label": "ledger desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_safe",
+      "locationId": "market",
+      "kind": "work",
+      "type": "safe",
+      "dx": 6,
+      "dy": 0,
+      "label": "market safe",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mk_sofa",
+      "locationId": "market",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 5,
+      "dy": 3,
+      "label": "break bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_bar",
+      "locationId": "inn",
+      "kind": "work",
+      "type": "counter",
+      "dx": 1,
+      "dy": 0,
+      "label": "bar counter",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_stove",
+      "locationId": "inn",
+      "kind": "work",
+      "type": "stove",
+      "dx": 2,
+      "dy": 0,
+      "label": "tavern stove",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_tap",
+      "locationId": "inn",
+      "kind": "work",
+      "type": "dresser.beer",
+      "dx": 3,
+      "dy": 0,
+      "label": "beer tap",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_table",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "table",
+      "dx": 1,
+      "dy": 1,
+      "label": "tavern table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_chair1",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "tavern chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_chair2",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "chair.alt",
+      "dx": 3,
+      "dy": 1,
+      "label": "bar stool",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_bed1",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "bed.wide.pink",
+      "dx": 1,
+      "dy": 2,
+      "label": "guest bed 1",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_nightst",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "nightstand",
+      "dx": 2,
+      "dy": 2,
+      "label": "bedside table",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_bed2",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "bed.wide.blue",
+      "dx": 3,
+      "dy": 2,
+      "label": "guest bed 2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_dresser",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "dresser",
+      "dx": 1,
+      "dy": 3,
+      "label": "guest dresser",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "inn_plant",
+      "locationId": "inn",
+      "kind": "rest",
+      "type": "plant.pink",
+      "dx": 3,
+      "dy": 3,
+      "label": "inn plant",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_clock",
+      "locationId": "clock_tower",
+      "kind": "work",
+      "type": "display",
+      "dx": 1,
+      "dy": 0,
+      "label": "clock mechanism",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_bell",
+      "locationId": "clock_tower",
+      "kind": "work",
+      "type": "display.alt",
+      "dx": 2,
+      "dy": 0,
+      "label": "bell controls",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_desk",
+      "locationId": "clock_tower",
+      "kind": "work",
+      "type": "table.mid",
+      "dx": 1,
+      "dy": 1,
+      "label": "logbook desk",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_chair",
+      "locationId": "clock_tower",
+      "kind": "work",
+      "type": "chair",
+      "dx": 2,
+      "dy": 1,
+      "label": "keeper chair",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_shelf",
+      "locationId": "clock_tower",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 1,
+      "dy": 2,
+      "label": "parts shelf",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ct_sofa",
+      "locationId": "clock_tower",
+      "kind": "rest",
+      "type": "sofa",
+      "dx": 2,
+      "dy": 2,
+      "label": "observation seat",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ed_mnpqimb2_31y47g",
+      "locationId": "ed_mnpqif1y_5hdn0g",
+      "kind": "work",
+      "type": "bed.wide.pink",
+      "dx": 3,
+      "dy": 3,
+      "label": "bed.wide.pink",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ed_mnpqio6r_swt1hx",
+      "locationId": "ed_mnpqif1y_5hdn0g",
+      "kind": "work",
+      "type": "bed.wide.blue",
+      "dx": 0,
+      "dy": 0,
+      "label": "bed.wide.blue",
+      "flipX": null,
+      "flipY": false
+    },
+    {
+      "id": "ed_mnpqiuuy_1tv0mn",
+      "locationId": "ed_mnpqif1y_5hdn0g",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 4,
+      "dy": 0,
+      "label": "bookshelf",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "ed_mnpqiwnj_jjknts",
+      "locationId": "ed_mnpqif1y_5hdn0g",
+      "kind": "work",
+      "type": "bookshelf",
+      "dx": 3,
+      "dy": 0,
+      "label": "bookshelf",
+      "flipX": null,
+      "flipY": null
+    }
+  ],
+  "outdoorStations": [
+    {
+      "id": "plaza_bench_n",
+      "kind": "rest",
+      "type": "outdoor.reading",
+      "x": 29,
+      "y": 27,
+      "dx": 0,
+      "dy": 0,
+      "label": "plaza bench N",
+      "activity": "reading on a bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "plaza_bench_s",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 31,
+      "y": 33,
+      "dx": 0,
+      "dy": 0,
+      "label": "plaza bench S",
+      "activity": "taking a break",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "plaza_bench_e",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 33,
+      "y": 29,
+      "dx": 0,
+      "dy": 0,
+      "label": "plaza bench E",
+      "activity": "people watching",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "plaza_bench_w",
+      "kind": "rest",
+      "type": "outdoor.reading",
+      "x": 27,
+      "y": 31,
+      "dx": 0,
+      "dy": 0,
+      "label": "plaza bench W",
+      "activity": "reading the paper",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_nw1",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 16,
+      "y": 8,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW rose garden",
+      "activity": "enjoying the roses",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_nw2",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 8,
+      "y": 18,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW herb garden",
+      "activity": "tending herbs",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bench_nw",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 14,
+      "y": 22,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW park bench",
+      "activity": "sitting under a tree",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nap_nw",
+      "kind": "rest",
+      "type": "outdoor.napping",
+      "x": 18,
+      "y": 18,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW shady spot",
+      "activity": "napping under a tree",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mine_nw",
+      "kind": "work",
+      "type": "outdoor.mining",
+      "x": 3,
+      "y": 24,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW quarry",
+      "activity": "mining stones",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "forage_nw",
+      "kind": "work",
+      "type": "outdoor.foraging",
+      "x": 18,
+      "y": 4,
+      "dx": 0,
+      "dy": 0,
+      "label": "NW berry bush",
+      "activity": "picking berries",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "stream_bench",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 13,
+      "y": 44,
+      "dx": 0,
+      "dy": 0,
+      "label": "stream bench",
+      "activity": "listening to the stream",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "stream_fish",
+      "kind": "rest",
+      "type": "outdoor.fishing",
+      "x": 8,
+      "y": 44,
+      "dx": 0,
+      "dy": 0,
+      "label": "stream fishing",
+      "activity": "fishing in the canal",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_ne1",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 38,
+      "y": 11,
+      "dx": 0,
+      "dy": 0,
+      "label": "NE flower bed",
+      "activity": "smelling the flowers",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_ne2",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 55,
+      "y": 12,
+      "dx": 0,
+      "dy": 0,
+      "label": "NE hedge",
+      "activity": "trimming hedges",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bench_ne",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 48,
+      "y": 20,
+      "dx": 0,
+      "dy": 0,
+      "label": "NE park bench",
+      "activity": "resting on a bench",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mine_ne",
+      "kind": "work",
+      "type": "outdoor.mining",
+      "x": 56,
+      "y": 22,
+      "dx": 0,
+      "dy": 0,
+      "label": "NE rock face",
+      "activity": "chipping rocks",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "pond_fish",
+      "kind": "rest",
+      "type": "outdoor.fishing",
+      "x": 48,
+      "y": 14,
+      "dx": 0,
+      "dy": 0,
+      "label": "pond fishing",
+      "activity": "fishing by the pond",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "pond_view",
+      "kind": "rest",
+      "type": "outdoor.watching",
+      "x": 52,
+      "y": 18,
+      "dx": 0,
+      "dy": 0,
+      "label": "pond view",
+      "activity": "watching the water",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_sw1",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 14,
+      "y": 36,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW garden",
+      "activity": "watering flowers",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_sw2",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 22,
+      "y": 46,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW wildflowers",
+      "activity": "picking wildflowers",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bench_sw",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 6,
+      "y": 56,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW corner bench",
+      "activity": "sitting quietly",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nap_sw",
+      "kind": "rest",
+      "type": "outdoor.napping",
+      "x": 20,
+      "y": 54,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW grassy knoll",
+      "activity": "napping in the sun",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mine_sw",
+      "kind": "work",
+      "type": "outdoor.mining",
+      "x": 3,
+      "y": 56,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW rock pile",
+      "activity": "breaking rocks",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "forage_sw",
+      "kind": "work",
+      "type": "outdoor.foraging",
+      "x": 24,
+      "y": 38,
+      "dx": 0,
+      "dy": 0,
+      "label": "SW herb patch",
+      "activity": "foraging herbs",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_se1",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 42,
+      "y": 36,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE rose garden",
+      "activity": "strolling the garden",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "garden_se2",
+      "kind": "rest",
+      "type": "outdoor.flowers",
+      "x": 54,
+      "y": 46,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE flower arch",
+      "activity": "admiring the arch",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "bench_se",
+      "kind": "rest",
+      "type": "outdoor.sitting",
+      "x": 56,
+      "y": 38,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE bench",
+      "activity": "enjoying the view",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "nap_se",
+      "kind": "rest",
+      "type": "outdoor.napping",
+      "x": 40,
+      "y": 56,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE shady tree",
+      "activity": "dozing in the shade",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "mine_se",
+      "kind": "work",
+      "type": "outdoor.mining",
+      "x": 56,
+      "y": 56,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE quarry",
+      "activity": "mining ore",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "id": "forage_se",
+      "kind": "work",
+      "type": "outdoor.foraging",
+      "x": 54,
+      "y": 34,
+      "dx": 0,
+      "dy": 0,
+      "label": "SE berry bush",
+      "activity": "gathering berries",
+      "flipX": null,
+      "flipY": null
+    }
+  ],
+  "trees": [
+    {
+      "x": 0,
+      "y": 0,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 3,
+      "y": 0,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 7,
+      "y": 0,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 15,
+      "y": 0,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 22,
+      "y": 0,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 28,
+      "y": 0,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 35,
+      "y": 0,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 42,
+      "y": 0,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 48,
+      "y": 0,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 55,
+      "y": 0,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 0,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "type": "tree.big.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 28,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 35,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 42,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 50,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 0,
+      "y": 58,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 5,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 12,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 20,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 28,
+      "type": "tree.big.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 35,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 42,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 50,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 58,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 3,
+      "y": 59,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 8,
+      "y": 59,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 15,
+      "y": 59,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 22,
+      "y": 59,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 28,
+      "y": 59,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 35,
+      "y": 59,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 42,
+      "y": 59,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 48,
+      "y": 59,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 55,
+      "y": 59,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 59,
+      "y": 59,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 16,
+      "y": 6,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 17,
+      "y": 10,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 26,
+      "y": 8,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 14,
+      "y": 24,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 22,
+      "y": 20,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 36,
+      "y": 18,
+      "type": "tree.alt",
+      "flipX": true,
+      "flipY": false
+    },
+    {
+      "x": 40,
+      "y": 10,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 56,
+      "y": 10,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 24,
+      "type": "tree.big.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 24,
+      "y": 34,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 14,
+      "y": 34,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 8,
+      "y": 36,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 22,
+      "y": 42,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 20,
+      "y": 56,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 8,
+      "y": 54,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 34,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 42,
+      "y": 34,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 56,
+      "y": 34,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 54,
+      "y": 42,
+      "type": "tree.big.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 42,
+      "y": 56,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 54,
+      "y": 56,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 56,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 26,
+      "y": 2,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 2,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 2,
+      "y": 30,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 57,
+      "y": 30,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 26,
+      "y": 26,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 26,
+      "type": "tree.alt",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 26,
+      "y": 34,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 34,
+      "y": 44,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 46,
+      "y": 22,
+      "type": "tree.alt2",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 16,
+      "y": 48,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 55,
+      "y": 13,
+      "type": "tree.big",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 55,
+      "y": 14,
+      "type": "tree.alt3",
+      "flipX": null,
+      "flipY": null
+    },
+    {
+      "x": 56,
+      "y": 14,
+      "type": "tree.big.alt",
+      "flipX": null,
+      "flipY": null
+    }
+  ]
+}

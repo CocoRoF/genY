@@ -83,6 +83,7 @@ const en = {
     chat: 'Chat',
     memory: 'Memory',
     vtuber: 'VTuber',
+    playground2d: 'Playground 2D',
   },
 
   // ─── Sidebar ───
