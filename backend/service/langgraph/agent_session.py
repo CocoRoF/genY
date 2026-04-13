@@ -108,6 +108,7 @@ class AgentSession:
         graph_name: Optional[str] = None,
         tool_preset_id: Optional[str] = None,
         owner_username: Optional[str] = None,
+        geny_tool_registry: Optional[Any] = None,
     ):
         """Initialize AgentSession.
 
@@ -155,8 +156,13 @@ class AgentSession:
         # Internal components
         self._model: Optional[ClaudeCLIChatModel] = None
         self._graph: Optional[CompiledStateGraph] = None
+        self._pipeline: Optional[Any] = None  # geny-executor Pipeline (pipeline mode)
+        self._execution_backend: str = "langgraph"  # "langgraph" | "pipeline"
         self._checkpointer: Optional[object] = None  # MemorySaver or SqliteSaver
         self._enable_checkpointing = enable_checkpointing
+
+        # geny-executor tool registry (set by AgentSessionManager)
+        self._geny_tool_registry = geny_tool_registry
 
         # Memory manager (initialized lazily once storage_path is available)
         self._memory_manager: Optional["SessionMemoryManager"] = None
@@ -752,7 +758,15 @@ class AgentSession:
         Called at the top of invoke() and astream() after freshness check.
         If the process needs restart (flagged by _auto_revive), performs
         full async revival.  If revival fails, raises RuntimeError.
+
+        In pipeline mode, the ClaudeProcess is only used for storage_path
+        infrastructure — LLM calls go through the Anthropic API directly.
+        Skip process liveness checks in pipeline mode.
         """
+        # Pipeline mode: skip process checks (API calls don't need CLI subprocess)
+        if self._pipeline is not None:
+            return
+
         if getattr(self, '_needs_process_restart', False):
             logger.info(
                 f"[{self._session_id}] Process restart needed — "
@@ -865,11 +879,15 @@ class AgentSession:
             return False
 
     def _build_graph(self):
-        """Build the LangGraph StateGraph from the linked WorkflowDefinition.
+        """Build the execution backend from the linked WorkflowDefinition.
 
         Loads the WorkflowDefinition (from workflow_id or default template),
-        creates an ExecutionContext, and compiles via WorkflowExecutor.
-        All graph types go through this single path.
+        then dispatches to either:
+          - Pipeline mode (geny-executor): for template-based workflows
+          - LangGraph mode (legacy): for custom user-created workflows
+
+        Pipeline mode is default for templates. Set GENY_FORCE_LANGGRAPH=1
+        to force legacy mode for all workflows.
         """
         # Checkpointer setup (persistent when storage_path is available)
         if self._enable_checkpointing:
@@ -890,6 +908,25 @@ class AgentSession:
         # Update graph_name from the workflow if not explicitly set
         if not self._graph_name:
             self._graph_name = self._workflow.name
+
+        # ── Pipeline mode dispatch ──
+        # Template workflows use geny-executor Pipeline by default.
+        # Custom workflows always use LangGraph.
+        use_pipeline = (
+            self._workflow_id
+            and self._workflow_id.startswith("template-")
+            and not os.environ.get("GENY_FORCE_LANGGRAPH")
+        )
+        # Also use pipeline when inferred template (no explicit workflow_id)
+        if not self._workflow_id and self._workflow and getattr(self._workflow, "is_template", False):
+            if not os.environ.get("GENY_FORCE_LANGGRAPH"):
+                use_pipeline = True
+
+        if use_pipeline:
+            self._build_pipeline()
+            return
+
+        # ── Legacy LangGraph mode ──
 
         # Create lightweight memory model (ChatAnthropic) if configured
         memory_chat_model = None
@@ -968,6 +1005,346 @@ class AgentSession:
             f"[{self._session_id}] Graph compiled from workflow "
             f"'{self._workflow.name}' ({self._workflow.id})"
         )
+
+    # ========================================================================
+    # geny-executor Pipeline Mode
+    # ========================================================================
+
+    def _build_pipeline(self):
+        """Build a geny-executor Pipeline for template-based execution.
+
+        Maps the loaded WorkflowDefinition's template to a GenyPresets
+        method, wiring in memory_manager, tools, and LLM callbacks.
+        """
+        try:
+            from geny_executor.memory import GenyPresets
+
+            # Get API key
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            try:
+                from service.config.manager import get_config_manager
+                from service.config.sub_config.general.api_config import APIConfig
+                api_cfg = get_config_manager().load_config(APIConfig)
+                api_key = api_key or api_cfg.anthropic_api_key or ""
+            except Exception:
+                pass
+
+            if not api_key:
+                logger.warning(
+                    f"[{self._session_id}] Pipeline mode: no API key, "
+                    f"falling back to LangGraph"
+                )
+                self._build_graph_langgraph()
+                return
+
+            model = self._model_name or "claude-sonnet-4-20250514"
+            system_prompt = self._system_prompt or ""
+
+            # Curated knowledge manager
+            curated_km = None
+            if self._owner_username:
+                try:
+                    from service.memory.curated_knowledge import get_curated_knowledge_manager
+                    curated_km = get_curated_knowledge_manager(self._owner_username)
+                except Exception:
+                    pass
+
+            # LLM reflect callback (uses Anthropic SDK directly)
+            llm_reflect = self._make_llm_reflect_callback(api_key)
+
+            # Determine preset from template
+            template_id = getattr(self._workflow, "id", "") or self._workflow_id or ""
+            is_vtuber = "vtuber" in template_id.lower()
+            is_simple = "simple" in template_id.lower()
+
+            if is_vtuber:
+                self._pipeline = GenyPresets.vtuber(
+                    api_key=api_key,
+                    memory_manager=self._memory_manager,
+                    model=model,
+                    persona_prompt=system_prompt,
+                    curated_knowledge_manager=curated_km,
+                    llm_reflect=llm_reflect,
+                    tools=self._geny_tool_registry,
+                )
+            elif is_simple:
+                self._pipeline = GenyPresets.worker_easy(
+                    api_key=api_key,
+                    memory_manager=self._memory_manager,
+                    model=model,
+                    system_prompt=system_prompt,
+                )
+            else:
+                # autonomous, optimized-autonomous, ultra-light → worker_full
+                max_turns = self._max_iterations or 50
+                if "optimized" in template_id.lower():
+                    max_turns = min(max_turns, 30)
+
+                self._pipeline = GenyPresets.worker_full(
+                    api_key=api_key,
+                    memory_manager=self._memory_manager,
+                    model=model,
+                    system_prompt=system_prompt,
+                    tools=self._geny_tool_registry,
+                    max_turns=max_turns,
+                    curated_knowledge_manager=curated_km,
+                    llm_reflect=llm_reflect,
+                )
+
+            self._execution_backend = "pipeline"
+            logger.info(
+                f"[{self._session_id}] Pipeline built from template "
+                f"'{template_id}' (preset={'vtuber' if is_vtuber else 'worker_easy' if is_simple else 'worker_full'})"
+            )
+
+        except ImportError:
+            logger.warning(
+                f"[{self._session_id}] geny-executor not installed, "
+                f"falling back to LangGraph"
+            )
+            self._build_graph_langgraph()
+        except Exception as exc:
+            logger.warning(
+                f"[{self._session_id}] Pipeline build failed ({exc}), "
+                f"falling back to LangGraph"
+            )
+            self._build_graph_langgraph()
+
+    def _build_graph_langgraph(self):
+        """Legacy LangGraph graph compilation (fallback from pipeline failure).
+
+        Re-runs _build_graph() with GENY_FORCE_LANGGRAPH temporarily set
+        so the pipeline dispatch is skipped.
+        """
+        self._execution_backend = "langgraph"
+        self._pipeline = None
+        # Temporarily force LangGraph mode to avoid infinite recursion
+        _prev = os.environ.get("GENY_FORCE_LANGGRAPH")
+        os.environ["GENY_FORCE_LANGGRAPH"] = "1"
+        try:
+            self._build_graph()
+        finally:
+            if _prev is None:
+                os.environ.pop("GENY_FORCE_LANGGRAPH", None)
+            else:
+                os.environ["GENY_FORCE_LANGGRAPH"] = _prev
+
+    @staticmethod
+    def _make_llm_reflect_callback(api_key: str):
+        """Create an LLM reflection callback for GenyMemoryStrategy.
+
+        Returns an async callable: (input_text, output_text) -> List[Dict].
+        Uses the Anthropic SDK directly (lightweight, no LangChain).
+        """
+        async def _llm_reflect(input_text: str, output_text: str):
+            import json as _json
+            try:
+                import anthropic
+            except ImportError:
+                return []
+
+            prompt = (
+                "Analyze the following execution and extract any reusable knowledge, "
+                "decisions, or insights worth remembering for future tasks.\n\n"
+                f"<input>\n{input_text}\n</input>\n\n"
+                f"<output>\n{output_text}\n</output>\n\n"
+                "Extract concise, reusable insights. Skip trivial/obvious observations.\n\n"
+                'Respond with JSON only:\n'
+                '{\n'
+                '  "learned": [\n'
+                '    {\n'
+                '      "title": "concise title (3-10 words)",\n'
+                '      "content": "what was learned (1-3 sentences)",\n'
+                '      "category": "topics|insights|entities|projects",\n'
+                '      "tags": ["tag1", "tag2"],\n'
+                '      "importance": "low|medium|high"\n'
+                '    }\n'
+                '  ],\n'
+                '  "should_save": true\n'
+                '}\n\n'
+                'If nothing meaningful was learned, return:\n'
+                '{"learned": [], "should_save": false}'
+            )
+
+            try:
+                client = anthropic.AsyncAnthropic(api_key=api_key)
+                response = await client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = response.content[0].text
+                data = _json.loads(text)
+                if data.get("should_save") and data.get("learned"):
+                    return data["learned"]
+                return []
+            except Exception:
+                return []
+
+        return _llm_reflect
+
+    # ========================================================================
+    # Pipeline Execution Methods
+    # ========================================================================
+
+    async def _invoke_pipeline(
+        self,
+        input_text: str,
+        start_time: float,
+        session_logger: Optional[SessionLogger],
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """Execute via geny-executor Pipeline (non-streaming).
+
+        Maintains the same return contract as the LangGraph path:
+        {"output": str, "total_cost": float}
+        """
+        # Record user input to short-term memory
+        if self._memory_manager:
+            try:
+                self._memory_manager.record_message("user", input_text)
+            except Exception:
+                logger.debug("Failed to record user message — non-critical", exc_info=True)
+
+        # Execute pipeline
+        result = await self._pipeline.run(input_text)
+
+        duration_ms = int((time.time() - start_time) * 1000)
+        output_text = result.text or ""
+        total_cost = result.total_cost_usd or 0.0
+
+        # Log execution completion
+        if session_logger:
+            session_logger.log_graph_execution_complete(
+                success=result.success,
+                total_iterations=result.iterations,
+                final_output=output_text[:500] if output_text else None,
+                total_duration_ms=duration_ms,
+                stop_reason="pipeline_complete" if result.success else (result.error or "error"),
+            )
+
+        # Record structured execution entry to long-term memory
+        self._execution_count += 1
+        if self._memory_manager:
+            try:
+                await self._memory_manager.record_execution(
+                    input_text=input_text,
+                    result_state={
+                        "final_answer": output_text,
+                        "total_cost": total_cost,
+                        "iteration": result.iterations,
+                    },
+                    duration_ms=duration_ms,
+                    execution_number=self._execution_count,
+                    success=result.success,
+                )
+            except Exception:
+                logger.debug(
+                    f"[{self._session_id}] LTM execution record failed (non-critical)",
+                    exc_info=True,
+                )
+
+        if not result.success:
+            self._error_message = result.error
+            return {"output": f"Error: {result.error}", "total_cost": total_cost}
+
+        return {"output": output_text, "total_cost": total_cost}
+
+    async def _astream_pipeline(
+        self,
+        input_text: str,
+        start_time: float,
+        session_logger: Optional[SessionLogger],
+        **kwargs,
+    ) -> AsyncIterator[Dict[str, Any]]:
+        """Stream via geny-executor Pipeline.
+
+        Converts PipelineEvent objects to the dict format that
+        agent_executor.py and the frontend expect.
+        """
+        # Record user input to short-term memory
+        if self._memory_manager:
+            try:
+                self._memory_manager.record_message("user", input_text)
+            except Exception:
+                logger.debug("Failed to record user message — non-critical", exc_info=True)
+
+        accumulated_output = ""
+        total_cost = 0.0
+        iterations = 0
+
+        async for event in self._pipeline.run_stream(input_text):
+            event_type = event.type if hasattr(event, "type") else ""
+            event_data = event.data if hasattr(event, "data") else {}
+
+            if event_type == "text.delta":
+                # Stream text deltas as they arrive
+                text = event_data.get("text", "")
+                if text:
+                    accumulated_output += text
+                    yield {"text_delta": {"text": text}}
+
+            elif event_type == "stage.enter":
+                stage_name = event.stage if hasattr(event, "stage") else "unknown"
+                yield {stage_name: {"status": "enter"}}
+
+            elif event_type == "stage.exit":
+                stage_name = event.stage if hasattr(event, "stage") else "unknown"
+                yield {stage_name: {"status": "exit"}}
+
+            elif event_type == "pipeline.complete":
+                result_text = event_data.get("result", accumulated_output)
+                iterations = event_data.get("iterations", 0)
+                yield {
+                    "__end__": {
+                        "final_answer": result_text,
+                        "total_cost": total_cost,
+                        "iteration": iterations,
+                    }
+                }
+
+            elif event_type == "pipeline.error":
+                yield {
+                    "__end__": {
+                        "error": event_data.get("error", "Unknown error"),
+                        "total_cost": total_cost,
+                    }
+                }
+
+            # Heartbeat: refresh activity timestamp
+            self._execution_start_time = datetime.now()
+
+        # Post-stream: log and record
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        if session_logger:
+            session_logger.log_graph_execution_complete(
+                success=True,
+                total_iterations=iterations,
+                final_output=accumulated_output[:500] if accumulated_output else None,
+                total_duration_ms=duration_ms,
+                stop_reason="pipeline_stream_complete",
+            )
+
+        self._execution_count += 1
+        if self._memory_manager:
+            try:
+                await self._memory_manager.record_execution(
+                    input_text=input_text,
+                    result_state={
+                        "final_answer": accumulated_output,
+                        "total_cost": total_cost,
+                        "iteration": iterations,
+                    },
+                    duration_ms=duration_ms,
+                    execution_number=self._execution_count,
+                    success=True,
+                )
+            except Exception:
+                logger.debug(
+                    f"[{self._session_id}] LTM execution record failed (non-critical)",
+                    exc_info=True,
+                )
 
     def _load_workflow_definition(self) -> Optional[WorkflowDefinition]:
         """Load the WorkflowDefinition for this session.
@@ -1061,7 +1438,7 @@ class AgentSession:
         """
         start_time = time.time()
 
-        if not self._initialized or not self._graph:
+        if not self._initialized or (not self._graph and not self._pipeline):
             raise RuntimeError("AgentSession not initialized. Call initialize() first.")
 
         # Freshness check — auto-revive if idle, raise if hard limit
@@ -1085,10 +1462,21 @@ class AgentSession:
                 input_text=input_text,
                 thread_id=thread_id,
                 max_iterations=effective_max_iterations,
-                execution_mode="invoke",
+                execution_mode="pipeline" if self._pipeline else "invoke",
             )
 
         try:
+            # ── Pipeline mode dispatch ──
+            if self._pipeline is not None:
+                try:
+                    return await self._invoke_pipeline(
+                        input_text, start_time, session_logger, **kwargs
+                    )
+                finally:
+                    self._is_executing = False
+                    self._execution_start_time = datetime.now()
+                    self._freshness.reset_revive_counter()
+
             config = {"configurable": {"thread_id": thread_id}}
 
             # Unified initial state — all workflows use AutonomousState
@@ -1201,7 +1589,7 @@ class AgentSession:
         Yields:
             Per-node execution results.
         """
-        if not self._initialized or not self._graph:
+        if not self._initialized or (not self._graph and not self._pipeline):
             raise RuntimeError("AgentSession not initialized. Call initialize() first.")
 
         # Freshness check — auto-revive if idle
@@ -1229,8 +1617,21 @@ class AgentSession:
                 input_text=input_text,
                 thread_id=thread_id,
                 max_iterations=effective_max_iterations,
-                execution_mode="astream",
+                execution_mode="pipeline_stream" if self._pipeline else "astream",
             )
+
+        # ── Pipeline mode dispatch ──
+        if self._pipeline is not None:
+            try:
+                async for event in self._astream_pipeline(
+                    input_text, start_time, session_logger, **kwargs
+                ):
+                    yield event
+            finally:
+                self._is_executing = False
+                self._execution_start_time = datetime.now()
+                self._freshness.reset_revive_counter()
+            return
 
         try:
             config = {"configurable": {"thread_id": thread_id}}
@@ -1452,6 +1853,7 @@ class AgentSession:
             self._model = None
 
         self._graph = None
+        self._pipeline = None
         self._workflow = None
         self._checkpointer = None
         self._initialized = False
@@ -1464,7 +1866,14 @@ class AgentSession:
         await self.cleanup()
 
     def is_alive(self) -> bool:
-        """Check whether the underlying process is still running."""
+        """Check whether the session is operational.
+
+        In pipeline mode, the session is always alive as long as it's initialized
+        (LLM calls go through the Anthropic API, not the CLI subprocess).
+        In LangGraph mode, checks the underlying ClaudeProcess.
+        """
+        if self._pipeline is not None:
+            return self._initialized
         if self._model and self._model.process:
             return self._model.process.is_alive()
         return False

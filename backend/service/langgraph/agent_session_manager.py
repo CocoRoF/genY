@@ -426,6 +426,17 @@ class AgentSessionManager(SessionManager):
 
         logger.info(f"  workflow_id: {workflow_id}, graph_name: {graph_name}")
 
+        # Build geny-executor ToolRegistry for pipeline mode
+        geny_tool_registry = None
+        if self._tool_loader and allowed_tool_names:
+            try:
+                from service.langgraph.tool_bridge import build_geny_tool_registry
+                geny_tool_registry = build_geny_tool_registry(
+                    self._tool_loader, allowed_tool_names
+                )
+            except Exception as e:
+                logger.debug(f"  geny-executor tool registry build skipped: {e}")
+
         # Create AgentSession
         agent = await AgentSession.create(
             working_dir=request.working_dir,
@@ -444,6 +455,7 @@ class AgentSessionManager(SessionManager):
             graph_name=graph_name,
             tool_preset_id=preset_id,
             owner_username=owner_username,
+            geny_tool_registry=geny_tool_registry,
         )
 
         session_id = agent.session_id
