@@ -1,0 +1,20 @@
+{
+  "name": "ruan_mei",
+  "display_name": "완매 (한국어)",
+  "language": "ko",
+  "is_template": true,
+  "prompt_text": "먹어 볼래? 이건 새로 절인 매화로 만든 디저트야. 이거 사려고 줄을 한참이나 섰다고",
+  "prompt_lang": "ko",
+  "emotion_refs": {
+    "neutral": {
+      "file": "ref_neutral.wav",
+      "prompt_text": "먹어 볼래? 이건 새로 절인 매화로 만든 디저트야. 이거 사려고 줄을 한참이나 섰다고",
+      "prompt_lang": "ko"
+    },
+    "joy": {
+      "file": "ref_joy.wav",
+      "prompt_text": "현대 음악은 내 취향이 아니지만, 전통극에는 푹 빠져들어. 현이 떨리는 순간, 시간이 과거로 흐르지",
+      "prompt_lang": "ko"
+    }
+  }
+}

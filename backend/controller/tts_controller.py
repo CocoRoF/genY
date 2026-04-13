@@ -20,6 +20,7 @@ REST API endpoints for Text-to-Speech:
 
 import json
 import os
+import shutil
 from logging import getLogger
 from pathlib import Path
 
@@ -314,24 +315,86 @@ _BUILTIN_PROFILES = {
             },
         },
     },
+    "ruan_mei": {
+        "name": "ruan_mei",
+        "display_name": "완매 (한국어)",
+        "language": "ko",
+        "is_template": True,
+        "prompt_text": "먹어 볼래? 이건 새로 절인 매화로 만든 디저트야. 이거 사려고 줄을 한참이나 섰다고",
+        "prompt_lang": "ko",
+        "emotion_refs": {
+            "neutral": {
+                "file": "ref_neutral.wav",
+                "prompt_text": "먹어 볼래? 이건 새로 절인 매화로 만든 디저트야. 이거 사려고 줄을 한참이나 섰다고",
+                "prompt_lang": "ko",
+            },
+            "joy": {
+                "file": "ref_joy.wav",
+                "prompt_text": "현대 음악은 내 취향이 아니지만, 전통극에는 푹 빠져들어. 현이 떨리는 순간, 시간이 과거로 흐르지",
+                "prompt_lang": "ko",
+            },
+        },
+    },
 }
 
 
+# Seed directory lives outside the Docker named-volume mount, so its files
+# are always available from the image even when the volume already exists.
+_BUILTIN_SOURCE_DIR = Path(__file__).parent.parent / "static" / "voices_seed"
+
+
 def _ensure_builtin_profiles() -> None:
-    """Auto-create profile.json for built-in template profiles if missing."""
+    """Auto-create builtin voice profile directories, audio files, and profile.json.
+
+    On Docker named-volume deployments the volume may already exist from a
+    previous image that did not include a new builtin preset.  This function
+    copies the full preset directory from the *image source* (``static/voices/``)
+    into the runtime ``VOICES_DIR`` so that newly added presets always appear.
+    """
     for name, data in _BUILTIN_PROFILES.items():
         profile_dir = VOICES_DIR / name
-        if profile_dir.is_dir():
-            profile_json = profile_dir / "profile.json"
-            if not profile_json.exists():
+        source_dir = _BUILTIN_SOURCE_DIR / name
+
+        # --- directory ---
+        if not profile_dir.is_dir():
+            if source_dir.is_dir():
                 try:
-                    profile_json.write_text(
-                        json.dumps(data, ensure_ascii=False, indent=2),
-                        encoding="utf-8",
-                    )
-                    logger.info(f"Auto-created profile.json for built-in profile: {name}")
+                    shutil.copytree(source_dir, profile_dir)
+                    logger.info(f"Copied builtin voice directory: {name}")
+                    continue  # copytree already includes profile.json
                 except Exception as e:
-                    logger.warning(f"Failed to auto-create profile.json for {name}: {e}")
+                    logger.warning(f"Failed to copy builtin voice directory {name}: {e}")
+                    continue
+            else:
+                # Source not available (shouldn't happen in production)
+                continue
+
+        # --- ref audio files ---
+        emotion_refs = data.get("emotion_refs", {})
+        for _emotion, ref in emotion_refs.items():
+            ref_file = ref.get("file", "")
+            if not ref_file:
+                continue
+            dest = profile_dir / ref_file
+            src = source_dir / ref_file
+            if not dest.exists() and src.exists():
+                try:
+                    shutil.copy2(src, dest)
+                    logger.info(f"Copied missing ref audio {ref_file} for {name}")
+                except Exception as e:
+                    logger.warning(f"Failed to copy ref audio {ref_file} for {name}: {e}")
+
+        # --- profile.json ---
+        profile_json = profile_dir / "profile.json"
+        if not profile_json.exists():
+            try:
+                profile_json.write_text(
+                    json.dumps(data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                logger.info(f"Auto-created profile.json for built-in profile: {name}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-create profile.json for {name}: {e}")
 
 
 def _is_template_profile(name: str) -> bool:
