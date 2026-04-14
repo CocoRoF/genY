@@ -59,8 +59,11 @@ export function useChatWebSocket() {
       onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
       getLatestMsgId?: () => string | null,
     ): { close: () => void } => {
+      const _tag = `[useChatWS:${roomId.slice(0, 8)}]`;
+
       // Close existing connection
       if (wsRef.current) {
+        console.debug(`${_tag} closing existing connection before re-subscribe`);
         wsRef.current.close();
         wsRef.current = null;
       }
@@ -71,16 +74,20 @@ export function useChatWebSocket() {
       const maxAttempts = 20;
       const reconnectDelay = 3000;
 
+      console.debug(`${_tag} subscribe called, afterId=${afterId}`);
+
       const connect = () => {
         if (closed) return;
 
         const wsUrl = getChatWsUrl(roomId);
+        console.debug(`${_tag} connecting (attempt=${attempts}), url=${wsUrl}`);
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
 
         ws.onopen = () => {
           attempts = 0;
           const currentAfter = getLatestMsgId ? getLatestMsgId() : afterId;
+          console.debug(`${_tag} connected, sending subscribe after=${currentAfter}`);
           ws.send(
             JSON.stringify({
               type: 'subscribe',
@@ -92,21 +99,29 @@ export function useChatWebSocket() {
         ws.onmessage = (ev) => {
           try {
             const event: ChatWsEvent = JSON.parse(ev.data);
+            if (event.type !== 'heartbeat') {
+              console.debug(`${_tag} event: ${event.type}`, event.data);
+            }
             onEvent(event.type, event.data);
-          } catch {
-            // ignore
+          } catch (err) {
+            console.warn(`${_tag} failed to parse WS message:`, ev.data, err);
           }
         };
 
-        ws.onerror = () => {
+        ws.onerror = (err) => {
+          console.warn(`${_tag} WebSocket error:`, err);
           wsRef.current = null;
         };
 
-        ws.onclose = () => {
+        ws.onclose = (ev) => {
+          console.debug(`${_tag} WebSocket closed (code=${ev.code}, reason=${ev.reason}, clean=${ev.wasClean})`);
           wsRef.current = null;
           if (!closed && attempts < maxAttempts) {
             attempts++;
+            console.debug(`${_tag} scheduling reconnect in ${reconnectDelay}ms (attempt=${attempts}/${maxAttempts})`);
             reconnectTimer = setTimeout(connect, reconnectDelay);
+          } else if (!closed) {
+            console.error(`${_tag} max reconnect attempts (${maxAttempts}) reached, giving up`);
           }
         };
       };
@@ -115,6 +130,7 @@ export function useChatWebSocket() {
 
       return {
         close: () => {
+          console.debug(`${_tag} close() called`);
           closed = true;
           if (reconnectTimer) {
             clearTimeout(reconnectTimer);

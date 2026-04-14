@@ -59,12 +59,25 @@ def _sanitize(obj: Any) -> Any:
         return str(obj)
 
 
-async def _send_event(ws: WebSocket, event_type: str, data: dict) -> bool:
+async def _send_event(ws: WebSocket, event_type: str, data: dict, session_id: str = "") -> bool:
     """Send a JSON event over WebSocket. Returns False if connection is lost."""
     try:
         await ws.send_json({"type": event_type, "data": _sanitize(data)})
+        if event_type not in ("heartbeat", "log"):
+            logger.debug(
+                "[ExecWS:%s] sent event=%s data_keys=%s",
+                session_id[:8] if session_id else "?",
+                event_type,
+                list(data.keys()) if isinstance(data, dict) else type(data).__name__,
+            )
         return True
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "[ExecWS:%s] failed to send event=%s: %s",
+            session_id[:8] if session_id else "?",
+            event_type,
+            exc,
+        )
         return False
 
 
@@ -128,8 +141,8 @@ async def _emit_avatar_state_for_log(
                     expression_index=model.emotionMap.get("joy", 0),
                     trigger="state_change",
                 )
-    except Exception:
-        pass  # Best-effort
+    except Exception as exc:
+        logger.debug("[ExecWS:%s] avatar state emission failed: %s", session_id[:8], exc)
 
 
 async def _stream_execution_ws(
@@ -147,12 +160,19 @@ async def _stream_execution_ws(
     session_logger = get_session_logger(session_id, create_if_missing=False)
     cache_cursor = holder.get("cache_cursor", 0)
     heartbeat_interval = 15.0
-    poll_interval = 0.10  # 100ms — faster than SSE's 150ms since WS has no buffering overhead
+    poll_interval = 0.10  # 100ms
     last_event_time = time.monotonic()
     start_time = holder.get("start_time", time.time())
+    total_logs_sent = 0
+
+    logger.info(
+        "[ExecWS:%s] _stream_execution_ws started, cache_cursor=%d, has_logger=%s",
+        session_id[:8], cache_cursor, session_logger is not None,
+    )
 
     # Initial status
-    if not await _send_event(ws, "status", {"status": "running", "message": "Execution started"}):
+    if not await _send_event(ws, "status", {"status": "running", "message": "Execution started"}, session_id):
+        logger.warning("[ExecWS:%s] connection lost on initial status", session_id[:8])
         return
     last_event_time = time.monotonic()
 
@@ -182,53 +202,75 @@ async def _stream_execution_ws(
                 new_entries, cache_cursor = session_logger.get_cache_entries_since(
                     cache_cursor
                 )
+                if new_entries:
+                    logger.debug(
+                        "[ExecWS:%s] polling: %d new log entries (cursor=%d)",
+                        session_id[:8], len(new_entries), cache_cursor,
+                    )
                 for entry in new_entries:
                     entry_dict = entry.to_dict()
-                    if not await _send_event(ws, "log", entry_dict):
+                    if not await _send_event(ws, "log", entry_dict, session_id):
+                        logger.warning("[ExecWS:%s] connection lost while streaming logs", session_id[:8])
                         return  # Connection lost
                     if app_state:
                         await _emit_avatar_state_for_log(entry_dict, session_id, app_state)
                     had_data = True
+                    total_logs_sent += 1
 
             if had_data:
                 last_event_time = time.monotonic()
             elif time.monotonic() - last_event_time >= heartbeat_interval:
-                if not await _send_event(ws, "heartbeat", _build_heartbeat()):
+                if not await _send_event(ws, "heartbeat", _build_heartbeat(), session_id):
+                    logger.warning("[ExecWS:%s] connection lost on heartbeat", session_id[:8])
                     return
                 last_event_time = time.monotonic()
 
             await asyncio.sleep(poll_interval)
 
-        # Final drain — pick up entries written during last poll cycle
+        # Final drain
         await asyncio.sleep(0.05)
         if session_logger:
             final_entries, cache_cursor = session_logger.get_cache_entries_since(
                 cache_cursor
             )
+            if final_entries:
+                logger.debug(
+                    "[ExecWS:%s] final drain: %d entries", session_id[:8], len(final_entries),
+                )
             for entry in final_entries:
                 entry_dict = entry.to_dict()
-                await _send_event(ws, "log", entry_dict)
+                await _send_event(ws, "log", entry_dict, session_id)
+                total_logs_sent += 1
 
     except Exception as e:
-        logger.error("WebSocket stream error: %s", e, exc_info=True)
-        await _send_event(ws, "error", {"error": str(e)})
+        logger.error("[ExecWS:%s] stream error: %s", session_id[:8], e, exc_info=True)
+        await _send_event(ws, "error", {"error": str(e)}, session_id)
 
     # Emit final result or error
     if holder.get("error"):
-        await _send_event(
-            ws, "status", {"status": "error", "message": holder["error"]}
+        logger.info(
+            "[ExecWS:%s] execution finished with error: %s (total_logs=%d)",
+            session_id[:8], holder["error"][:100], total_logs_sent,
         )
-        await _send_event(ws, "result", holder.get("result", {}))
+        await _send_event(
+            ws, "status", {"status": "error", "message": holder["error"]}, session_id,
+        )
+        await _send_event(ws, "result", holder.get("result", {}), session_id)
     else:
-        await _send_event(
-            ws, "status", {"status": "completed", "message": "Execution completed"}
+        logger.info(
+            "[ExecWS:%s] execution completed successfully (total_logs=%d)",
+            session_id[:8], total_logs_sent,
         )
-        await _send_event(ws, "result", holder.get("result", {}))
+        await _send_event(
+            ws, "status", {"status": "completed", "message": "Execution completed"}, session_id,
+        )
+        await _send_event(ws, "result", holder.get("result", {}), session_id)
 
-    await _send_event(ws, "done", {})
+    await _send_event(ws, "done", {}, session_id)
 
     # Cleanup execution holder
     cleanup_execution(session_id)
+    logger.debug("[ExecWS:%s] execution holder cleaned up", session_id[:8])
 
 
 @router.websocket("/ws/execute/{session_id}")
@@ -238,30 +280,34 @@ async def ws_execute_stream(websocket: WebSocket, session_id: str):
 
     Supports three message types from the client:
 
-    1. execute — Start a new execution:
+    1. execute -- Start a new execution:
        {"type": "execute", "prompt": "...", "timeout": null, "system_prompt": null, "max_turns": null}
 
-    2. stop — Stop the current execution:
+    2. stop -- Stop the current execution:
        {"type": "stop"}
 
-    3. reconnect — Reconnect to an active execution:
+    3. reconnect -- Reconnect to an active execution:
        {"type": "reconnect"}
 
     The server streams events in real time until execution completes,
     then sends a "done" event. The connection stays open for further
     commands (multi-turn conversation over a single WebSocket).
     """
+    logger.info("[ExecWS:%s] WebSocket connection attempt", session_id[:8])
     await websocket.accept()
+    logger.info("[ExecWS:%s] WebSocket accepted", session_id[:8])
     app_state = websocket.app.state
 
     try:
         while True:
             raw = await websocket.receive_text()
+            logger.debug("[ExecWS:%s] received: %s", session_id[:8], raw[:200])
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
+                logger.warning("[ExecWS:%s] invalid JSON: %s", session_id[:8], raw[:100])
                 await _send_event(
-                    websocket, "error", {"error": "Invalid JSON"}
+                    websocket, "error", {"error": "Invalid JSON"}, session_id,
                 )
                 continue
 
@@ -271,9 +317,14 @@ async def ws_execute_stream(websocket: WebSocket, session_id: str):
                 prompt = (msg.get("prompt") or "").strip()
                 if not prompt:
                     await _send_event(
-                        websocket, "error", {"error": "Prompt must not be empty"}
+                        websocket, "error", {"error": "Prompt must not be empty"}, session_id,
                     )
                     continue
+
+                logger.info(
+                    "[ExecWS:%s] execute request: prompt=%s, timeout=%s, max_turns=%s",
+                    session_id[:8], prompt[:80], msg.get("timeout"), msg.get("max_turns"),
+                )
 
                 try:
                     holder = await start_command_background(
@@ -283,23 +334,32 @@ async def ws_execute_stream(websocket: WebSocket, session_id: str):
                         system_prompt=msg.get("system_prompt"),
                         max_turns=msg.get("max_turns"),
                     )
+                    logger.info(
+                        "[ExecWS:%s] execution started, exec_id=%s",
+                        session_id[:8], holder.get("exec_id", "?")[:8],
+                    )
                 except AgentNotFoundError:
+                    logger.warning("[ExecWS:%s] agent not found", session_id[:8])
                     await _send_event(
                         websocket,
                         "error",
                         {"error": f"AgentSession not found: {session_id}"},
+                        session_id,
                     )
                     continue
                 except AgentNotAliveError as e:
+                    logger.warning("[ExecWS:%s] agent not alive: %s", session_id[:8], e)
                     await _send_event(
-                        websocket, "error", {"error": str(e)}
+                        websocket, "error", {"error": str(e)}, session_id,
                     )
                     continue
                 except AlreadyExecutingError:
+                    logger.warning("[ExecWS:%s] already executing", session_id[:8])
                     await _send_event(
                         websocket,
                         "error",
                         {"error": "Execution already in progress"},
+                        session_id,
                     )
                     continue
 
@@ -308,7 +368,9 @@ async def ws_execute_stream(websocket: WebSocket, session_id: str):
                 )
 
             elif msg_type == "stop":
+                logger.info("[ExecWS:%s] stop request", session_id[:8])
                 stopped = await stop_execution(session_id)
+                logger.info("[ExecWS:%s] stop result: %s", session_id[:8], stopped)
                 await _send_event(
                     websocket,
                     "status",
@@ -316,35 +378,45 @@ async def ws_execute_stream(websocket: WebSocket, session_id: str):
                         "status": "stopped" if stopped else "idle",
                         "message": "Execution stopped" if stopped else "No active execution",
                     },
+                    session_id,
                 )
 
             elif msg_type == "reconnect":
+                logger.info("[ExecWS:%s] reconnect request", session_id[:8])
                 holder = get_execution_holder(session_id)
                 if holder and not holder.get("done", True):
+                    logger.info(
+                        "[ExecWS:%s] reconnecting to active execution, exec_id=%s",
+                        session_id[:8], holder.get("exec_id", "?")[:8],
+                    )
                     await _stream_execution_ws(
                         websocket, holder, session_id, app_state=app_state
                     )
                 else:
+                    logger.info("[ExecWS:%s] no active execution to reconnect", session_id[:8])
                     await _send_event(
                         websocket,
                         "status",
                         {"status": "idle", "message": "No active execution to reconnect"},
+                        session_id,
                     )
 
             else:
+                logger.warning("[ExecWS:%s] unknown message type: %s", session_id[:8], msg_type)
                 await _send_event(
                     websocket,
                     "error",
                     {"error": f"Unknown message type: {msg_type}"},
+                    session_id,
                 )
 
     except WebSocketDisconnect:
-        logger.debug("WebSocket disconnected for session %s", session_id)
+        logger.info("[ExecWS:%s] WebSocket disconnected", session_id[:8])
     except Exception as e:
         logger.error(
-            "WebSocket error for session %s: %s", session_id, e, exc_info=True
+            "[ExecWS:%s] WebSocket error: %s", session_id[:8], e, exc_info=True
         )
         try:
-            await _send_event(websocket, "error", {"error": str(e)})
+            await _send_event(websocket, "error", {"error": str(e)}, session_id)
         except Exception:
             pass

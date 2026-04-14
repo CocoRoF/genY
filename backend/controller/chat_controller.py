@@ -136,6 +136,9 @@ def _notify_room(room_id: str):
     ev = _room_new_msg_events.get(room_id)
     if ev:
         ev.set()
+        logger.debug("[Broadcast:%s] room event notified (listeners present)", room_id[:8])
+    else:
+        logger.debug("[Broadcast:%s] room event notify skipped (no listeners)", room_id[:8])
 
 
 def _build_agent_progress_data(astate: AgentExecutionState) -> dict:
@@ -530,11 +533,17 @@ async def _run_broadcast(
         sname = info.get("session_name", session_id[:8])
         role = info.get("role", "unknown")
 
+        logger.info(
+            "[Broadcast:%s] _invoke_one started for session=%s (%s, role=%s)",
+            room_id[:8], session_id[:8], sname, role,
+        )
+
         # Get per-agent state tracker
         agent_state = state.agent_states.get(session_id)
 
         # Cancellation guard
         if state.cancelled:
+            logger.info("[Broadcast:%s] session=%s skipped (broadcast cancelled)", room_id[:8], session_id[:8])
             if agent_state:
                 agent_state.status = "cancelled"
             state.completed += 1
@@ -544,6 +553,7 @@ async def _run_broadcast(
         if agent_state:
             agent_state.status = "executing"
             agent_state.started_at = time.time()
+            logger.debug("[Broadcast:%s] session=%s status -> executing", room_id[:8], session_id[:8])
             _notify_room(room_id)
 
         # Start log-polling task to capture thinking preview
@@ -598,10 +608,19 @@ async def _run_broadcast(
 
         try:
             # THE core call -- with broadcast context
+            logger.info(
+                "[Broadcast:%s] calling execute_command for session=%s, prompt=%s",
+                room_id[:8], session_id[:8], message[:60],
+            )
             result = await execute_command(
                 session_id=session_id,
                 prompt=message,
                 is_chat_message=True,
+            )
+            logger.info(
+                "[Broadcast:%s] execute_command returned for session=%s: success=%s, output_len=%d, duration=%dms, cost=%s",
+                room_id[:8], session_id[:8], result.success,
+                len(result.output or ""), result.duration_ms, result.cost_usd,
             )
 
             if result.success and result.output and result.output.strip():
@@ -619,13 +638,22 @@ async def _run_broadcast(
                     fc = session_logger.extract_file_changes_from_cache(pre_exec_cursor)
                     if fc:
                         msg_data["file_changes"] = fc
+                        logger.debug("[Broadcast:%s] session=%s: %d file changes", room_id[:8], session_id[:8], len(fc))
                 store.add_message(room_id, msg_data)
                 state.responded += 1
                 if agent_state:
                     agent_state.status = "completed"
+                logger.info(
+                    "[Broadcast:%s] session=%s: agent message saved (responded=%d/%d)",
+                    room_id[:8], session_id[:8], state.responded, state.total,
+                )
                 _notify_room(room_id)
             elif not result.success:
                 # Execution failed (timeout, error, etc.)
+                logger.warning(
+                    "[Broadcast:%s] session=%s FAILED: %s",
+                    room_id[:8], session_id[:8], result.error,
+                )
                 store.add_message(room_id, {
                     "type": "system",
                     "content": f"{sname}: {result.error or 'Unknown error'}",
@@ -634,7 +662,10 @@ async def _run_broadcast(
                     agent_state.status = "failed"
                 _notify_room(room_id)
             else:
-                logger.debug("Session %s skipped (no output)", session_id)
+                logger.debug(
+                    "[Broadcast:%s] session=%s completed with no output",
+                    room_id[:8], session_id[:8],
+                )
                 if agent_state:
                     agent_state.status = "completed"
 

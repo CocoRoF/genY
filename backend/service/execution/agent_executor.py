@@ -473,6 +473,10 @@ async def _execute_core(
 
     try:
         # 1. Log command
+        logger.info(
+            "[Executor:%s] _execute_core: prompt=%s, timeout=%s, max_turns=%s",
+            session_id[:8], prompt[:80], timeout, max_turns,
+        )
         if session_logger:
             session_logger.log_command(
                 prompt=prompt,
@@ -483,6 +487,10 @@ async def _execute_core(
 
         # 2. Invoke
         effective_timeout = timeout or getattr(agent, "timeout", 21600.0)
+        logger.info(
+            "[Executor:%s] invoking agent (effective_timeout=%s, agent_type=%s)",
+            session_id[:8], effective_timeout, type(agent).__name__,
+        )
         invoke_result = await asyncio.wait_for(
             agent.invoke(input_text=prompt, **invoke_kwargs),
             timeout=effective_timeout,
@@ -499,6 +507,11 @@ async def _execute_core(
             else None
         )
         duration_ms = int((time.time() - start_time) * 1000)
+
+        logger.info(
+            "[Executor:%s] invoke returned: output_len=%d, cost=%s, duration=%dms",
+            session_id[:8], len(result_text), result_cost, duration_ms,
+        )
 
         # 3. Log response
         if session_logger:
@@ -612,8 +625,14 @@ async def execute_command(
       AgentNotAliveError    – process dead, revival failed
       AlreadyExecutingError – another command is already running
     """
+    logger.info(
+        "[Executor:%s] execute_command called: prompt=%s, is_trigger=%s, kwargs=%s",
+        session_id[:8], prompt[:80], is_trigger, list(invoke_kwargs.keys()),
+    )
+
     # 1. Resolve & revive
     agent = await _resolve_agent(session_id)
+    logger.debug("[Executor:%s] agent resolved, alive=%s", session_id[:8], agent.is_alive())
 
     # 1b. Record activity for VTuber thinking trigger
     #     Skip for trigger executions (would break adaptive backoff)
@@ -629,17 +648,22 @@ async def execute_command(
         if not is_trigger and is_trigger_executing(session_id):
             # User message takes priority over trigger — abort the trigger
             logger.info(
-                "Preempting trigger for user message on session %s",
-                session_id,
+                "[Executor:%s] preempting trigger for user message",
+                session_id[:8],
             )
             aborted = await abort_trigger_execution(session_id)
             if not aborted:
+                logger.warning("[Executor:%s] trigger preemption failed", session_id[:8])
                 raise AlreadyExecutingError(
                     f"Execution already in progress for session {session_id}"
                 )
             # Small yield to let cleanup propagate
             await asyncio.sleep(0)
         else:
+            logger.warning(
+                "[Executor:%s] already executing (is_trigger=%s, current_is_trigger=%s)",
+                session_id[:8], is_trigger, is_trigger_executing(session_id),
+            )
             raise AlreadyExecutingError(
                 f"Execution already in progress for session {session_id}"
             )
@@ -647,17 +671,22 @@ async def execute_command(
     # 3. Register
     session_logger = _get_session_logger(session_id, create_if_missing=True)
     exec_id = uuid.uuid4().hex
+    cache_cursor = session_logger.get_cache_length() if session_logger else 0
     holder: dict = {
         "done": False,
         "result": None,
         "error": None,
         "start_time": time.time(),
-        "cache_cursor": session_logger.get_cache_length() if session_logger else 0,
+        "cache_cursor": cache_cursor,
         "is_trigger": is_trigger,
         "task": None,
         "exec_id": exec_id,
     }
     _active_executions[session_id] = holder
+    logger.info(
+        "[Executor:%s] holder registered: exec_id=%s, cache_cursor=%d",
+        session_id[:8], exec_id[:8], cache_cursor,
+    )
 
     # 4. Execute (blocking)
     try:
@@ -842,8 +871,14 @@ async def start_command_background(
       AgentNotAliveError    – process dead, revival failed
       AlreadyExecutingError – another command is already running
     """
+    logger.info(
+        "[Executor:%s] start_command_background called: prompt=%s, timeout=%s",
+        session_id[:8], prompt[:80], timeout,
+    )
+
     # 1. Resolve & revive
     agent = await _resolve_agent(session_id)
+    logger.debug("[Executor:%s] (bg) agent resolved, alive=%s", session_id[:8], agent.is_alive())
 
     # 1b. Record activity for VTuber thinking trigger
     if getattr(agent, '_session_type', None) == 'vtuber':
@@ -856,13 +891,16 @@ async def start_command_background(
     # 2. Double-execution guard — with trigger preemption
     if is_executing(session_id):
         if is_trigger_executing(session_id):
+            logger.info("[Executor:%s] (bg) preempting trigger", session_id[:8])
             aborted = await abort_trigger_execution(session_id)
             if not aborted:
+                logger.warning("[Executor:%s] (bg) trigger preemption failed", session_id[:8])
                 raise AlreadyExecutingError(
                     f"Execution already in progress for session {session_id}"
                 )
             await asyncio.sleep(0)
         else:
+            logger.warning("[Executor:%s] (bg) already executing", session_id[:8])
             raise AlreadyExecutingError(
                 f"Execution already in progress for session {session_id}"
             )
@@ -870,17 +908,22 @@ async def start_command_background(
     # 3. Register
     session_logger = _get_session_logger(session_id, create_if_missing=True)
     exec_id = uuid.uuid4().hex
+    cache_cursor = session_logger.get_cache_length() if session_logger else 0
     holder: dict = {
         "done": False,
         "result": None,
         "error": None,
         "start_time": time.time(),
-        "cache_cursor": session_logger.get_cache_length() if session_logger else 0,
+        "cache_cursor": cache_cursor,
         "is_trigger": False,
         "task": None,
         "exec_id": exec_id,
     }
     _active_executions[session_id] = holder
+    logger.info(
+        "[Executor:%s] (bg) holder registered: exec_id=%s, cache_cursor=%d",
+        session_id[:8], exec_id[:8], cache_cursor,
+    )
 
     # 4. Fire-and-forget background task
     async def _run():

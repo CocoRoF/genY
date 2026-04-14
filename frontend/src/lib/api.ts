@@ -162,6 +162,8 @@ export const agentApi = {
     onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
   ): Promise<void> => {
     const wsUrl = getWsUrl(id);
+    const _tag = `[ExecWS:${id.slice(0, 8)}]`;
+    console.debug(`${_tag} executeStream called, wsUrl=${wsUrl}, prompt=${data.prompt.slice(0, 60)}...`);
 
     return new Promise<void>((resolve, reject) => {
       const ws = new WebSocket(wsUrl);
@@ -170,11 +172,13 @@ export const agentApi = {
       const finish = () => {
         if (!resolved) {
           resolved = true;
+          console.debug(`${_tag} stream finished`);
           resolve();
         }
       };
 
       ws.onopen = () => {
+        console.debug(`${_tag} connected, sending execute command`);
         ws.send(JSON.stringify({
           type: 'execute',
           prompt: data.prompt,
@@ -187,16 +191,20 @@ export const agentApi = {
       ws.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
+          if (event.type !== 'heartbeat') {
+            console.debug(`${_tag} event: ${event.type}`, event.data);
+          }
           onEvent(event.type, event.data);
           if (event.type === 'done') {
             finish();
           }
-        } catch {
-          // ignore unparseable messages
+        } catch (err) {
+          console.warn(`${_tag} failed to parse WS message:`, ev.data, err);
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (err) => {
+        console.warn(`${_tag} WebSocket error, falling back to SSE:`, err);
         if (!resolved) {
           // WebSocket failed — fall back to legacy SSE
           resolved = true;
@@ -204,7 +212,8 @@ export const agentApi = {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
+        console.debug(`${_tag} WebSocket closed (code=${ev.code}, reason=${ev.reason})`);
         finish();
       };
     });
@@ -285,29 +294,41 @@ export const agentApi = {
     onEvent: (eventType: string, eventData: Record<string, unknown>) => void,
   ): { close: () => void } => {
     const wsUrl = getWsUrl(id);
+    const _tag = `[ReconnWS:${id.slice(0, 8)}]`;
+    console.debug(`${_tag} reconnectStream called, wsUrl=${wsUrl}`);
     let ws: WebSocket | null = new WebSocket(wsUrl);
     let closed = false;
     let fallbackSub: { close: () => void } | null = null;
 
     ws.onopen = () => {
+      console.debug(`${_tag} connected, sending reconnect`);
       ws!.send(JSON.stringify({ type: 'reconnect' }));
     };
 
     ws.onmessage = (ev) => {
       try {
         const event = JSON.parse(ev.data);
+        if (event.type !== 'heartbeat') {
+          console.debug(`${_tag} event: ${event.type}`, event.data);
+        }
         onEvent(event.type, event.data);
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn(`${_tag} failed to parse WS message:`, ev.data, err);
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (err) => {
+      console.warn(`${_tag} WebSocket error, falling back to SSE:`, err);
       ws = null;
       if (!closed) {
         // Fall back to SSE reconnect
         const backendUrl = getBackendUrl();
-        const dispatch = (name: string) => (d: unknown) => onEvent(name, d as Record<string, unknown>);
+        const dispatch = (name: string) => (d: unknown) => {
+          if (name !== 'heartbeat') {
+            console.debug(`${_tag} SSE event: ${name}`, d);
+          }
+          onEvent(name, d as Record<string, unknown>);
+        };
         fallbackSub = sseSubscribe({
           url: `${backendUrl}/api/agents/${id}/execute/events`,
           events: {
@@ -324,7 +345,8 @@ export const agentApi = {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      console.debug(`${_tag} WebSocket closed (code=${ev.code}, reason=${ev.reason})`);
       ws = null;
     };
 
@@ -649,7 +671,8 @@ export const chatApi = {
     getLatestMsgId?: () => string | null,
   ): { close: () => void } => {
     const wsUrl = getChatWsUrl(roomId);
-    let ws: WebSocket | null = new WebSocket(wsUrl);
+    const _tag = `[ChatWS:${roomId.slice(0, 8)}]`;
+    let ws: WebSocket | null = null;
     let closed = false;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
@@ -657,14 +680,18 @@ export const chatApi = {
     const reconnectDelay = 3000;
     let fallbackSub: { close: () => void } | null = null;
 
+    console.debug(`${_tag} subscribeToRoom called, wsUrl=${wsUrl}, afterId=${afterId}`);
+
     const connect = () => {
       if (closed) return;
 
+      console.debug(`${_tag} connecting (attempt=${attempts})...`);
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         attempts = 0;
         const currentAfter = getLatestMsgId?.() ?? afterId;
+        console.debug(`${_tag} connected, sending subscribe after=${currentAfter}`);
         ws!.send(JSON.stringify({
           type: 'subscribe',
           after: currentAfter,
@@ -674,18 +701,28 @@ export const chatApi = {
       ws.onmessage = (ev) => {
         try {
           const event = JSON.parse(ev.data);
+          if (event.type !== 'heartbeat') {
+            console.debug(`${_tag} event: ${event.type}`, event.data);
+          }
           onEvent(event.type, event.data);
-        } catch {
-          // ignore
+        } catch (err) {
+          console.warn(`${_tag} failed to parse WS message:`, ev.data, err);
         }
       };
 
-      ws.onerror = () => {
+      ws.onerror = (err) => {
+        console.warn(`${_tag} WebSocket error (attempt=${attempts}):`, err);
         ws = null;
         if (!closed && attempts === 0) {
           // First connection failed — fall back to SSE
+          console.warn(`${_tag} first connection failed, falling back to SSE`);
           closed = true;
-          const dispatch = (name: string) => (d: unknown) => onEvent(name, d as Record<string, unknown>);
+          const dispatch = (name: string) => (d: unknown) => {
+            if (name !== 'heartbeat') {
+              console.debug(`${_tag} SSE event: ${name}`, d);
+            }
+            onEvent(name, d as Record<string, unknown>);
+          };
           fallbackSub = sseSubscribe({
             url: () => {
               const currentAfter = getLatestMsgId?.() ?? afterId;
@@ -704,11 +741,15 @@ export const chatApi = {
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (ev) => {
+        console.debug(`${_tag} WebSocket closed (code=${ev.code}, reason=${ev.reason}, clean=${ev.wasClean})`);
         ws = null;
         if (!closed && attempts < maxAttempts) {
           attempts++;
+          console.debug(`${_tag} scheduling reconnect in ${reconnectDelay}ms (attempt=${attempts}/${maxAttempts})`);
           reconnectTimer = setTimeout(connect, reconnectDelay);
+        } else if (!closed) {
+          console.error(`${_tag} max reconnect attempts (${maxAttempts}) reached, giving up`);
         }
       };
     };
@@ -717,6 +758,7 @@ export const chatApi = {
 
     return {
       close: () => {
+        console.debug(`${_tag} close() called`);
         closed = true;
         if (reconnectTimer) {
           clearTimeout(reconnectTimer);
