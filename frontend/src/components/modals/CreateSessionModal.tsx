@@ -51,12 +51,8 @@ export default function CreateSessionModal({ onClose }: Props) {
   const [selectedCliPrompt, setSelectedCliPrompt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [availableWorkflows] = useState<unknown[]>([]);
-  const [templateWorkflows] = useState<unknown[]>([]);
-  const [selectedWorkflow, setSelectedWorkflow] = useState('template-optimized-autonomous');
   const [toolPresets, setToolPresets] = useState<ToolPresetDefinition[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
-  const [selectedCliWorkflow, setSelectedCliWorkflow] = useState('template-optimized-autonomous');
   const [selectedCliPreset, setSelectedCliPreset] = useState('');
   const [selectedAvatar, setSelectedAvatar] = useState('');
   const [selectedTtsProfile, setSelectedTtsProfile] = useState('');
@@ -125,10 +121,7 @@ export default function CreateSessionModal({ onClose }: Props) {
 
   const handleRoleChange = (role: string) => {
     setFormState(f => ({ ...f, role }));
-    // Auto-select VTuber defaults
     if (role === 'vtuber') {
-      setSelectedWorkflow('template-vtuber');
-      setSelectedCliWorkflow('template-optimized-autonomous');
       handlePromptChange('vtuber-default');
       handleCliPromptChange('cli-default');
       if (!avatarsLoaded) fetchAvatarModels();
@@ -136,7 +129,6 @@ export default function CreateSessionModal({ onClose }: Props) {
       setSelectedAvatar('');
       setSelectedTtsProfile('');
       setSelectedCliPrompt('');
-      setSelectedCliWorkflow('template-optimized-autonomous');
       setSelectedCliPreset('');
     }
   };
@@ -151,22 +143,14 @@ export default function CreateSessionModal({ onClose }: Props) {
     setError('');
     try {
       const payload: CreateAgentRequest = { ...formState };
-      // Always send workflow_id directly — backend resolves from store
-      const allWfs = [...templateWorkflows, ...availableWorkflows];
-      const wf = allWfs.find(w => w.id === selectedWorkflow);
-      payload.workflow_id = selectedWorkflow;
-      payload.graph_name = wf?.name || selectedWorkflow;
+      // Preset is determined by role on backend — send workflow_id for compat
+      payload.workflow_id = formState.role === 'vtuber' ? 'template-vtuber' : 'template-optimized-autonomous';
       // Send tool preset if explicitly selected
       if (selectedPreset) {
         payload.tool_preset_id = selectedPreset;
       }
       // CLI-specific settings for VTuber role
       if (formState.role === 'vtuber') {
-        if (selectedCliWorkflow && selectedCliWorkflow !== 'template-optimized-autonomous') {
-          const cliWf = allWfs.find(w => w.id === selectedCliWorkflow);
-          payload.cli_workflow_id = selectedCliWorkflow;
-          payload.cli_graph_name = cliWf?.name || selectedCliWorkflow;
-        }
         if (selectedCliPreset) {
           payload.cli_tool_preset_id = selectedCliPreset;
         }
@@ -298,47 +282,13 @@ export default function CreateSessionModal({ onClose }: Props) {
             </div>
           </div>
 
-          {/* Graph Workflow */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.graphWorkflow')} <InfoTooltip text={t('createSession.graphWorkflowHelp')} /></label>
-            <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedWorkflow} onChange={e => setSelectedWorkflow(e.target.value)}>
-              {templateWorkflows.length > 0 && (
-                <optgroup label={t('createSession.officialTemplates')}>
-                  {templateWorkflows.map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {availableWorkflows.length > 0 && (
-                <optgroup label={t('createSession.customWorkflows')}>
-                  {availableWorkflows.map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            <small className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">
-              {(() => {
-                const allWfs = [...templateWorkflows, ...availableWorkflows];
-                const wf = allWfs.find(w => w.id === selectedWorkflow);
-                return wf?.description || t('createSession.customHelp');
-              })()}
-            </small>
-          </div>
-
-          {/* Max Iterations (for non-simple workflows) */}
-          {!selectedWorkflow.endsWith('-simple') && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.maxIterations')} <InfoTooltip text={t('createSession.maxIterationsHelp')} /></label>
-                <NumberStepper value={formState.max_iterations ?? 50} onChange={v => setFormState(f => ({ ...f, max_iterations: v }))} min={1} max={500} step={5} />
-              </div>
+          {/* Max Iterations */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.maxIterations')} <InfoTooltip text={t('createSession.maxIterationsHelp')} /></label>
+              <NumberStepper value={formState.max_iterations ?? 30} onChange={v => setFormState(f => ({ ...f, max_iterations: v }))} min={1} max={500} step={5} />
             </div>
-          )}
+          </div>
 
           {/* Tool Preset */}
           <div className="flex flex-col gap-1.5">
@@ -407,33 +357,6 @@ export default function CreateSessionModal({ onClose }: Props) {
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
-              </div>
-              {/* CLI Agent Graph Workflow */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[0.8125rem] font-medium text-[var(--text-secondary)] inline-flex items-center gap-1.5">{t('createSession.cliWorkflow')} <InfoTooltip text={t('createSession.cliWorkflowHelp')} /></label>
-                <select className="w-full py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-[var(--border-radius)] text-[0.875rem] text-[var(--text-primary)] appearance-none cursor-pointer transition-[border-color] focus:outline-none focus:border-[var(--primary-color)] focus:shadow-[0_0_0_3px_rgba(59,130,246,0.15)] pr-8" style={selectArrow} value={selectedCliWorkflow} onChange={e => setSelectedCliWorkflow(e.target.value)}>
-                  {templateWorkflows.length > 0 && (
-                    <optgroup label={t('createSession.officialTemplates')}>
-                      {templateWorkflows.map(w => (
-                        <option key={w.id} value={w.id}>{w.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {availableWorkflows.length > 0 && (
-                    <optgroup label={t('createSession.customWorkflows')}>
-                      {availableWorkflows.map(w => (
-                        <option key={w.id} value={w.id}>{w.name}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-                <small className="text-[0.75rem] text-[var(--text-muted)] mt-0.5">
-                  {(() => {
-                    const allWfs = [...templateWorkflows, ...availableWorkflows];
-                    const wf = allWfs.find(w => w.id === selectedCliWorkflow);
-                    return wf?.description || t('createSession.cliWorkflowDefault');
-                  })()}
-                </small>
               </div>
               {/* CLI Agent Tool Preset */}
               <div className="flex flex-col gap-1.5">
