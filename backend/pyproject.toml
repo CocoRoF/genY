@@ -6,25 +6,22 @@ readme = "README.md"
 requires-python = ">=3.11"
 
 dependencies = [
+    # Web framework
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
     "python-multipart>=0.0.9",
     "httpx>=0.28.0",
-    "redis>=7.0.0",
     "python-dotenv>=1.0.0",
-    "requests>=2.32.5",
-    "aiohttp>=3.13.3",
-    "pathspec>=0.12.0",
-    # LangGraph + LangChain integration
-    "langchain>=1.0.0",
-    "langgraph>=1.0.0",
+    # LangChain (memory reflection + curation engine)
     "langchain-anthropic>=0.3.0",
     "langchain-core>=0.3.0",
-    "jinja2>=3.1.0",
+    # Vector search
     "faiss-cpu>=1.9.0",
     "numpy>=1.26.0",
+    # File pattern matching
+    "pathspec>=0.12.0",
     # PostgreSQL database
     "psycopg[binary]>=3.2.0",
     "psycopg-pool>=3.2.0",
@@ -32,10 +29,11 @@ dependencies = [
     "ddgs==9.11.4",
     # Web fetch & browser automation
     "playwright>=1.49.0",
-    # geny-executor: Pipeline-based execution engine (built-in tools, MCP, session persistence)
+    # geny-executor: Pipeline-based execution engine
     "geny-executor>=0.8.1",
-    # MCP (Model Context Protocol) — proxy MCP server
+    # MCP (Model Context Protocol)
     "mcp>=1.0.0",
+    # Auth
     "bcrypt>=5.0.0",
 ]
 
