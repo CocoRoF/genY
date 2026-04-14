@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/store/useAppStore';
 import { agentApi, ttsApi, type VoiceProfile } from '@/lib/api';
-import { workflowApi } from '@/lib/workflowApi';
+// workflowApi removed — pipeline presets replace workflow selection
 import { toolPresetApi } from '@/lib/toolApi';
 import NumberStepper from '@/components/ui/NumberStepper';
 import InfoTooltip from '@/components/ui/InfoTooltip';
@@ -12,7 +12,7 @@ import { X } from 'lucide-react';
 import { useI18n } from '@/lib/i18n';
 import { useVTuberStore } from '@/store/useVTuberStore';
 import type { CreateAgentRequest, SessionInfo, ToolPresetDefinition } from '@/types';
-import type { WorkflowDefinition } from '@/types/workflow';
+// WorkflowDefinition type removed — using preset strings instead
 
 const selectArrow: React.CSSProperties = {
   backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
@@ -96,15 +96,8 @@ export default function CreateSessionModal({ onClose }: Props) {
 
   // Load available workflows
   useEffect(() => {
-    Promise.all([
-      workflowApi.list().catch(() => ({ workflows: [] })),
-      workflowApi.listTemplates().catch(() => ({ templates: [] })),
-      toolPresetApi.list().catch(() => ({ presets: [] })),
-    ]).then(([wfRes, tmplRes, presetRes]) => {
-      const tmpls = tmplRes.templates || [];
-      setTemplateWorkflows(tmpls);
-      const userWfs = (wfRes.workflows || []).filter(w => !w.is_template);
-      setAvailableWorkflows(userWfs);
+    // Workflow list removed — presets are determined by role
+    toolPresetApi.list().catch(() => ({ presets: [] })).then((presetRes) => {
       setToolPresets(presetRes.presets || []);
     });
   }, []);

@@ -1,257 +1,149 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ReactFlowProvider } from '@xyflow/react';
+import { useMemo } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { useWorkflowStore } from '@/store/useWorkflowStore';
-import PropertyPanel from '@/components/workflow/PropertyPanel';
-import WorkflowCanvas from '@/components/workflow/WorkflowCanvas';
-import { agentApi } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { BarChart3, AlertTriangle, RefreshCw, X } from 'lucide-react';
-import { useIsMobile } from '@/lib/useIsMobile';
-import type { WorkflowDefinition } from '@/types/workflow';
+import { Layers, Zap, Brain, Shield, Database, Wrench, BarChart3, MessageSquare } from 'lucide-react';
 
-// ========== Main GraphTab Component ==========
+/**
+ * Pipeline Visualization Tab
+ *
+ * Shows the geny-executor 16-stage Pipeline structure for the
+ * currently selected session. Replaces the old workflow node graph.
+ */
+
+const PIPELINE_STAGES = [
+  { id: 's01', name: 'Input', icon: MessageSquare, category: 'ingress', desc: 'Validate & normalize input' },
+  { id: 's02', name: 'Context', icon: Database, category: 'ingress', desc: 'Load history & memory' },
+  { id: 's03', name: 'System', icon: Brain, category: 'ingress', desc: 'Build system prompt' },
+  { id: 's04', name: 'Guard', icon: Shield, category: 'preflight', desc: 'Budget & safety checks' },
+  { id: 's05', name: 'Cache', icon: Zap, category: 'preflight', desc: 'Prompt caching optimization' },
+  { id: 's06', name: 'API', icon: Zap, category: 'execution', desc: 'Call Anthropic API' },
+  { id: 's07', name: 'Token', icon: BarChart3, category: 'execution', desc: 'Track token usage & cost' },
+  { id: 's08', name: 'Think', icon: Brain, category: 'execution', desc: 'Extended thinking blocks' },
+  { id: 's09', name: 'Parse', icon: Layers, category: 'execution', desc: 'Parse response & signals' },
+  { id: 's10', name: 'Tool', icon: Wrench, category: 'execution', desc: 'Execute tool calls' },
+  { id: 's11', name: 'Agent', icon: MessageSquare, category: 'execution', desc: 'Multi-agent orchestration' },
+  { id: 's12', name: 'Evaluate', icon: BarChart3, category: 'decision', desc: 'Quality & completion check' },
+  { id: 's13', name: 'Loop', icon: Zap, category: 'decision', desc: 'Continue or finish' },
+  { id: 's14', name: 'Emit', icon: MessageSquare, category: 'egress', desc: 'Output to consumers' },
+  { id: 's15', name: 'Memory', icon: Database, category: 'egress', desc: 'Persist conversation' },
+  { id: 's16', name: 'Yield', icon: Layers, category: 'egress', desc: 'Format final result' },
+];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  ingress: 'bg-blue-500/10 border-blue-500/30 text-blue-400',
+  preflight: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+  execution: 'bg-green-500/10 border-green-500/30 text-green-400',
+  decision: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+  egress: 'bg-orange-500/10 border-orange-500/30 text-orange-400',
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  ingress: 'Ingress',
+  preflight: 'Pre-flight',
+  execution: 'Execution (Loop)',
+  decision: 'Decision',
+  egress: 'Egress',
+};
+
+const PRESET_LABELS: Record<string, { label: string; desc: string }> = {
+  'worker_adaptive': {
+    label: 'Worker Adaptive',
+    desc: 'Binary classify (easy/not_easy) + autonomous execution',
+  },
+  'worker_easy': {
+    label: 'Worker Easy',
+    desc: 'Single-turn Q&A with memory context',
+  },
+  'vtuber': {
+    label: 'VTuber',
+    desc: 'Conversational agent with persona & memory reflection',
+  },
+};
 
 export default function GraphTab() {
-  const { selectedSessionId, sessions, setActiveTab } = useAppStore();
+  const { selectedSessionId, sessions } = useAppStore();
   const { t } = useI18n();
-  const { selectedNodeId, setSelectedNode, nodes } = useWorkflowStore();
-  const isMobile = useIsMobile();
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [workflowDef, setWorkflowDef] = useState<WorkflowDefinition | null>(null);
-  const [viewMode, setViewMode] = useState<'vtuber' | 'cli'>('vtuber');
-
-  // Get current session info
   const session = useMemo(
     () => sessions.find(s => s.session_id === selectedSessionId),
     [sessions, selectedSessionId],
   );
 
-  // Find linked CLI session (if current is VTuber)
-  const linkedCliSession = useMemo(() => {
-    if (!session || session.session_type !== 'vtuber') return null;
-    return sessions.find(s => s.session_type === 'cli' && s.linked_session_id === session.session_id) ?? null;
-  }, [session, sessions]);
-
-  const hasDualView = !!linkedCliSession;
-
-  // Resolve which session ID to use for fetching
-  const targetSessionId = useMemo(() => {
-    if (!hasDualView || viewMode === 'vtuber') return selectedSessionId;
-    return linkedCliSession?.session_id ?? selectedSessionId;
-  }, [hasDualView, viewMode, selectedSessionId, linkedCliSession]);
-
-  const targetSession = useMemo(
-    () => sessions.find(s => s.session_id === targetSessionId),
-    [sessions, targetSessionId],
-  );
-
-  // Reset viewMode when session changes
-  useEffect(() => { setViewMode('vtuber'); }, [selectedSessionId]);
-
-  // Load workflow definition for the selected session
-  const fetchSessionWorkflow = useCallback(async () => {
-    if (!targetSessionId) return;
-    setLoading(true);
-    setError('');
-    try {
-      const store = useWorkflowStore.getState();
-      if (!store.nodeCatalog) {
-        await store.loadCatalog();
-      }
-
-      const wfDef = await agentApi.getWorkflow(targetSessionId);
-      setWorkflowDef(wfDef);
-      useWorkflowStore.getState().loadFromDefinition(wfDef);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed to load graph';
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, [targetSessionId]);
-
-  useEffect(() => {
-    fetchSessionWorkflow();
-  }, [fetchSessionWorkflow]);
-
-  // Derive display metadata
-  const graphName = targetSession?.graph_name || workflowDef?.name || 'Simple';
-  const isTemplate = workflowDef?.is_template ?? false;
-  const nodeCount = workflowDef?.nodes?.length ?? nodes.length;
-  const edgeCount = workflowDef?.edges?.length ?? 0;
-
-  // ── No session selected ──
-  if (!selectedSessionId) {
+  if (!session) {
     return (
-      <div className="flex flex-col h-full min-h-0 overflow-hidden">
-        <div className="flex items-center justify-center flex-1">
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <BarChart3 size={32} className="mb-3 opacity-60 text-[var(--text-muted)]" />
-            <h3 className="text-[1rem] font-medium text-[var(--text-secondary)] mb-2">
-              {t('graphTab.selectSession')}
-            </h3>
-            <p className="text-[0.8125rem] text-[var(--text-muted)] max-w-[360px]">
-              {t('graphTab.selectSessionDesc')}
-              <button
-                className="text-[var(--primary-color)] underline underline-offset-2 font-medium bg-transparent border-none cursor-pointer"
-                onClick={() => setActiveTab('workflows')}
-              >
-                {t('graphTab.workflowsLink')}
-              </button>
-              {t('graphTab.selectSessionSuffix')}
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center h-full text-zinc-500">
+        {t('graph.selectSession', 'Select a session to view pipeline')}
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-6 h-6 border-2 border-[var(--primary-color)] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[0.8125rem] text-[var(--text-muted)]">{t('graphTab.loadingGraph')}</span>
-        </div>
-      </div>
-    );
-  }
+  // Determine preset from workflow_id
+  const workflowId = session.workflow_id || '';
+  let presetKey = 'worker_adaptive';
+  if (workflowId.includes('vtuber')) presetKey = 'vtuber';
+  else if (workflowId.includes('simple')) presetKey = 'worker_easy';
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="flex flex-col items-center gap-3 text-center max-w-[400px]">
-          <AlertTriangle size={28} className="text-[var(--warning-color)]" />
-          <p className="text-[0.875rem] text-[var(--danger-color)]">{error}</p>
-          <button
-            className="px-4 py-2 text-[0.8125rem] rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors inline-flex items-center gap-1.5"
-            onClick={fetchSessionWorkflow}
-          >
-            <RefreshCw size={12} /> {t('graphTab.resetBtn')}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const preset = PRESET_LABELS[presetKey] || PRESET_LABELS['worker_adaptive'];
 
   return (
-    <ReactFlowProvider>
-      <div className="flex flex-col h-full min-h-0 overflow-hidden">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between h-10 px-2 md:px-4 bg-[var(--bg-secondary)] border-b border-[var(--border-color)] shrink-0 overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-2 md:gap-3 min-w-0">
-            <span className="text-[12px] md:text-[13px] font-semibold text-[var(--text-primary)] flex items-center gap-2 shrink-0">
-              {t('graphTab.title')}
-            </span>
+    <div className="h-full flex flex-col p-4 overflow-auto">
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+          <Layers className="w-5 h-5" />
+          Pipeline: {preset.label}
+        </h2>
+        <p className="text-sm text-zinc-400 mt-1">{preset.desc}</p>
+        <p className="text-xs text-zinc-500 mt-1">
+          Session: {session.session_name || session.session_id.slice(0, 8)} | Model: {session.model || 'default'}
+        </p>
+      </div>
 
-            {/* VTuber / CLI toggle */}
-            {hasDualView && (
-              <div className="flex items-center h-6 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] overflow-hidden shrink-0">
-                <button
-                  className={`px-2 h-full text-[10px] font-semibold transition-colors ${
-                    viewMode === 'vtuber'
-                      ? 'bg-[var(--primary-color)] text-white'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-                  }`}
-                  onClick={() => setViewMode('vtuber')}
-                >
-                  VTuber
-                </button>
-                <button
-                  className={`px-2 h-full text-[10px] font-semibold transition-colors ${
-                    viewMode === 'cli'
-                      ? 'bg-[var(--primary-color)] text-white'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
-                  }`}
-                  onClick={() => setViewMode('cli')}
-                >
-                  CLI
-                </button>
+      {/* Pipeline Stages */}
+      <div className="flex-1">
+        {Object.entries(CATEGORY_LABELS).map(([cat, label]) => {
+          const stages = PIPELINE_STAGES.filter(s => s.category === cat);
+          if (stages.length === 0) return null;
+          const colorClass = CATEGORY_COLORS[cat] || '';
+
+          return (
+            <div key={cat} className="mb-4">
+              <div className="text-xs font-medium text-zinc-500 uppercase mb-2">{label}</div>
+              <div className="flex flex-wrap gap-2">
+                {stages.map((stage) => {
+                  const Icon = stage.icon;
+                  return (
+                    <div
+                      key={stage.id}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${colorClass} text-sm`}
+                    >
+                      <Icon className="w-4 h-4 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">{stage.id}: {stage.name}</div>
+                        <div className="text-xs opacity-70">{stage.desc}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-
-            {/* Graph name */}
-            <span className="text-[11px] md:text-[12px] font-medium text-[var(--text-secondary)] truncate max-w-[120px] md:max-w-[200px]">
-              {graphName}
-            </span>
-
-            {/* Template badge */}
-            {isTemplate && (
-              <span className="hidden sm:inline text-[10px] font-semibold py-[2px] px-1.5 rounded-md bg-[rgba(168,85,247,0.12)] text-[#c084fc] border border-[rgba(168,85,247,0.2)] uppercase tracking-wide shrink-0">
-                Template
-              </span>
-            )}
-
-            {/* Session name */}
-            {targetSession?.session_name && (
-              <>
-                <span className="w-px h-4 bg-[var(--border-color)] shrink-0 hidden md:block" />
-                <span className="text-[11px] text-[var(--text-muted)] truncate max-w-[100px] md:max-w-[150px] hidden md:block">
-                  {targetSession.session_name}
-                </span>
-              </>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Stats */}
-            <span className="text-[10px] text-[var(--text-muted)]">
-              {t('workflowEditor.nodesEdges', { nodes: nodeCount, edges: edgeCount })}
-            </span>
-
-            {/* Refresh */}
-            <button
-              className="h-7 px-2.5 text-[11px] font-medium rounded-md border border-[var(--border-color)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] hover:text-[var(--text-primary)] transition-colors"
-              onClick={fetchSessionWorkflow}
-            >
-              ⟳ {t('graphTab.resetBtn')}
-            </button>
-          </div>
-        </div>
-
-        {/* Canvas + Property Panel */}
-        <div className="flex flex-1 min-h-0 relative">
-          {/* ReactFlow Canvas */}
-          <div className="flex-1 min-w-0">
-            <WorkflowCanvas readOnly />
-          </div>
-
-          {/* Mobile backdrop for property panel */}
-          {isMobile && selectedNodeId && (
-            <div className="fixed inset-0 z-20 bg-black/40" onClick={() => setSelectedNode(null)} />
-          )}
-
-          {/* Property Panel — overlay on mobile, side panel on desktop */}
-          <div
-            className={`shrink-0 border-l border-[var(--border-color)] bg-[var(--bg-secondary)] overflow-y-auto transition-[width] duration-150 ${
-              selectedNodeId
-                ? 'fixed inset-y-0 right-0 z-30 w-[280px] md:static md:w-[300px] shadow-lg md:shadow-none'
-                : 'w-0 overflow-hidden border-l-0'
-            }`}
-          >
-            {/* Mobile close button */}
-            {isMobile && selectedNodeId && (
-              <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-color)]">
-                <span className="text-xs font-medium text-[var(--text-secondary)]">{t('propertyPanel.title')}</span>
-                <button
-                  onClick={() => setSelectedNode(null)}
-                  className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)]"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-            <div className="w-[280px] md:w-[300px]">
-              <PropertyPanel readOnly />
             </div>
-          </div>
+          );
+        })}
+
+        {/* Loop indicator */}
+        <div className="mt-4 p-3 rounded-lg border border-zinc-700 bg-zinc-800/50 text-sm text-zinc-400">
+          <div className="font-medium text-zinc-300 mb-1">Execution Loop</div>
+          <div>s06 (API) → s13 (Loop) repeats until completion signal or max_turns reached.</div>
+          {presetKey === 'worker_adaptive' && (
+            <div className="mt-1 text-xs">
+              <span className="text-green-400">easy</span>: 1 turn |{' '}
+              <span className="text-yellow-400">not_easy</span>: up to 30 turns with tool execution
+            </div>
+          )}
         </div>
       </div>
-    </ReactFlowProvider>
+    </div>
   );
 }

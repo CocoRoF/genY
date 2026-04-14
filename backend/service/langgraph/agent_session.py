@@ -705,8 +705,47 @@ class AgentSession:
             for t in self._geny_tool_registry.list_all():
                 tools.register(t)
 
+        # 3. External MCP server tools (GitHub, Notion, etc.)
+        if self._mcp_config:
+            try:
+                from geny_executor.tools.mcp.manager import MCPManager, MCPServerConfig
+                mcp_servers = {}
+                if isinstance(self._mcp_config, dict):
+                    raw_servers = self._mcp_config.get("mcpServers", {})
+                elif hasattr(self._mcp_config, "mcpServers"):
+                    raw_servers = self._mcp_config.mcpServers or {}
+                else:
+                    raw_servers = {}
+                for name, cfg in raw_servers.items():
+                    if isinstance(cfg, dict):
+                        mcp_servers[name] = MCPServerConfig(
+                            name=name,
+                            command=cfg.get("command", ""),
+                            args=cfg.get("args", []),
+                            env=cfg.get("env", {}),
+                            transport=cfg.get("transport", "stdio"),
+                            url=cfg.get("url", ""),
+                        )
+                if mcp_servers:
+                    import asyncio
+                    mcp_manager = MCPManager()
+                    asyncio.get_event_loop().run_until_complete(
+                        mcp_manager.connect_all(mcp_servers)
+                    )
+                    mcp_tools = asyncio.get_event_loop().run_until_complete(
+                        mcp_manager.discover_tools()
+                    )
+                    for t in mcp_tools:
+                        tools.register(t)
+                    logger.info(
+                        f"[{self._session_id}] MCP tools registered: "
+                        f"{[t.name for t in mcp_tools]} from {list(mcp_servers.keys())}"
+                    )
+            except Exception as e:
+                logger.warning(f"[{self._session_id}] MCP tool registration failed: {e}")
+
         logger.info(
-            f"[{self._session_id}] Tool registry: {tools.list_names()}"
+            f"[{self._session_id}] Tool registry: {len(tools)} tools"
         )
 
         # Curated knowledge manager
