@@ -1229,159 +1229,42 @@ class GraphStructure(BaseModel):
     edges: list[GraphEdgeInfo] = []
 
 
-def _build_graph_structure_from_workflow(
-    session_id: str,
-    session_name: str,
-    workflow: "WorkflowDefinition",
-) -> GraphStructure:
-    """Build a GraphStructure from a WorkflowDefinition for visualization.
 
-    Converts the workflow's nodes and edges into the GraphStructure format
-    used by the frontend graph viewer.
-    """
-    nodes = []
-    edges = []
-
-    for node in workflow.nodes:
-        node_type = "node"
-        if node.node_type == "start":
-            node_type = "start"
-        elif node.node_type == "end":
-            node_type = "end"
-        elif node.node_type in ("context_guard", "post_model", "iteration_gate", "memory_inject"):
-            node_type = "resilience"
-
-        nodes.append(GraphNodeInfo(
-            id=node.id,
-            label=node.label,
-            type=node_type,
-            description=f"{node.node_type} node",
-            metadata=dict(node.config) if node.config else {},
-        ))
-
-    # Group edges by source to detect conditional routing
-    from collections import defaultdict
-    edges_by_source = defaultdict(list)
-    for edge in workflow.edges:
-        edges_by_source[edge.source].append(edge)
-
-    for source_id, source_edges in edges_by_source.items():
-        targets = {e.target for e in source_edges}
-        is_conditional = len(targets) > 1
-
-        if is_conditional:
-            # Build condition map for conditional edges
-            condition_map = {}
-            for e in source_edges:
-                port = e.source_port or "default"
-                condition_map[port] = e.target
-
-            for e in source_edges:
-                port = e.source_port or "default"
-                edges.append(GraphEdgeInfo(
-                    source=e.source,
-                    target=e.target,
-                    label=e.label or port,
-                    type="conditional",
-                    condition_map=condition_map,
-                ))
-        else:
-            for e in source_edges:
-                edges.append(GraphEdgeInfo(
-                    source=e.source,
-                    target=e.target,
-                    label=e.label or "",
-                    type="edge",
-                ))
-
-    return GraphStructure(
-        session_id=session_id,
-        session_name=session_name,
-        graph_type=workflow.template_name or "custom",
-        nodes=nodes,
-        edges=edges,
-    )
-
-
-@router.get("/{session_id}/graph", response_model=GraphStructure)
+@router.get("/{session_id}/graph")
 async def get_session_graph(
     session_id: str = Path(..., description="Session ID"),
 ):
-    """
-    Get the LangGraph graph structure for a session.
-
-    Returns all nodes, edges, conditional edges, and metadata
-    for complete graph visualization. Uses the session's linked
-    WorkflowDefinition instead of hardcoded structures.
-    """
-    from service.workflow.workflow_store import get_workflow_store
-
+    """Get pipeline info for a session (replaces workflow graph)."""
     agent: Optional[AgentSession] = agent_manager.get_agent(session_id)
     if not agent:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-    session_name = agent.session_name or session_id[:8]
+    wid = getattr(agent, '_workflow_id', '') or ''
+    preset = 'vtuber' if 'vtuber' in wid else 'worker_easy' if 'simple' in wid else 'worker_adaptive'
 
-    # Use the linked workflow from the agent session
-    workflow = agent.workflow
-    if not workflow:
-        # Fallback: try to load from workflow_id or template
-        store = get_workflow_store()
-        workflow_id = getattr(agent, '_workflow_id', None)
-        if workflow_id:
-            workflow = store.load(workflow_id)
-        if not workflow:
-            template_id = "template-autonomous" if agent.autonomous else "template-simple"
-            workflow = store.load(template_id)
-        if not workflow:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No workflow definition found for session {session_id}",
-            )
-
-    return _build_graph_structure_from_workflow(session_id, session_name, workflow)
+    return {
+        "session_id": session_id,
+        "preset": preset,
+        "workflow_id": wid,
+        "execution_backend": "pipeline",
+    }
 
 
 @router.get("/{session_id}/workflow")
 async def get_session_workflow(
     session_id: str = Path(..., description="Session ID"),
 ):
-    """
-    Get the workflow definition associated with a session.
-
-    Returns the raw WorkflowDefinition (nodes, edges, positions)
-    so the frontend can render it with the same ReactFlow-based
-    editor used in the Workflow tab.
-
-    Uses the session's linked WorkflowDefinition directly,
-    falling back to store lookup if needed.
-    """
-    from service.workflow.workflow_store import get_workflow_store
-
+    """Get pipeline preset info (replaces workflow definition)."""
     agent: Optional[AgentSession] = agent_manager.get_agent(session_id)
     if not agent:
         raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 
-    # 1. Use the linked workflow from the agent session
-    if agent.workflow:
-        return agent.workflow.model_dump()
+    wid = getattr(agent, '_workflow_id', '') or ''
+    preset = 'vtuber' if 'vtuber' in wid else 'worker_easy' if 'simple' in wid else 'worker_adaptive'
 
-    # 2. Fallback: try workflow_id from store
-    store = get_workflow_store()
-    workflow_id = getattr(agent, '_workflow_id', None)
-    if workflow_id:
-        wf = store.load(workflow_id)
-        if wf:
-            return wf.model_dump()
-
-    # 3. Fall back to built-in template based on graph_name
-    template_id = "template-autonomous" if agent.autonomous else "template-simple"
-    wf = store.load(template_id)
-    if wf:
-        return wf.model_dump()
-
-    # 4. If nothing found, error
-    raise HTTPException(
-        status_code=404,
-        detail=f"No workflow definition found for session {session_id}",
-    )
+    return {
+        "id": wid or f"preset-{preset}",
+        "name": preset,
+        "preset": preset,
+        "execution_backend": "pipeline",
+    }

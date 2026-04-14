@@ -122,7 +122,7 @@ class CurationScheduler:
             llm_model = None
             if cfg.auto_curation_use_llm:
                 try:
-                    from service.workflow.nodes.memory.memory_reflect_node import _get_memory_model
+                    from service.memory.reflect_utils import get_memory_model as _get_memory_model
                     llm_model = _get_memory_model()
                 except Exception:
                     pass

@@ -3,7 +3,7 @@
 Each session runs a geny-executor Pipeline that calls the Anthropic API
 directly (no CLI subprocess). Session creation flow:
 
-    1. Load WorkflowDefinition (template_id determines preset)
+    1. Determine preset from workflow_id string
     2. Build geny-executor Pipeline via GenyPresets
     3. Initialize SessionMemoryManager for session storage path
 
@@ -42,7 +42,6 @@ from service.claude_manager.models import (
 )
 from service.langgraph.session_freshness import SessionFreshness, FreshnessStatus
 from service.logging.session_logger import get_session_logger, SessionLogger
-from service.workflow.workflow_model import WorkflowDefinition
 
 logger = getLogger(__name__)
 
@@ -96,7 +95,7 @@ class AgentSession:
             max_iterations: Max graph iterations.
             role: Session role.
             enable_checkpointing: Enable LangGraph MemorySaver checkpointing.
-            workflow_id: Optional workflow ID (used to load WorkflowDefinition).
+            workflow_id: Preset identifier (e.g. template-vtuber, template-optimized-autonomous).
             graph_name: Human-readable graph/workflow name.
         """
         # Session identity
@@ -122,7 +121,6 @@ class AgentSession:
         self._graph_name = graph_name
         self._tool_preset_id = tool_preset_id
         self._owner_username = owner_username
-        self._workflow: Optional[WorkflowDefinition] = None
 
         # Storage path (set during create())
         self._storage_path: Optional[str] = None
@@ -260,17 +258,9 @@ class AgentSession:
 
     @property
     def autonomous(self) -> bool:
-        """Whether this session uses an autonomous-type graph (derived from workflow)."""
-        if self._workflow:
-            return 'autonomous' in (self._workflow.name or '').lower()
-        if self._graph_name:
-            return 'autonomous' in self._graph_name.lower()
-        return False
-
-    @property
-    def workflow(self) -> Optional[WorkflowDefinition]:
-        """The linked WorkflowDefinition for this session."""
-        return self._workflow
+        """Whether this session uses an autonomous-type preset."""
+        wid = self._workflow_id or ""
+        return "autonomous" in wid.lower() or (not "simple" in wid.lower() and not "vtuber" in wid.lower())
 
     @property
     def max_iterations(self) -> int:
@@ -632,23 +622,8 @@ class AgentSession:
     def _build_graph(self):
         """Build the geny-executor Pipeline execution backend.
 
-        All execution goes through the geny-executor Pipeline — there is
-        no LangGraph/CLI fallback. The Pipeline calls the Anthropic API
-        directly (no subprocess).
+        Determines preset from workflow_id string, then calls _build_pipeline().
         """
-        # Load WorkflowDefinition
-        self._workflow = self._load_workflow_definition()
-        if not self._workflow:
-            raise RuntimeError(
-                f"Failed to load WorkflowDefinition for session {self._session_id} "
-                f"(workflow_id={self._workflow_id}, graph_name={self._graph_name})"
-            )
-
-        # Update graph_name from the workflow if not explicitly set
-        if not self._graph_name:
-            self._graph_name = self._workflow.name
-
-        # Always use geny-executor Pipeline
         self._build_pipeline()
 
     # ========================================================================
@@ -658,7 +633,7 @@ class AgentSession:
     def _build_pipeline(self):
         """Build a geny-executor Pipeline with built-in tools and MCP.
 
-        Maps the loaded WorkflowDefinition's template to a GenyPresets
+        Maps the workflow_id string to a GenyPresets
         method, wiring in memory_manager, tools (built-in + Geny custom +
         MCP), and LLM callbacks.
 
@@ -761,7 +736,7 @@ class AgentSession:
         llm_reflect = self._make_llm_reflect_callback(api_key)
 
         # Determine preset from template
-        template_id = getattr(self._workflow, "id", "") or self._workflow_id or ""
+        template_id = self._workflow_id or ""
         is_vtuber = "vtuber" in template_id.lower()
         is_simple = "simple" in template_id.lower()
 
@@ -1118,71 +1093,6 @@ class AgentSession:
                     exc_info=True,
                 )
 
-    def _load_workflow_definition(self) -> Optional[WorkflowDefinition]:
-        """Load the WorkflowDefinition for this session.
-
-        Resolution order:
-            1. workflow_id → load from WorkflowStore
-            2. graph_name contains 'autonomous' → template-autonomous
-            3. Fallback → template-simple
-        """
-        from service.workflow.workflow_store import get_workflow_store
-
-        store = get_workflow_store()
-
-        # 1. Try explicit workflow_id
-        if self._workflow_id:
-            wf = store.load(self._workflow_id)
-            if wf:
-                logger.info(
-                    f"[{self._session_id}] Loaded workflow '{wf.name}' "
-                    f"from workflow_id={self._workflow_id}"
-                )
-                return wf
-            logger.warning(
-                f"[{self._session_id}] workflow_id={self._workflow_id} not found "
-                f"in store, falling back to template"
-            )
-
-        # 2. Infer from graph_name
-        is_optimized = self._graph_name and 'optimized' in self._graph_name.lower()
-        is_autonomous = self._graph_name and 'autonomous' in self._graph_name.lower()
-
-        if is_optimized and is_autonomous:
-            template_id = "template-optimized-autonomous"
-        elif is_autonomous:
-            template_id = "template-autonomous"
-        else:
-            template_id = "template-simple"
-
-        wf = store.load(template_id)
-        if wf:
-            logger.info(
-                f"[{self._session_id}] Using template '{wf.name}' ({template_id})"
-            )
-            return wf
-
-        # 3. If templates are not in store, generate them on the fly
-        logger.warning(
-            f"[{self._session_id}] Template {template_id} not found in store, "
-            f"generating from factory"
-        )
-        from service.workflow.templates import (
-            create_autonomous_template,
-            create_optimized_autonomous_template,
-            create_simple_template,
-            create_vtuber_template,
-        )
-
-        _template_factories = {
-            "template-autonomous": create_autonomous_template,
-            "template-optimized-autonomous": create_optimized_autonomous_template,
-            "template-simple": create_simple_template,
-            "template-vtuber": create_vtuber_template,
-        }
-        factory = _template_factories.get(template_id, create_simple_template)
-        return factory()
-
     # ========================================================================
     # Execution Methods
     # ========================================================================
@@ -1379,7 +1289,6 @@ class AgentSession:
             self._memory_manager = None
 
         self._pipeline = None
-        self._workflow = None
         self._initialized = False
         self._status = SessionStatus.STOPPED
 

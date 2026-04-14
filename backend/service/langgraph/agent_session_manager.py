@@ -389,18 +389,7 @@ class AgentSessionManager(SessionManager):
         graph_name = getattr(request, 'graph_name', None)
         workflow_id = getattr(request, 'workflow_id', None)
 
-        if workflow_id and not graph_name:
-            # Custom workflow → resolve name from store
-            try:
-                from service.workflow.workflow_store import get_workflow_store
-                wf_store = get_workflow_store()
-                wf_def = wf_store.load(workflow_id)
-                if wf_def:
-                    graph_name = wf_def.name
-            except Exception:
-                pass
-
-        # Map built-in graph_name choices to template workflow_ids
+        # Map role to preset workflow_id
         if not workflow_id:
             role_val = request.role.value if request.role else "worker"
             if role_val == "vtuber":

@@ -368,9 +368,9 @@ export const agentApi = {
   /** GET /api/agents/{id}/graph — graph structure */
   getGraph: (id: string) => apiCall<GraphStructure>(`/api/agents/${id}/graph`),
 
-  /** GET /api/agents/{id}/workflow — workflow definition for the session */
+  /** GET /api/agents/{id}/workflow — pipeline preset info */
   getWorkflow: (id: string) =>
-    apiCall<import('@/types/workflow').WorkflowDefinition>(`/api/agents/${id}/workflow`),
+    apiCall<{ id: string; name: string; preset: string; execution_backend: string }>(`/api/agents/${id}/workflow`),
 
   /** PUT /api/agents/{id}/system-prompt — update system prompt */
   updateSystemPrompt: (id: string, systemPrompt: string | null) =>

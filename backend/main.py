@@ -30,7 +30,6 @@ from controller.claude_controller import router as claude_router
 from controller.command_controller import router as command_router, get_prompts_list
 from controller.agent_controller import router as agent_router, agent_manager
 from controller.config_controller import router as config_router
-from controller.workflow_controller import router as workflow_router
 from controller.shared_folder_controller import router as shared_folder_router
 from controller.chat_controller import router as chat_router
 from controller.tool_preset_controller import router as tool_preset_router
@@ -235,20 +234,6 @@ async def lifespan(app: FastAPI):
     tool_preset_templates_installed = install_tool_preset_templates(tool_preset_store)
     logger.info(f"   - Tool preset templates installed: {tool_preset_templates_installed}")
     logger.info(f"   - Total tool presets: {len(tool_preset_store.list_all())}")
-
-    # Install workflow templates (node registry is deprecated but templates still define preset names)
-    print_step_banner("WORKFLOW", "WORKFLOW ENGINE", "Installing workflow templates...")
-    try:
-        from service.workflow.nodes import register_all_nodes
-        register_all_nodes()
-    except Exception:
-        logger.debug("Workflow node registration skipped (deprecated)")
-    from service.workflow.workflow_store import get_workflow_store
-    from service.workflow.templates import install_templates
-    workflow_store = get_workflow_store()
-    templates_installed = install_templates(workflow_store)
-    logger.info(f"   - Workflow templates installed: {templates_installed}")
-    logger.info(f"   - Total workflows: {len(workflow_store.list_all())}")
 
     # Initialize Shared Folder
     print_step_banner("SHARED", "SHARED FOLDER", "Initializing shared folder for cross-session collaboration...")
@@ -460,7 +445,6 @@ app.include_router(claude_router)
 app.include_router(command_router)
 app.include_router(agent_router)  # LangGraph agent sessions
 app.include_router(config_router)  # Configuration management
-app.include_router(workflow_router)  # Workflow editor
 app.include_router(shared_folder_router)  # Shared folder
 app.include_router(chat_router)  # Chat broadcast
 app.include_router(tool_preset_router)  # Tool preset management

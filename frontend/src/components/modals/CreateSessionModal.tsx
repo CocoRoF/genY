@@ -51,8 +51,8 @@ export default function CreateSessionModal({ onClose }: Props) {
   const [selectedCliPrompt, setSelectedCliPrompt] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [availableWorkflows, setAvailableWorkflows] = useState<WorkflowDefinition[]>([]);
-  const [templateWorkflows, setTemplateWorkflows] = useState<WorkflowDefinition[]>([]);
+  const [availableWorkflows] = useState<unknown[]>([]);
+  const [templateWorkflows] = useState<unknown[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState('template-optimized-autonomous');
   const [toolPresets, setToolPresets] = useState<ToolPresetDefinition[]>([]);
   const [selectedPreset, setSelectedPreset] = useState('');
