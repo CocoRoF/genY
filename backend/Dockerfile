@@ -1,19 +1,19 @@
 # ── Backend Dockerfile ─────────────────────────────────────────────────
-# Python 3.12 + Node.js 20 (needed for Claude CLI subprocess)
+# Python 3.12 + geny-executor (direct Anthropic API, no CLI subprocess)
 # ──────────────────────────────────────────────────────────────────────
 FROM python:3.12-slim AS base
 
-# ── System deps + Node.js ─────────────────────────────────────────────
+# ── System deps ──────────────────────────────────────────────────────
+# Node.js is only needed if MCP servers require npx. Kept minimal.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl git ca-certificates gnupg && \
-    # Install Node.js 20.x (required for Claude CLI / MCP servers)
+    # Install Node.js 20.x (needed for npx-based MCP servers)
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" \
         > /etc/apt/sources.list.d/nodesource.list && \
     apt-get update && apt-get install -y nodejs && \
-    npm install -g @anthropic-ai/claude-code && \
     # Cleanup
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -27,19 +27,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # ── Non-root user ────────────────────────────────────────────────────
-# Claude CLI refuses --dangerously-skip-permissions when running as root.
-# Create a dedicated 'geny' user (UID 1000) so the CLI works inside Docker.
 RUN groupadd -r geny && useradd -r -g geny -m -d /home/geny -s /bin/bash geny
 
 # ── Storage directories ──────────────────────────────────────────────
-# Agent session workspaces — bind-mounted to host for visibility
-# /app/cache/tts, /app/static/voices: Docker named volumes —
-# 이미지에 geny:geny 소유로 존재해야 볼륨 초기화 시 권한이 복사됨
 RUN mkdir -p /data/geny_agent_sessions && \
     mkdir -p /app/logs && \
     mkdir -p /app/cache/tts && \
     mkdir -p /app/static/voices && \
-    mkdir -p /app/service/claude_manager/session_data && \
+    mkdir -p /app/service/config/variables && \
     mkdir -p /home/geny/.claude && \
     chown -R geny:geny /data /app /home/geny
 

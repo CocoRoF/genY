@@ -1065,10 +1065,13 @@ class AgentSession:
         session_logger: Optional[SessionLogger],
         **kwargs,
     ) -> Dict[str, Any]:
-        """Execute via geny-executor Pipeline (non-streaming).
+        """Execute via geny-executor Pipeline with real-time event logging.
 
-        Maintains the same return contract as the LangGraph path:
-        {"output": str, "total_cost": float}
+        Uses run_stream() internally so that Pipeline events are logged to
+        session_logger in real time. The WebSocket/SSE layer polls
+        session_logger.get_cache_entries_since() and streams events to clients.
+
+        Maintains the same return contract: {"output": str, "total_cost": float}
         """
         # Record user input to short-term memory
         if self._memory_manager:
@@ -1077,37 +1080,93 @@ class AgentSession:
             except Exception:
                 logger.debug("Failed to record user message — non-critical", exc_info=True)
 
-        # Execute pipeline
-        result = await self._pipeline.run(input_text)
+        # Stream pipeline and log events in real time
+        accumulated_output = ""
+        total_cost = 0.0
+        iterations = 0
+        success = True
+        error_msg = None
+
+        async for event in self._pipeline.run_stream(input_text):
+            event_type = event.type if hasattr(event, "type") else ""
+            event_data = event.data if hasattr(event, "data") else {}
+
+            # Log pipeline events to session_logger for WebSocket/SSE streaming
+            if session_logger:
+                if event_type == "tool.execute_start":
+                    tool_name = event_data.get("tools", ["unknown"])[0] if event_data.get("tools") else "unknown"
+                    session_logger.log_tool_use(
+                        tool_name=tool_name,
+                        tool_input=str(event_data.get("count", "")),
+                    )
+                elif event_type == "tool.execute_complete":
+                    errors = event_data.get("errors", 0)
+                    count = event_data.get("count", 0)
+                    session_logger.log(
+                        level="TOOL_RES",
+                        message=f"Tool execution complete: {count} calls, {errors} errors",
+                        metadata={"tool_count": count, "error_count": errors},
+                    )
+                elif event_type == "stage.enter":
+                    stage_name = event.stage if hasattr(event, "stage") else event_data.get("stage", "unknown")
+                    session_logger.log_graph_event(
+                        event_type="node_enter",
+                        message=f"→ {stage_name}",
+                        node_name=stage_name,
+                    )
+                elif event_type == "stage.exit":
+                    stage_name = event.stage if hasattr(event, "stage") else event_data.get("stage", "unknown")
+                    session_logger.log_graph_event(
+                        event_type="node_exit",
+                        message=f"✓ {stage_name}",
+                        node_name=stage_name,
+                    )
+
+            # Accumulate output
+            if event_type == "text.delta":
+                text = event_data.get("text", "")
+                if text:
+                    accumulated_output += text
+
+            elif event_type == "pipeline.complete":
+                accumulated_output = event_data.get("result", accumulated_output)
+                total_cost = event_data.get("total_cost_usd", 0.0) or 0.0
+                iterations = event_data.get("iterations", 0)
+
+            elif event_type == "pipeline.error":
+                success = False
+                error_msg = event_data.get("error", "Unknown error")
+                total_cost = event_data.get("total_cost_usd", 0.0) or 0.0
+
+            # Heartbeat
+            self._execution_start_time = datetime.now()
 
         duration_ms = int((time.time() - start_time) * 1000)
-        output_text = result.text or ""
-        total_cost = result.total_cost_usd or 0.0
 
         # Log execution completion
         if session_logger:
             session_logger.log_graph_execution_complete(
-                success=result.success,
-                total_iterations=result.iterations,
-                final_output=output_text[:500] if output_text else None,
+                success=success,
+                total_iterations=iterations,
+                final_output=accumulated_output[:500] if accumulated_output else None,
                 total_duration_ms=duration_ms,
-                stop_reason="pipeline_complete" if result.success else (result.error or "error"),
+                stop_reason="pipeline_complete" if success else (error_msg or "error"),
             )
 
-        # Record structured execution entry to long-term memory
+        # Record to long-term memory
         self._execution_count += 1
         if self._memory_manager:
             try:
                 await self._memory_manager.record_execution(
                     input_text=input_text,
                     result_state={
-                        "final_answer": output_text,
+                        "final_answer": accumulated_output,
                         "total_cost": total_cost,
-                        "iteration": result.iterations,
+                        "iteration": iterations,
                     },
                     duration_ms=duration_ms,
                     execution_number=self._execution_count,
-                    success=result.success,
+                    success=success,
                 )
             except Exception:
                 logger.debug(
@@ -1115,11 +1174,11 @@ class AgentSession:
                     exc_info=True,
                 )
 
-        if not result.success:
-            self._error_message = result.error
-            return {"output": f"Error: {result.error}", "total_cost": total_cost}
+        if not success:
+            self._error_message = error_msg
+            return {"output": f"Error: {error_msg}", "total_cost": total_cost}
 
-        return {"output": output_text, "total_cost": total_cost}
+        return {"output": accumulated_output, "total_cost": total_cost}
 
     async def _astream_pipeline(
         self,
@@ -1128,10 +1187,11 @@ class AgentSession:
         session_logger: Optional[SessionLogger],
         **kwargs,
     ) -> AsyncIterator[Dict[str, Any]]:
-        """Stream via geny-executor Pipeline.
+        """Stream via geny-executor Pipeline with real-time event logging.
 
         Converts PipelineEvent objects to the dict format that
-        agent_executor.py and the frontend expect.
+        agent_executor.py and the frontend expect, while also logging
+        events to session_logger for WebSocket/SSE streaming.
         """
         # Record user input to short-term memory
         if self._memory_manager:
@@ -1143,13 +1203,45 @@ class AgentSession:
         accumulated_output = ""
         total_cost = 0.0
         iterations = 0
+        success = True
 
         async for event in self._pipeline.run_stream(input_text):
             event_type = event.type if hasattr(event, "type") else ""
             event_data = event.data if hasattr(event, "data") else {}
 
+            # ── Log pipeline events to session_logger ──
+            if session_logger:
+                if event_type == "tool.execute_start":
+                    tool_name = event_data.get("tools", ["unknown"])[0] if event_data.get("tools") else "unknown"
+                    session_logger.log_tool_use(
+                        tool_name=tool_name,
+                        tool_input=str(event_data.get("count", "")),
+                    )
+                elif event_type == "tool.execute_complete":
+                    errors = event_data.get("errors", 0)
+                    count = event_data.get("count", 0)
+                    session_logger.log(
+                        level="TOOL_RES",
+                        message=f"Tool execution complete: {count} calls, {errors} errors",
+                        metadata={"tool_count": count, "error_count": errors},
+                    )
+                elif event_type == "stage.enter":
+                    stage_name = event.stage if hasattr(event, "stage") else event_data.get("stage", "unknown")
+                    session_logger.log_graph_event(
+                        event_type="node_enter",
+                        message=f"→ {stage_name}",
+                        node_name=stage_name,
+                    )
+                elif event_type == "stage.exit":
+                    stage_name = event.stage if hasattr(event, "stage") else event_data.get("stage", "unknown")
+                    session_logger.log_graph_event(
+                        event_type="node_exit",
+                        message=f"✓ {stage_name}",
+                        node_name=stage_name,
+                    )
+
+            # ── Yield events to caller ──
             if event_type == "text.delta":
-                # Stream text deltas as they arrive
                 text = event_data.get("text", "")
                 if text:
                     accumulated_output += text
@@ -1165,6 +1257,7 @@ class AgentSession:
 
             elif event_type == "pipeline.complete":
                 result_text = event_data.get("result", accumulated_output)
+                total_cost = event_data.get("total_cost_usd", 0.0) or 0.0
                 iterations = event_data.get("iterations", 0)
                 yield {
                     "__end__": {
@@ -1175,6 +1268,7 @@ class AgentSession:
                 }
 
             elif event_type == "pipeline.error":
+                success = False
                 yield {
                     "__end__": {
                         "error": event_data.get("error", "Unknown error"),
@@ -1190,7 +1284,7 @@ class AgentSession:
 
         if session_logger:
             session_logger.log_graph_execution_complete(
-                success=True,
+                success=success,
                 total_iterations=iterations,
                 final_output=accumulated_output[:500] if accumulated_output else None,
                 total_duration_ms=duration_ms,
@@ -1209,7 +1303,7 @@ class AgentSession:
                     },
                     duration_ms=duration_ms,
                     execution_number=self._execution_count,
-                    success=True,
+                    success=success,
                 )
             except Exception:
                 logger.debug(

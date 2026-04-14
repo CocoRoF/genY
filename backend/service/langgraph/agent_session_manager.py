@@ -66,16 +66,9 @@ class AgentSessionManager(SessionManager):
 
     Core structure:
     - _local_agents: AgentSession store (local)
-    - _local_processes: ClaudeProcess store (existing, retained for compatibility)
 
-    Both approaches are supported:
-    1. AgentSession approach (LangGraph state management)
-       - create_agent_session() -> AgentSession
-       - get_agent() -> AgentSession
-
-    2. Legacy approach (direct ClaudeProcess usage)
-       - create_session() -> SessionInfo
-       - get_process() -> ClaudeProcess
+    All sessions use geny-executor Pipeline mode.
+    Legacy ClaudeProcess/LangGraph paths have been removed.
     """
 
     def __init__(self):
@@ -287,9 +280,8 @@ class AgentSessionManager(SessionManager):
         """
         Create a new AgentSession.
 
-        1. Create ClaudeProcess (via AgentSession.create())
-        2. Build CompiledStateGraph
-        3. Register in local store
+        1. Build geny-executor Pipeline (via AgentSession.create())
+        2. Register in local store
 
         Args:
             request: Session creation request
@@ -463,10 +455,6 @@ class AgentSessionManager(SessionManager):
         # Register in local store
         self._local_agents[session_id] = agent
 
-        # Legacy compatibility: also register ClaudeProcess in _local_processes
-        if agent.process:
-            self._local_processes[session_id] = agent.process
-
         # Wire DB into session memory manager (if available)
         if self._app_db is not None and agent.memory_manager is not None:
             try:
@@ -476,15 +464,9 @@ class AgentSessionManager(SessionManager):
                 logger.warning(f"[{session_id}] Failed to wire memory DB: {e}")
 
         # Link shared folder into session's storage directory
-        if agent.process and agent.process.storage_path:
-            self._link_shared_folder(agent.process.storage_path, session_id)
-            # Tell the ClaudeProcess about the shared folder so storage reads
-            # through the junction/symlink are properly delegated
-            if self._shared_folder_enabled and self._shared_folder_manager:
-                agent.process.set_shared_folder(
-                    link_name=self._shared_folder_link_name,
-                    shared_path=self._shared_folder_manager.shared_path,
-                )
+        storage = agent.storage_path if hasattr(agent, 'storage_path') else None
+        if storage:
+            self._link_shared_folder(storage, session_id)
 
         # Create SessionInfo
         session_info = agent.get_session_info()
