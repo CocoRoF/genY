@@ -58,7 +58,7 @@ export class ChatRoomWSManager {
     listeners.add(handler);
 
     const conn: RoomConnection = {
-      sub: null as unknown as { close: () => void },
+      sub: null as unknown as { close: () => void; reconnect: () => void },
       listeners,
       lastMsgId: afterId,
     };
