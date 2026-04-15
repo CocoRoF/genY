@@ -155,7 +155,10 @@ async def ws_chat_room_stream(websocket: WebSocket, room_id: str):
                     websocket, store, room_id, last_seen_id,
                     _active_broadcasts, _get_room_event, _build_agent_progress_data,
                 )
-                logger.info("[ChatWS:%s] _stream_room_events returned", room_id[:8])
+                # Stream ended (client disconnected or unsubscribed) — exit cleanly.
+                # Trying to receive_text() after disconnect causes RuntimeError.
+                logger.info("[ChatWS:%s] stream ended, closing connection", room_id[:8])
+                return
 
             elif msg_type == "ping":
                 await _send_event(websocket, "pong", {"ts": time.time()}, room_id)
