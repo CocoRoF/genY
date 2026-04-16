@@ -297,6 +297,13 @@ export default function VTuberChatPanel({
     const text = input.trim();
     if (!text || sending || !roomId) return;
 
+    // iOS WebKit: 채팅 전송은 user gesture이므로 이 시점에 AudioContext를 활성화.
+    // ttsEnabled가 기본 true인 경우 toggleTTS()가 호출되지 않으므로,
+    // 채팅 전송 시점에서 오디오를 언락해야 이후 auto-TTS가 작동한다.
+    if (useVTuberStore.getState().ttsEnabled) {
+      getAudioManager().ensureResumed();
+    }
+
     setInput('');
     setSending(true);
 

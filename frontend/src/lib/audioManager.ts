@@ -36,6 +36,10 @@ export class AudioManager {
   private _isProcessingQueue = false;
   private _currentOnEnd: (() => void) | null = null;
 
+  // ── iOS WebKit user gesture 오디오 언락 ──
+  private _gestureListenerAttached = false;
+  private _audioUnlocked = false;
+
   /**
    * AudioContext 초기화 (사용자 인터랙션 후 호출 필요)
    */
@@ -101,19 +105,14 @@ export class AudioManager {
 
   /**
    * Response body를 Blob으로 변환 (pre-fetch용 분리).
+   *
+   * response.blob()을 사용하여 iOS WebKit 호환성을 확보한다.
+   * (ReadableStream.getReader()는 iOS WebKit에서 streaming response에 불안정)
    */
   private async _fetchBlob(response: Response, sessionId: string): Promise<Blob | null> {
-    if (!response.ok || !response.body) return null;
+    if (!response.ok) return null;
     try {
-      const reader = response.body.getReader();
-      const chunks: BlobPart[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const contentType = response.headers.get('content-type') || 'audio/mpeg';
-      const blob = new Blob(chunks, { type: contentType });
+      const blob = await response.blob();
       if (blob.size === 0) return null;
       console.info(`[AudioManager] prefetch ready: ${blob.size} bytes, session=${sessionId.slice(0, 8)}`);
       return blob;
@@ -181,18 +180,24 @@ export class AudioManager {
       this.currentAudio = audio;
       this._currentOnEnd = onEnd ?? null;
 
-      // Web Audio API 연결 시도 — 실패해도 HTMLAudioElement 직접 재생으로 fallback
+      // Web Audio API 연결 시도 — 실패해도 HTMLAudioElement 직접 재생으로 fallback.
+      // iOS WebKit: AudioContext가 suspended이거나 createMediaElementSource가
+      // 실패할 수 있으므로 방어적으로 처리한다.
+      let webAudioConnected = false;
       try {
-        if (this.audioContext && this.analyser && this.gainNode) {
+        if (this.audioContext && this.audioContext.state === 'running' && this.analyser && this.gainNode) {
           this.sourceNode = this.audioContext.createMediaElementSource(audio);
           this.sourceNode.connect(this.analyser);
           this.analyser.connect(this.gainNode);
           this.startAmplitudeTracking();
+          webAudioConnected = true;
         }
       } catch (webAudioErr) {
-        // iOS WebKit에서 MediaElementSource 연결 실패 시
-        // 립싱크 없이 직접 재생 (audio.volume으로 볼륨 제어)
         console.warn('[AudioManager] Web Audio API connection failed, falling back to direct playback:', webAudioErr);
+      }
+
+      // Web Audio API 미연결 시 HTMLAudioElement.volume으로 볼륨 제어
+      if (!webAudioConnected) {
         audio.volume = this._volume;
       }
 
@@ -326,6 +331,44 @@ export class AudioManager {
     if (this.audioContext.state === 'suspended') {
       this.audioContext.resume();
     }
+
+    // iOS 오디오 언락: 무음 버퍼를 재생하여 오디오 파이프라인을 완전히 활성화.
+    // AudioContext.resume()만으로는 부족한 경우가 있으며, 실제 오디오를
+    // 재생해야 iOS가 오디오 세션을 활성화한다.
+    if (!this._audioUnlocked && this.audioContext.state === 'running') {
+      try {
+        const silentBuffer = this.audioContext.createBuffer(1, 1, 22050);
+        const source = this.audioContext.createBufferSource();
+        source.buffer = silentBuffer;
+        source.connect(this.audioContext.destination);
+        source.start(0);
+        this._audioUnlocked = true;
+      } catch {
+        // 실패해도 무시 — 다음 gesture에서 재시도
+      }
+    }
+
+    // 글로벌 gesture 리스너 등록 — 이후 모든 터치/클릭에서 자동 resume
+    this._attachGestureListener();
+  }
+
+  /**
+   * 페이지의 모든 터치/클릭에서 AudioContext를 자동 resume하는 리스너.
+   * iOS는 백그라운드 전환 후 AudioContext를 re-suspend할 수 있으므로,
+   * 유저의 모든 인터랙션에서 resume을 시도해야 한다.
+   */
+  private _attachGestureListener(): void {
+    if (this._gestureListenerAttached) return;
+    this._gestureListenerAttached = true;
+
+    const handler = () => {
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume();
+      }
+    };
+
+    document.addEventListener('touchend', handler, { passive: true });
+    document.addEventListener('click', handler);
   }
 
   /** AudioContext 접근 (Enhanced LipSync 초기화용) */
