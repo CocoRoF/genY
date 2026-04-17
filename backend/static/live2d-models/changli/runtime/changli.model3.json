@@ -1,0 +1,42 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "changli.moc3",
+		"Textures": [
+			"changli.4096/texture_00.png",
+			"changli.4096/texture_01.png",
+			"changli.4096/texture_02.png",
+			"changli.4096/texture_03.png"
+		],
+		"Physics": "changli.physics3.json",
+		"DisplayInfo": "changli.cdi3.json",
+		"Expressions": [
+			{ "Name": "angry",       "File": "expressions/angry.exp3.json" },
+			{ "Name": "eye_roll",    "File": "expressions/eye_roll.exp3.json" },
+			{ "Name": "dark_face",   "File": "expressions/dark_face.exp3.json" },
+			{ "Name": "heart_eyes",  "File": "expressions/heart_eyes.exp3.json" },
+			{ "Name": "blindfold",   "File": "expressions/blindfold.exp3.json" },
+			{ "Name": "coat_toggle", "File": "expressions/coat_toggle.exp3.json" },
+			{ "Name": "blush",       "File": "expressions/blush.exp3.json" }
+		],
+		"Motions": {}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthOpenY"
+			]
+		}
+	],
+	"HitAreas": []
+}

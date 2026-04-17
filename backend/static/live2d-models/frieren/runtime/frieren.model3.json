@@ -1,0 +1,53 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "frieren.moc3",
+		"Textures": [
+			"frieren.4096/texture_00.png"
+		],
+		"Physics": "frieren.physics3.json",
+		"DisplayInfo": "frieren.cdi3.json",
+		"Expressions": [
+			{ "Name": "ku",       "File": "expressions/ku.exp3.json" },
+			{ "Name": "yy",       "File": "expressions/yy.exp3.json" },
+			{ "Name": "han",      "File": "expressions/han.exp3.json" },
+			{ "Name": "mmy",      "File": "expressions/mmy.exp3.json" },
+			{ "Name": "d",        "File": "expressions/d.exp3.json" },
+			{ "Name": "lks",      "File": "expressions/lks.exp3.json" },
+			{ "Name": "bl",       "File": "expressions/bl.exp3.json" },
+			{ "Name": "wh",       "File": "expressions/wh.exp3.json" },
+			{ "Name": "zx",       "File": "expressions/zx.exp3.json" },
+			{ "Name": "anya",     "File": "expressions/anya.exp3.json" },
+			{ "Name": "anya2",    "File": "expressions/anya2.exp3.json" },
+			{ "Name": "anyazZZ",  "File": "expressions/anyazZZ.exp3.json" },
+			{ "Name": "w",        "File": "expressions/w.exp3.json" },
+			{ "Name": "erd",      "File": "expressions/erd.exp3.json" }
+		],
+		"Motions": {
+			"Idle": [
+				{ "File": "motions/idle.motion3.json", "FadeInTime": 0.5, "FadeOutTime": 0.5 }
+			],
+			"": [
+				{ "File": "motions/zs1.motion3.json", "FadeInTime": 0.5, "FadeOutTime": 0.5 }
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthOpenY"
+			]
+		}
+	],
+	"HitAreas": []
+}
