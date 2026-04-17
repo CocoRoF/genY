@@ -1,0 +1,48 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "ellen_joe.moc3",
+		"Textures": [
+			"ellen_joe.4096/texture_00.png",
+			"ellen_joe.4096/texture_01.png",
+			"ellen_joe.4096/texture_02.png"
+		],
+		"Physics": "ellen_joe.physics3.json",
+		"DisplayInfo": "ellen_joe.cdi3.json",
+		"Expressions": [
+			{ "Name": "black",    "File": "expressions/black.exp3.json" },
+			{ "Name": "red",      "File": "expressions/red.exp3.json" },
+			{ "Name": "shock",    "File": "expressions/shock.exp3.json" },
+			{ "Name": "shou",     "File": "expressions/shou.exp3.json" },
+			{ "Name": "shuiyin",  "File": "expressions/shuiyin.exp3.json" },
+			{ "Name": "tang",     "File": "expressions/tang.exp3.json" }
+		],
+		"Motions": {
+			"Idle": [
+				{ "File": "motions/idle.motion3.json",  "FadeInTime": 0.5, "FadeOutTime": 0.5 },
+				{ "File": "motions/idle2.motion3.json", "FadeInTime": 0.5, "FadeOutTime": 0.5 }
+			]
+		}
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": [
+				"Param13",
+				"Param14",
+				"ParamEyeLOpen",
+				"ParamEyeROpen"
+			]
+		},
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": [
+				"ParamMouthForm",
+				"ParamMouthOpenY"
+			]
+		}
+	],
+	"HitAreas": []
+}
