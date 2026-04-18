@@ -16,6 +16,12 @@ import {
 } from '@/lib/live2d';
 import type { Live2DEnhancedConfig, BeatSyncController } from '@/lib/live2d';
 
+// Pan/zoom bounds — keeps the model usable but prevents accidental infinite zoom.
+const MIN_USER_ZOOM = 0.3;
+const MAX_USER_ZOOM = 4;
+const WHEEL_ZOOM_SPEED = 0.0015;   // Logarithmic factor per wheel-deltaY unit.
+const DRAG_CLICK_THRESHOLD_PX = 4; // Below this movement, still counts as a click.
+
 /**
  * Live2DCanvas — Enhanced Live2D Cubism 4 renderer
  *
@@ -66,6 +72,25 @@ export default function Live2DCanvas({
     ...DEFAULT_ENHANCED_CONFIG,
     ...configOverrides,
   });
+
+  // ── Pan / zoom state (user-controlled view manipulation) ──
+  // baseScaleRef holds the fit-to-canvas scale; userZoomRef is the multiplier on top.
+  // userPanRef is an additive pixel offset from the resting (initialXshift/Yshift) center.
+  // dragRef tracks an in-flight pointer drag — `moved` is read by onClick to suppress
+  // tap interactions when the pointer was actually dragging the view.
+  const baseScaleRef = useRef(1);
+  const userZoomRef = useRef(1);
+  const userPanRef = useRef({ x: 0, y: 0 });
+  const dragRef = useRef({
+    active: false,
+    moved: false,
+    pointerId: -1,
+    startClientX: 0,
+    startClientY: 0,
+    startPanX: 0,
+    startPanY: 0,
+  });
+  const applyTransformRef = useRef<() => void>(() => {});
 
   // Update config when overrides change
   useEffect(() => {
@@ -170,16 +195,28 @@ export default function Live2DCanvas({
       }
       modelRef.current = live2dModel;
 
-      // ── Scale model to fit canvas ──
+      // ── Compute fit-to-canvas base scale and set anchor ──
       const scaleX = app.screen.width / live2dModel.width;
       const scaleY = app.screen.height / live2dModel.height;
-      const scale = Math.min(scaleX, scaleY) * (model.kScale || 0.85);
-      live2dModel.scale.set(scale);
-
-      // ── Center model with anchor for eye-tracking ──
+      baseScaleRef.current = Math.min(scaleX, scaleY) * (model.kScale || 0.85);
       live2dModel.anchor.set(0.5, 0.5);
-      live2dModel.x = app.screen.width / 2 + (model.initialXshift || 0);
-      live2dModel.y = app.screen.height / 2 + (model.initialYshift || 0);
+
+      // ── Reset user-controlled zoom/pan on model swap ──
+      userZoomRef.current = 1;
+      userPanRef.current = { x: 0, y: 0 };
+      dragRef.current.active = false;
+      dragRef.current.moved = false;
+
+      // ── Shared transform applier (used by load, resize, wheel, drag) ──
+      applyTransformRef.current = () => {
+        const a = pixiAppRef.current;
+        const m = modelRef.current;
+        if (!a || !m) return;
+        m.scale.set(baseScaleRef.current * userZoomRef.current);
+        m.x = a.screen.width / 2 + (model.initialXshift || 0) + userPanRef.current.x;
+        m.y = a.screen.height / 2 + (model.initialYshift || 0) + userPanRef.current.y;
+      };
+      applyTransformRef.current();
 
       app.stage.addChild(live2dModel);
 
@@ -323,6 +360,11 @@ export default function Live2DCanvas({
       expressionControllerRef.current = null;
       beatSyncRef.current = null;
       hiddenPartIndicesRef.current = [];
+      applyTransformRef.current = () => {};
+      userZoomRef.current = 1;
+      userPanRef.current = { x: 0, y: 0 };
+      dragRef.current.active = false;
+      dragRef.current.moved = false;
 
       // Remove model from stage FIRST, then destroy model, then app.
       if (modelRef.current) {
@@ -373,6 +415,13 @@ export default function Live2DCanvas({
     (e: React.MouseEvent<HTMLDivElement>) => {
       if (!interactive || !modelRef.current || !containerRef.current) return;
 
+      // Suppress tap if the pointer was dragging the view — the click fires after
+      // pointerup regardless, so we gate it on the drag state we just tracked.
+      if (dragRef.current.moved) {
+        dragRef.current.moved = false;
+        return;
+      }
+
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = (e.clientY - rect.top) / rect.height;
@@ -399,12 +448,12 @@ export default function Live2DCanvas({
         pixiAppRef.current.renderer.resize(width, height);
         if (modelRef.current) {
           const m = modelRef.current;
-          const scaleX = width / (m.width / m.scale.x);
-          const scaleY = height / (m.height / m.scale.y);
-          const scale = Math.min(scaleX, scaleY) * (model?.kScale || 0.85);
-          m.scale.set(scale);
-          m.x = width / 2 + (model?.initialXshift || 0);
-          m.y = height / 2 + (model?.initialYshift || 0);
+          // Recompute fit-to-canvas base scale from natural dimensions (undo current scale).
+          const naturalW = m.width / (m.scale.x || 1);
+          const naturalH = m.height / (m.scale.y || 1);
+          baseScaleRef.current =
+            Math.min(width / naturalW, height / naturalH) * (model?.kScale || 0.85);
+          applyTransformRef.current();
         }
       }
     });
@@ -420,6 +469,9 @@ export default function Live2DCanvas({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!modelRef.current) return;
+      // Don't snap the eye-focus target while the user is dragging the view —
+      // it looks jittery and the focus target isn't where they're looking anyway.
+      if (dragRef.current.active) return;
       const rect = container.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = (e.clientY - rect.top) / rect.height;
@@ -433,12 +485,132 @@ export default function Live2DCanvas({
     return () => container.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
+  // ── Pan / zoom interactions ───────────────────────────────
+  // Wheel zooms around the cursor (common VTuber-viewer UX); left-button drag
+  // pans. Touch / trackpad pinch is deferred — scope can expand if requested.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (!interactive) return;
+
+    // Map a clientX/Y pair to Pixi screen coordinates. The canvas display size
+    // may differ from app.screen (resolution / DPR), so scale by the ratio.
+    const toScreenCoords = (clientX: number, clientY: number) => {
+      const rect = container.getBoundingClientRect();
+      const app = pixiAppRef.current;
+      if (!app || rect.width === 0 || rect.height === 0) return { x: 0, y: 0 };
+      const sx = app.screen.width / rect.width;
+      const sy = app.screen.height / rect.height;
+      return {
+        x: (clientX - rect.left) * sx,
+        y: (clientY - rect.top) * sy,
+      };
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (!modelRef.current || !pixiAppRef.current) return;
+      e.preventDefault();
+
+      const app = pixiAppRef.current;
+      const oldZoom = userZoomRef.current;
+      // Exponential factor keeps zoom feel consistent across input devices.
+      const newZoom = Math.max(
+        MIN_USER_ZOOM,
+        Math.min(MAX_USER_ZOOM, oldZoom * Math.exp(-e.deltaY * WHEEL_ZOOM_SPEED)),
+      );
+      if (newZoom === oldZoom) return;
+
+      // Zoom around cursor: keep the world point under the cursor stationary.
+      // Derivation (anchor=(0.5, 0.5), pan on top of initial shift):
+      //   newPan = oldPan * ratio + (cursor - baseline) * (1 - ratio)
+      const ratio = newZoom / oldZoom;
+      const cursor = toScreenCoords(e.clientX, e.clientY);
+      const baselineX = app.screen.width / 2 + (model?.initialXshift || 0);
+      const baselineY = app.screen.height / 2 + (model?.initialYshift || 0);
+      userPanRef.current = {
+        x: userPanRef.current.x * ratio + (cursor.x - baselineX) * (1 - ratio),
+        y: userPanRef.current.y * ratio + (cursor.y - baselineY) * (1 - ratio),
+      };
+      userZoomRef.current = newZoom;
+      applyTransformRef.current();
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return; // Left button only — right-click reserved for browser menu.
+      if (!modelRef.current) return;
+      dragRef.current = {
+        active: true,
+        moved: false,
+        pointerId: e.pointerId,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        startPanX: userPanRef.current.x,
+        startPanY: userPanRef.current.y,
+      };
+      try { container.setPointerCapture(e.pointerId); } catch { /* capture optional */ }
+      container.style.cursor = 'grabbing';
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+
+      const dx = e.clientX - d.startClientX;
+      const dy = e.clientY - d.startClientY;
+      if (!d.moved && Math.hypot(dx, dy) > DRAG_CLICK_THRESHOLD_PX) {
+        d.moved = true;
+      }
+      if (!d.moved) return;
+
+      const app = pixiAppRef.current;
+      const rect = container.getBoundingClientRect();
+      if (!app || rect.width === 0 || rect.height === 0) return;
+      // Convert client-pixel delta to Pixi-screen-pixel delta.
+      const sx = app.screen.width / rect.width;
+      const sy = app.screen.height / rect.height;
+      userPanRef.current = {
+        x: d.startPanX + dx * sx,
+        y: d.startPanY + dy * sy,
+      };
+      applyTransformRef.current();
+    };
+
+    const endDrag = (e: PointerEvent) => {
+      const d = dragRef.current;
+      if (!d.active || e.pointerId !== d.pointerId) return;
+      try { container.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+      d.active = false;
+      // Keep `d.moved` set — handleClick (onClick) will read and consume it.
+      container.style.cursor = interactive ? 'grab' : 'default';
+    };
+
+    // pointer capture (above, in pointerdown) routes pointermove/up back to this
+    // element even when the pointer leaves it, so we don't need pointerleave.
+    container.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointermove', onPointerMove);
+    container.addEventListener('pointerup', endDrag);
+    container.addEventListener('pointercancel', endDrag);
+
+    return () => {
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerup', endDrag);
+      container.removeEventListener('pointercancel', endDrag);
+    };
+  }, [interactive, model?.initialXshift, model?.initialYshift]);
+
   return (
     <div
       ref={containerRef}
       className={`w-full h-full overflow-hidden ${className}`}
       onClick={handleClick}
-      style={{ cursor: interactive ? 'pointer' : 'default', position: 'relative' }}
+      style={{
+        cursor: interactive ? 'grab' : 'default',
+        position: 'relative',
+        touchAction: 'none', // Prevent browser pan/zoom from eating pointer gestures.
+      }}
     />
   );
 }
