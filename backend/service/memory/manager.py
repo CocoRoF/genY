@@ -210,7 +210,14 @@ class SessionMemoryManager:
             content: Message content.
             **metadata: Extra metadata fields.
         """
-        self._stm.add_message(role, content, metadata=metadata if metadata else None)
+        meta = metadata if metadata else None
+        try:
+            from service.memory_provider.adapters.stm_adapter import try_record_message
+            if try_record_message(self._session_id, role, content, meta):
+                return
+        except Exception as exc:
+            logger.warning(f"STM provider adapter failed, using legacy path: {exc}")
+        self._stm.add_message(role, content, metadata=meta)
 
     def record_event(self, event: str, data: Optional[Dict[str, Any]] = None) -> None:
         """Record a non-message event (tool call, state change, etc.)."""
