@@ -262,17 +262,33 @@ async def lifespan(app: FastAPI):
     agent_manager.start_idle_monitor()
     logger.info("   - Session idle monitor: started (10min threshold)")
 
-    # ── MemoryProvider Registry (Phase 2: additive, default-off) ───────
-    # Registry sits next to the legacy SessionMemoryManager. With no
-    # default config it stays dormant (provision() returns None) — the
-    # new /api/sessions/{id}/memory endpoints will 404 until a future
-    # PR wires MEMORY_* env vars in. agent_manager gets a handle via
-    # set_memory_registry() so Phase 4 can attach providers to Stage 2.
-    from service.memory_provider import MemorySessionRegistry
-    memory_registry = MemorySessionRegistry(default_config=None)
+    # ── MemoryProvider Registry (Phase 2) ──────────────────────────────
+    # Registry sits next to the legacy SessionMemoryManager. Its default
+    # config is resolved from MEMORY_* env vars; if MEMORY_PROVIDER is
+    # unset / "disabled", the registry stays dormant and the new
+    # /api/sessions/{id}/memory endpoints return 404. agent_manager gets
+    # a handle via set_memory_registry() so Phase 4 can attach providers
+    # to Stage 2.
+    from service.memory_provider import (
+        MemoryConfigError,
+        MemorySessionRegistry,
+        build_default_memory_config,
+    )
+    try:
+        default_memory_config = build_default_memory_config()
+    except MemoryConfigError as exc:
+        logger.error(f"   - MemorySessionRegistry: config error: {exc}")
+        raise
+    memory_registry = MemorySessionRegistry(default_config=default_memory_config)
     app.state.memory_registry = memory_registry
     agent_manager.set_memory_registry(memory_registry)
-    logger.info("   - MemorySessionRegistry: initialized (dormant until MEMORY_* env lands)")
+    if default_memory_config:
+        logger.info(
+            f"   - MemorySessionRegistry: default provider='{default_memory_config['provider']}' "
+            f"scope='{default_memory_config.get('scope', 'session')}'"
+        )
+    else:
+        logger.info("   - MemorySessionRegistry: dormant (MEMORY_PROVIDER=disabled or unset)")
 
     # ── VTuber Service: Live2D model management + avatar state ─────────
     print_step_banner("VTUBER", "VTUBER SERVICE", "Initializing Live2D model management...")

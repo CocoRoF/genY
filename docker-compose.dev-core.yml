@@ -68,6 +68,13 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-geny123}
       - AUTO_MIGRATION=true
       - TIMEZONE=${TIMEZONE:-Asia/Seoul}
+      # MemoryProvider (Phase 2) — unset / "disabled" keeps registry dormant.
+      - MEMORY_PROVIDER=${MEMORY_PROVIDER:-}
+      - MEMORY_DSN=${MEMORY_DSN:-}
+      - MEMORY_DIALECT=${MEMORY_DIALECT:-}
+      - MEMORY_ROOT=${MEMORY_ROOT:-}
+      - MEMORY_SCOPE=${MEMORY_SCOPE:-session}
+      - MEMORY_TIMEZONE=${MEMORY_TIMEZONE:-}
     volumes:
       # ── Bind mount: 로컬 소스 ↔ 컨테이너 동기화 ──────────────────
       - ./backend:/app

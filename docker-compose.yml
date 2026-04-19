@@ -74,6 +74,14 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-geny123}
       - AUTO_MIGRATION=true
       - TIMEZONE=${TIMEZONE:-Asia/Seoul}
+      # MemoryProvider (Phase 2) — unset / "disabled" keeps registry dormant.
+      # Supported values: ephemeral | file | sql. See docs/memory-provider.md
+      - MEMORY_PROVIDER=${MEMORY_PROVIDER:-}
+      - MEMORY_DSN=${MEMORY_DSN:-}
+      - MEMORY_DIALECT=${MEMORY_DIALECT:-}
+      - MEMORY_ROOT=${MEMORY_ROOT:-}
+      - MEMORY_SCOPE=${MEMORY_SCOPE:-session}
+      - MEMORY_TIMEZONE=${MEMORY_TIMEZONE:-}
     volumes:
       - geny-tts-cache:/app/cache/tts
       - geny-voices:/app/static/voices

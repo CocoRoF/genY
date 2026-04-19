@@ -10,6 +10,7 @@ Stage-2 attach, env plumbing, and legacy-layer cutover arrive in later
 phases (see ``plan/03_memory_migration.md``).
 """
 
+from service.memory_provider.config import build_default_memory_config
 from service.memory_provider.exceptions import (
     MemoryConfigError,
     MemorySessionNotFoundError,
@@ -20,4 +21,5 @@ __all__ = [
     "MemoryConfigError",
     "MemorySessionNotFoundError",
     "MemorySessionRegistry",
+    "build_default_memory_config",
 ]
