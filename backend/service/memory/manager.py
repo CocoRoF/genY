@@ -232,14 +232,32 @@ class SessionMemoryManager:
             text: The knowledge to persist.
             heading: Optional markdown heading.
         """
+        try:
+            from service.memory_provider.adapters.ltm_adapter import try_append
+            if try_append(self._session_id, text, heading=heading):
+                return
+        except Exception as exc:
+            logger.warning(f"LTM provider adapter failed, using legacy path: {exc}")
         self._ltm.append(text, heading=heading)
 
     def remember_dated(self, text: str) -> None:
         """Write knowledge to a dated long-term memory file."""
+        try:
+            from service.memory_provider.adapters.ltm_adapter import try_write_dated
+            if try_write_dated(self._session_id, text):
+                return
+        except Exception as exc:
+            logger.warning(f"LTM provider adapter failed, using legacy path: {exc}")
         self._ltm.write_dated(text)
 
     def remember_topic(self, topic: str, text: str) -> None:
         """Write knowledge to a topic-specific long-term memory file."""
+        try:
+            from service.memory_provider.adapters.ltm_adapter import try_write_topic
+            if try_write_topic(self._session_id, topic, text):
+                return
+        except Exception as exc:
+            logger.warning(f"LTM provider adapter failed, using legacy path: {exc}")
         self._ltm.write_topic(topic, text)
 
     # ------------------------------------------------------------------
