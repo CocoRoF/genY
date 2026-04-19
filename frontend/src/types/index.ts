@@ -43,6 +43,11 @@ export interface CreateAgentRequest {
   cli_workflow_id?: string;
   cli_graph_name?: string;
   cli_tool_preset_id?: string;
+  // Phase 6 — adopt EnvironmentManifest pipeline at session creation,
+  // and override the per-session MemoryProvider config. Backend treats
+  // both as optional; legacy preset path runs when env_id is absent.
+  env_id?: string;
+  memory_config?: Record<string, unknown>;
 }
 
 export interface ExecuteRequest {
