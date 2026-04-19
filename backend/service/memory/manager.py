@@ -279,6 +279,17 @@ class SessionMemoryManager:
 
         Returns the filename of the created note, or None on failure.
         """
+        try:
+            from service.memory_provider.adapters.notes_adapter import try_write_note
+            result = try_write_note(
+                self._session_id, title, content,
+                category=category, tags=tags, importance=importance,
+                source=source, links_to=links_to,
+            )
+            if result is not None:
+                return result
+        except Exception as exc:
+            logger.warning(f"Notes provider adapter failed, using legacy path: {exc}")
         if self._structured_writer is None:
             # Fallback to legacy write
             self._ltm.write_topic(title, content)
@@ -305,6 +316,16 @@ class SessionMemoryManager:
 
         Returns True if updated successfully.
         """
+        try:
+            from service.memory_provider.adapters.notes_adapter import try_update_note
+            result = try_update_note(
+                self._session_id, filename,
+                body=body, tags=tags, importance=importance,
+            )
+            if result is not None:
+                return result
+        except Exception as exc:
+            logger.warning(f"Notes provider adapter failed, using legacy path: {exc}")
         if self._structured_writer is None:
             return False
         return self._structured_writer.update_note(
@@ -316,6 +337,13 @@ class SessionMemoryManager:
 
         Returns True if deleted successfully.
         """
+        try:
+            from service.memory_provider.adapters.notes_adapter import try_delete_note
+            result = try_delete_note(self._session_id, filename)
+            if result is not None:
+                return result
+        except Exception as exc:
+            logger.warning(f"Notes provider adapter failed, using legacy path: {exc}")
         if self._structured_writer is None:
             return False
         return self._structured_writer.delete_note(filename)
@@ -349,6 +377,13 @@ class SessionMemoryManager:
 
         Returns True if link was created successfully.
         """
+        try:
+            from service.memory_provider.adapters.notes_adapter import try_link_notes
+            result = try_link_notes(self._session_id, source_filename, target_filename)
+            if result is not None:
+                return result
+        except Exception as exc:
+            logger.warning(f"Notes provider adapter failed, using legacy path: {exc}")
         if self._structured_writer is None:
             return False
         return self._structured_writer.link_notes(source_filename, target_filename)
