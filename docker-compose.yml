@@ -84,6 +84,9 @@ services:
       - MEMORY_TIMEZONE=${MEMORY_TIMEZONE:-}
       # Phase 4 attach flag (false keeps legacy SessionMemoryManager authoritative).
       - MEMORY_PROVIDER_ATTACH=${MEMORY_PROVIDER_ATTACH:-false}
+      # Phase 7 API routing flag — when true, /api/agents/{id}/memory/*
+      # endpoints prefer the per-session MemoryProvider over legacy.
+      - MEMORY_API_PROVIDER=${MEMORY_API_PROVIDER:-false}
       # Phase 5 per-layer legacy/provider routing — flip to `false` per layer
       # as its Phase 5 PR (stm/ltm/notes/vector/curated) lands and is verified.
       - MEMORY_LEGACY_STM=${MEMORY_LEGACY_STM:-true}

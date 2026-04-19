@@ -5,15 +5,26 @@ Provides endpoints for browsing, searching, creating, updating, and
 deleting structured memory notes within an agent session.
 
 All endpoints are scoped to a session via ``/api/agents/{session_id}/memory``.
+
+Phase 7 (option B — paths stay, internals swap) is in progress: each
+endpoint can route through the per-session :class:`MemoryProvider` when
+``MEMORY_API_PROVIDER`` is enabled and the session has a provider
+attached. Today the routing is **observation-only** — the controller
+logs which backend would have served the request but always uses the
+legacy path. Once the provider read surface is finalized, the body-swap
+PR replaces the legacy calls without touching URL shapes or response
+models.
 """
 import json
 from logging import getLogger
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Path, Query
+from fastapi import APIRouter, HTTPException, Path, Query, Request
+
 from pydantic import BaseModel, Field
 
 from service.langgraph import get_agent_session_manager
+from service.memory_provider.config import is_api_provider_enabled
 
 logger = getLogger(__name__)
 
@@ -69,13 +80,50 @@ def _get_memory_manager(session_id: str):
     return mm
 
 
+def _get_memory_provider(request: Request, session_id: str):
+    """Return the per-session ``MemoryProvider`` if attached, else ``None``.
+
+    Used by the Phase 7 routing scaffold: each endpoint can call this
+    to discover whether a provider is available without taking a hard
+    dependency on the registry. ``None`` short-circuits the legacy
+    fallback. Never raises — observation-only.
+    """
+    registry = getattr(request.app.state, "memory_registry", None)
+    if registry is None:
+        return None
+    try:
+        return registry.get(session_id)
+    except Exception:
+        return None
+
+
+def _route_log(session_id: str, endpoint: str, request: Request) -> None:
+    """Phase 7 observation hook — log which backend will serve the request.
+
+    Behavior is unchanged. Once the body-swap PR lands and
+    ``MEMORY_API_PROVIDER=true``, this flips from "would route" to
+    actual routing. Today it just records the decision so operators can
+    verify provider attachment in production logs before flipping the
+    flag.
+    """
+    if not is_api_provider_enabled():
+        return
+    provider = _get_memory_provider(request, session_id)
+    backend = "provider" if provider is not None else "legacy (provider not attached)"
+    logger.info(
+        "memory.%s session=%s would-route=%s (Phase 7 scaffold — legacy still serves)",
+        endpoint, session_id, backend,
+    )
+
+
 # ============================================================================
 # Endpoints — Index & Stats
 # ============================================================================
 
 @router.get("/{session_id}/memory")
-async def get_memory_index(session_id: str = Path(...)):
+async def get_memory_index(request: Request, session_id: str = Path(...)):
     """Get the full memory index (file list, tags, stats)."""
+    _route_log(session_id, "get_memory_index", request)
     mm = _get_memory_manager(session_id)
     index = mm.get_memory_index()
     stats = mm.get_stats()
@@ -86,23 +134,26 @@ async def get_memory_index(session_id: str = Path(...)):
 
 
 @router.get("/{session_id}/memory/stats")
-async def get_memory_stats(session_id: str = Path(...)):
+async def get_memory_stats(request: Request, session_id: str = Path(...)):
     """Get memory statistics."""
+    _route_log(session_id, "get_memory_stats", request)
     mm = _get_memory_manager(session_id)
     stats = mm.get_stats()
     return stats.to_dict()
 
 
 @router.get("/{session_id}/memory/tags")
-async def get_memory_tags(session_id: str = Path(...)):
+async def get_memory_tags(request: Request, session_id: str = Path(...)):
     """Get all tags and their counts."""
+    _route_log(session_id, "get_memory_tags", request)
     mm = _get_memory_manager(session_id)
     return {"tags": mm.get_memory_tags()}
 
 
 @router.get("/{session_id}/memory/graph")
-async def get_memory_graph(session_id: str = Path(...)):
+async def get_memory_graph(request: Request, session_id: str = Path(...)):
     """Get link graph data for visualization."""
+    _route_log(session_id, "get_memory_graph", request)
     mm = _get_memory_manager(session_id)
     return mm.get_memory_graph()
 
@@ -113,11 +164,13 @@ async def get_memory_graph(session_id: str = Path(...)):
 
 @router.get("/{session_id}/memory/files")
 async def list_memory_files(
+    request: Request,
     session_id: str = Path(...),
     category: Optional[str] = Query(None),
     tag: Optional[str] = Query(None),
 ):
     """List memory files with optional filters."""
+    _route_log(session_id, "list_memory_files", request)
     mm = _get_memory_manager(session_id)
     notes = mm.list_notes(category=category, tag=tag)
     return {"files": notes, "total": len(notes)}
@@ -125,10 +178,12 @@ async def list_memory_files(
 
 @router.get("/{session_id}/memory/files/{filename:path}")
 async def read_memory_file(
+    request: Request,
     session_id: str = Path(...),
     filename: str = Path(...),
 ):
     """Read a single memory file with metadata and body."""
+    _route_log(session_id, "read_memory_file", request)
     mm = _get_memory_manager(session_id)
     result = mm.read_note(filename)
     if result is None:
@@ -138,10 +193,12 @@ async def read_memory_file(
 
 @router.post("/{session_id}/memory/files")
 async def create_memory_file(
+    request: Request,
     session_id: str = Path(...),
     req: WriteNoteRequest = ...,
 ):
     """Create a new structured memory note."""
+    _route_log(session_id, "create_memory_file", request)
     mm = _get_memory_manager(session_id)
     filename = mm.write_note(
         title=req.title,
@@ -159,11 +216,13 @@ async def create_memory_file(
 
 @router.put("/{session_id}/memory/files/{filename:path}")
 async def update_memory_file(
+    request: Request,
     session_id: str = Path(...),
     filename: str = Path(...),
     req: UpdateNoteRequest = ...,
 ):
     """Update an existing memory note."""
+    _route_log(session_id, "update_memory_file", request)
     mm = _get_memory_manager(session_id)
     ok = mm.update_note(
         filename,
@@ -178,10 +237,12 @@ async def update_memory_file(
 
 @router.delete("/{session_id}/memory/files/{filename:path}")
 async def delete_memory_file(
+    request: Request,
     session_id: str = Path(...),
     filename: str = Path(...),
 ):
     """Delete a memory note."""
+    _route_log(session_id, "delete_memory_file", request)
     mm = _get_memory_manager(session_id)
     ok = mm.delete_note(filename)
     if not ok:
@@ -195,6 +256,7 @@ async def delete_memory_file(
 
 @router.get("/{session_id}/memory/search")
 async def search_memory(
+    request: Request,
     session_id: str = Path(...),
     q: str = Query(..., min_length=1),
     max_results: int = Query(10, ge=1, le=50),
@@ -202,6 +264,7 @@ async def search_memory(
     tag: Optional[str] = Query(None),
 ):
     """Search memory with keyword matching."""
+    _route_log(session_id, "search_memory", request)
     mm = _get_memory_manager(session_id)
     results = mm.search(q, max_results=max_results)
 
@@ -215,10 +278,12 @@ async def search_memory(
 
 @router.post("/{session_id}/memory/search")
 async def search_memory_post(
+    request: Request,
     session_id: str = Path(...),
     req: SearchRequest = ...,
 ):
     """Search memory (POST variant for complex queries)."""
+    _route_log(session_id, "search_memory_post", request)
     mm = _get_memory_manager(session_id)
     results = mm.search(req.query, max_results=req.max_results)
     return {
@@ -234,10 +299,12 @@ async def search_memory_post(
 
 @router.post("/{session_id}/memory/links")
 async def create_memory_link(
+    request: Request,
     session_id: str = Path(...),
     req: LinkNotesRequest = ...,
 ):
     """Create a wikilink between two notes."""
+    _route_log(session_id, "create_memory_link", request)
     mm = _get_memory_manager(session_id)
     ok = mm.link_notes(req.source_filename, req.target_filename)
     if not ok:
@@ -250,8 +317,9 @@ async def create_memory_link(
 # ============================================================================
 
 @router.post("/{session_id}/memory/reindex")
-async def reindex_memory(session_id: str = Path(...)):
+async def reindex_memory(request: Request, session_id: str = Path(...)):
     """Force a full rebuild of the memory index."""
+    _route_log(session_id, "reindex_memory", request)
     mm = _get_memory_manager(session_id)
     count = mm.reindex_memory()
     return {"message": "Reindex complete", "total_files": count}
