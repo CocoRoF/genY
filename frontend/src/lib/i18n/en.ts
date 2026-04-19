@@ -72,6 +72,7 @@ const en = {
     workflows: 'Workflows',
     tools: 'Tools',
     toolSets: 'Tool Sets',
+    environments: 'Environments',
     settings: 'Settings',
     info: 'Info',
     graph: 'Graph',
@@ -471,6 +472,17 @@ const en = {
     allSelected: 'All Selected',
     noToolsFound: 'No tools found',
     newPresetTitle: 'New Tool Set',
+  },
+
+  // ─── Environments Tab ───
+  environmentsTab: {
+    title: 'Environments',
+    subtitle: 'v2 EnvironmentManifests — reusable pipeline + stage + tool configurations that can be attached to agent sessions. Build, snapshot, and share pipelines across sessions.',
+    loading: 'Loading environments…',
+    empty: 'No environments yet',
+    emptyHint: 'Environments capture a full v2 pipeline, per-stage artifact wiring, and tools snapshot. Create one from a session snapshot or an existing preset once the create flow lands in a follow-up PR.',
+    noDescription: 'No description',
+    updated: 'Updated {date}',
   },
 
   // ─── Graph Workflows Tab ───

@@ -72,6 +72,7 @@ const ko: Translations = {
     workflows: '워크플로우',
     tools: '도구',
     toolSets: '도구 세트',
+    environments: '환경',
     settings: '설정',
     info: '정보',
     graph: '그래프',
@@ -471,6 +472,17 @@ const ko: Translations = {
     allSelected: '전체 선택됨',
     noToolsFound: '도구를 찾을 수 없습니다',
     newPresetTitle: '새 도구 세트',
+  },
+
+  // ─── Environments Tab ───
+  environmentsTab: {
+    title: '환경',
+    subtitle: 'v2 EnvironmentManifest — 에이전트 세션에 붙일 수 있는 재사용 가능한 파이프라인 + 스테이지 + 도구 구성. 세션 간에 파이프라인을 빌드·스냅샷·공유합니다.',
+    loading: '환경 불러오는 중…',
+    empty: '아직 환경이 없습니다',
+    emptyHint: '환경은 v2 파이프라인 전체와 스테이지별 아티팩트 배선, 도구 스냅샷을 담습니다. 세션 스냅샷 또는 프리셋으로부터 생성하는 기능은 후속 PR 에서 제공됩니다.',
+    noDescription: '설명 없음',
+    updated: '업데이트 {date}',
   },
 
   // ─── Graph Workflows Tab ───
