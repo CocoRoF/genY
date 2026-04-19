@@ -87,3 +87,18 @@ def is_attach_enabled() -> bool:
     ``true``, ``yes``, ``on`` (case-insensitive).
     """
     return _env("MEMORY_PROVIDER_ATTACH").lower() in ("1", "true", "yes", "on")
+
+
+def is_api_provider_enabled() -> bool:
+    """Return True when ``/api/agents/{id}/memory/*`` endpoints should
+    prefer the per-session ``MemoryProvider`` over the legacy
+    ``SessionMemoryManager`` path.
+
+    Controlled by ``MEMORY_API_PROVIDER`` (default ``false``). Phase 7
+    of the integration plan keeps the legacy URL paths (option B —
+    "paths stay, internals swap") and gates the swap behind this flag.
+    Until set, the controller logs which backend would have served the
+    request but always uses the legacy path; flipping the flag enables
+    provider-first routing once the body-swap PRs land.
+    """
+    return _env("MEMORY_API_PROVIDER").lower() in ("1", "true", "yes", "on")
