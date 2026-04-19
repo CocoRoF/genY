@@ -495,12 +495,13 @@ class AgentSessionManager(SessionManager):
         # Register in local store
         self._local_agents[session_id] = agent
 
-        # ── Provision MemoryProvider (Phase 3 wire — attach waits for Phase 4) ──
+        # ── Provision + optionally attach MemoryProvider (Phase 4) ───────────
         # If a memory_config override is supplied, or a process-wide default
         # exists (MEMORY_PROVIDER=ephemeral/file/sql), spin up a provider now.
-        # The provider is registered under session_id so REST clients can hit
-        # /api/sessions/{id}/memory immediately. Actual attachment to Stage 2
-        # happens in Phase 4 via registry.attach_to_pipeline().
+        # When MEMORY_PROVIDER_ATTACH=true is set, the provider is also
+        # wired into Pipeline Stage 2 (ContextStage.provider). Default is
+        # off so the legacy SessionMemoryManager keeps ownership until each
+        # layer is migrated (Phase 5a-5e).
         if self._memory_registry is not None:
             try:
                 provider = self._memory_registry.provision(
@@ -511,6 +512,19 @@ class AgentSessionManager(SessionManager):
                         f"[{session_id}] MemoryProvider provisioned "
                         f"(capabilities={[c.name for c in provider.descriptor.capabilities]})"
                     )
+                    from service.memory_provider.config import is_attach_enabled
+                    if is_attach_enabled() and agent._pipeline is not None:
+                        try:
+                            self._memory_registry.attach_to_pipeline(
+                                agent._pipeline, provider
+                            )
+                            logger.info(
+                                f"[{session_id}] MemoryProvider attached to Stage 2"
+                            )
+                        except Exception as attach_exc:
+                            logger.warning(
+                                f"[{session_id}] MemoryProvider attach failed: {attach_exc}"
+                            )
             except Exception as e:
                 logger.warning(f"[{session_id}] MemoryProvider provisioning skipped: {e}")
 

@@ -76,3 +76,14 @@ def build_default_memory_config() -> Optional[Dict[str, Any]]:
         cfg["timezone"] = tz
 
     return cfg
+
+
+def is_attach_enabled() -> bool:
+    """Return True when providers should be attached to pipeline Stage 2.
+
+    Controlled by ``MEMORY_PROVIDER_ATTACH`` (default ``false``). Kept
+    false until operators opt in so the legacy SessionMemoryManager path
+    remains authoritative. Accepts the usual truthy strings: ``1``,
+    ``true``, ``yes``, ``on`` (case-insensitive).
+    """
+    return _env("MEMORY_PROVIDER_ATTACH").lower() in ("1", "true", "yes", "on")
